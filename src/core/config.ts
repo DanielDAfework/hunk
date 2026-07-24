@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import { join } from "node:path";
-import { BUNDLED_SHIKI_THEME_IDS } from "../ui/lib/shikiThemes";
-import { normalizeBuiltInThemeId } from "../ui/themes";
+import { BUNDLED_SHIKI_THEME_IDS, resolveBundledShikiThemeId } from "../ui/lib/shikiThemes";
 import { resolveGlobalConfigPath } from "./paths";
 import { detectVcs, findVcsRepoRootCandidate, getDefaultVcsAdapter, isVcsId } from "./vcs";
 import type {
@@ -136,7 +135,7 @@ function normalizeCustomThemeBase(value: unknown) {
     );
   }
 
-  const resolvedThemeId = normalizeBuiltInThemeId(value);
+  const resolvedThemeId = resolveBundledShikiThemeId(value);
   if (!resolvedThemeId) {
     throw new Error(
       `Expected custom_theme.base to be a built-in theme id. Known themes: ${BUILT_IN_THEME_IDS.join(", ")}.`,
