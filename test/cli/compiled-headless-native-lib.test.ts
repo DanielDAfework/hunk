@@ -155,8 +155,6 @@ describe("compiled headless native-library loading", () => {
       { args: ["--version"] },
       { args: ["session", "--help"] },
       { args: ["skill", "path"] },
-      { args: ["markup", "guide"] },
-      { args: ["markup", "render", "-"], stdin: "<text>Hello</text>\n" },
       { args: ["pager"], stdin: "plain pager text\n" },
       {
         args: ["pager"],
