@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.17.5
+
+### Patch Changes
+
+- 034ec93: Avoid loading OpenTUI's embedded native library for headless commands. Help, version, session polling, daemon serving, markup rendering, and non-interactive pager paths now stay behind a lightweight CLI entrypoint, preventing Bun from leaking a native temp file for commands that never open the review UI.
+- aa123df: Optimize terminal cell width measurement so diffs with CJK, emoji, and chrome-glyph runs render faster: single-scalar clusters now measure through a fast zero-width check plus the East Asian Width table instead of string-width's expensive emoji regexes, while multi-scalar clusters still defer to string-width for identical results.
+
 ## 0.17.4
 
 ### Patch Changes
