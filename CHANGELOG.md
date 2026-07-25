@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.17.6
+
+### Patch Changes
+
+- 736b1d7: Republish the 0.17.5 application changes as 0.17.6 so the GitHub release includes downloadable binaries for every supported platform. Application behavior is unchanged from 0.17.5.
+
 ## 0.17.5
 
 ### Patch Changes
