@@ -12,37 +12,76 @@ import type { SessionDaemonAction } from "../session/protocol";
 /** One agent-facing CLI option on a `hunk session` command. */
 export interface AgentCommandOption {
   /** Commander flag definition, e.g. `--repo <path>`. */
-  flag: string;
+  readonly flag: string;
   /** Description shared by `--help` output and generated docs. */
-  description: string;
+  readonly description: string;
   /** Parse the option value as a 1-based positive integer. */
-  parse?: "positiveInt";
+  readonly parse?: "positiveInt";
   /** Register with Commander as a required option. */
-  required?: boolean;
+  readonly required?: boolean;
 }
 
 /** One positional argument on a `hunk session` command. */
 export interface AgentCommandPositional {
   /** Commander argument token, e.g. `[sessionId]` or `[targets...]`. */
-  token: string;
-  description?: string;
+  readonly token: string;
+  readonly description?: string;
 }
 
 /** Declarative spec for one agent-facing `hunk session` command. */
 export interface AgentCommandSpec {
   /** Commander command path without the binary name, e.g. `session comment add`. */
-  name: string;
+  readonly name: string;
   /** One-line description used by Commander help. */
-  summary: string;
-  positionals: AgentCommandPositional[];
-  options: AgentCommandOption[];
+  readonly summary: string;
+  readonly positionals: readonly AgentCommandPositional[];
+  readonly options: readonly AgentCommandOption[];
   /** Canonical usage lines shared by `hunk session --help` and the generated skill. */
-  synopsis: string[];
+  readonly synopsis: readonly string[];
   /** Copy-paste invocations appended to `--help` output and reused in the generated skill. */
-  examples?: string[];
+  readonly examples?: readonly string[];
   /** Extra literal help lines (e.g. a stdin payload shape) appended after examples. */
-  helpExtra?: string[];
+  readonly helpExtra?: readonly string[];
 }
+
+/** Kebab-case flag body converted to the camelCase key Commander stores parsed values under. */
+type CamelCase<Text extends string> = Text extends `${infer Head}-${infer Tail}`
+  ? `${Head}${Capitalize<CamelCase<Tail>>}`
+  : Text;
+
+/** Flag name without the leading dashes or value token, e.g. `--old-line <n>` -> `old-line`. */
+type FlagBody<Flag extends string> = Flag extends `--${infer Name} ${string}`
+  ? Name
+  : Flag extends `--${infer Name}`
+    ? Name
+    : never;
+
+/** The parsed value Commander produces for one option: boolean flag, string value, or number. */
+type OptionValue<Option extends AgentCommandOption> = Option["flag"] extends `${string} <${string}>`
+  ? Option extends { readonly parse: "positiveInt" }
+    ? number
+    : string
+  : boolean;
+
+/**
+ * The parsed-options shape one spec produces. Deriving this from the manifest means adding or
+ * renaming an option automatically updates the action handler's type in `src/core/cli.ts` —
+ * hand-written option interfaces could silently drift from the declared surface.
+ */
+export type ParsedCommandOptions<Spec extends AgentCommandSpec> = {
+  [Option in Spec["options"][number] as Option extends { readonly required: true }
+    ? CamelCase<FlagBody<Option["flag"]>>
+    : never]: OptionValue<Option>;
+} & {
+  [Option in Spec["options"][number] as Option extends { readonly required: true }
+    ? never
+    : CamelCase<FlagBody<Option["flag"]>>]?: OptionValue<Option>;
+};
+
+/** Parsed-options shape for one daemon action's CLI command. */
+export type SessionCommandOptions<Action extends SessionDaemonAction> = ParsedCommandOptions<
+  (typeof SESSION_AGENT_COMMANDS)[Action]
+>;
 
 /** Selector notation shared by every synopsis line that targets one live session. */
 export const SESSION_SELECTOR_SYNOPSIS = "(<session-id> | --repo <path>)";
@@ -59,32 +98,32 @@ export const COMMENT_TARGET_FLAGS = ["--old-line <n>", "--new-line <n>"];
 /** Relative comment navigation directions: callers may pass at most one. */
 export const COMMENT_DIRECTION_FLAGS = ["--next-comment", "--prev-comment"];
 
-const repoOption: AgentCommandOption = {
+const repoOption = {
   flag: "--repo <path>",
   description: "target the live session whose repo root matches this path",
-};
+} as const satisfies AgentCommandOption;
 
-const jsonOption: AgentCommandOption = {
+const jsonOption = {
   flag: "--json",
   description: "emit structured JSON",
-};
+} as const satisfies AgentCommandOption;
 
-const diffFileOption: AgentCommandOption = {
+const diffFileOption = {
   flag: "--file <path>",
   description: "diff file path as shown by Hunk",
-};
+} as const satisfies AgentCommandOption;
 
-const oldLineOption: AgentCommandOption = {
+const oldLineOption = {
   flag: "--old-line <n>",
   description: "1-based line number on the old side",
   parse: "positiveInt",
-};
+} as const satisfies AgentCommandOption;
 
-const newLineOption: AgentCommandOption = {
+const newLineOption = {
   flag: "--new-line <n>",
   description: "1-based line number on the new side",
   parse: "positiveInt",
-};
+} as const satisfies AgentCommandOption;
 
 /**
  * Every live-session daemon action, described as one CLI command. `satisfies` keeps this map in
@@ -294,10 +333,11 @@ export const SESSION_AGENT_COMMANDS = {
       `hunk session comment clear ${SESSION_SELECTOR_SYNOPSIS} [--file <path>] [--include-user|--all] --yes [--json]`,
     ],
   },
-} satisfies Record<SessionDaemonAction, AgentCommandSpec>;
+} as const satisfies Record<SessionDaemonAction, AgentCommandSpec>;
 
 /** Specs in display order for help text and generated docs. */
-export const SESSION_AGENT_COMMAND_LIST: AgentCommandSpec[] = Object.values(SESSION_AGENT_COMMANDS);
+export const SESSION_AGENT_COMMAND_LIST: readonly AgentCommandSpec[] =
+  Object.values(SESSION_AGENT_COMMANDS);
 
 /** Specs for the `hunk session comment` subcommand family, in display order. */
 export const SESSION_COMMENT_COMMAND_LIST = SESSION_AGENT_COMMAND_LIST.filter((spec) =>

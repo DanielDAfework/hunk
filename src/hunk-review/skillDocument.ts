@@ -12,7 +12,7 @@ import { SESSION_AGENT_COMMANDS, type AgentCommandSpec } from "../hunk-session/a
  */
 
 /** Render one bash-highlighted code fence. */
-function bashFence(lines: string[]) {
+function bashFence(lines: readonly string[]) {
   return ["```bash", ...lines, "```"];
 }
 

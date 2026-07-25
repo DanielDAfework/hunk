@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
   agentOptionFlagName,
+  type AgentCommandOption,
   SESSION_AGENT_COMMAND_LIST,
   SESSION_AGENT_COMMANDS,
   SESSION_COMMENT_COMMAND_LIST,
+  type SessionCommandOptions,
 } from "./agentSurface";
 
 const FLAG_TOKEN_PATTERN = /--[a-z][a-z-]*/g;
@@ -57,10 +59,28 @@ describe("session agent command surface", () => {
     }
   });
 
+  test("derives parsed-option shapes from the specs at compile time", () => {
+    // These assignments are the assertions; `bun run typecheck` enforces them.
+    const navigate: SessionCommandOptions<"navigate"> = { repo: ".", hunk: 2, json: true };
+    // @ts-expect-error --hunk parses to a number, not a string
+    const badHunk: SessionCommandOptions<"navigate"> = { hunk: "2" };
+    // @ts-expect-error comment add requires --file and --summary
+    const missingRequired: SessionCommandOptions<"comment-add"> = { newLine: 3 };
+    const add: SessionCommandOptions<"comment-add"> = {
+      file: "a.ts",
+      summary: "note",
+      newLine: 3,
+    };
+    // @ts-expect-error unknown flags are rejected
+    const unknownFlag: SessionCommandOptions<"list"> = { repo: "." };
+
+    expect([navigate, badHunk, missingRequired, add, unknownFlag]).toBeTruthy();
+  });
+
   test("marks navigation and comment targets with positive-int parsing", () => {
-    const navigate = SESSION_AGENT_COMMANDS.navigate;
+    const navigateOptions: readonly AgentCommandOption[] = SESSION_AGENT_COMMANDS.navigate.options;
     const targetFlags = ["--hunk", "--old-line", "--new-line"];
-    for (const option of navigate.options) {
+    for (const option of navigateOptions) {
       if (targetFlags.includes(agentOptionFlagName(option))) {
         expect(option.parse).toBe("positiveInt");
       }

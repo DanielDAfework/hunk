@@ -14,6 +14,7 @@ import type {
 import { resolveBundledHunkReviewSkillPath } from "./paths";
 import {
   type AgentCommandSpec,
+  type SessionCommandOptions,
   COMMENT_DIRECTION_FLAGS,
   COMMENT_TARGET_FLAGS,
   NAVIGATE_TARGET_FLAGS,
@@ -681,7 +682,7 @@ function sessionCommandHelpText(command: Command, spec: AgentCommandSpec): HelpC
 }
 
 /** Render usage lines for a list of session commands as one indented help block. */
-function sessionUsageLines(specs: AgentCommandSpec[]) {
+function sessionUsageLines(specs: readonly AgentCommandSpec[]) {
   return specs.flatMap((spec) => spec.synopsis.map((line) => `  ${line}`));
 }
 
@@ -705,9 +706,9 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
 
   if (subcommand === "list") {
     const command = buildSessionCommand(SESSION_AGENT_COMMANDS.list);
-    let parsedOptions: { json?: boolean } = {};
+    let parsedOptions: SessionCommandOptions<"list"> = {};
 
-    command.action((options: { json?: boolean }) => {
+    command.action((options: SessionCommandOptions<"list">) => {
       parsedOptions = options;
     });
 
@@ -728,22 +729,13 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
     const command = buildSessionCommand(spec);
 
     let parsedSessionId: string | undefined;
-    let parsedOptions: {
-      repo?: string;
-      includePatch?: boolean;
-      includeNotes?: boolean;
-      json?: boolean;
-    } = {};
+    // Review's parsed shape is a strict superset of get/context, so it types the shared branch.
+    let parsedOptions: SessionCommandOptions<"review"> = {};
 
-    command.action(
-      (
-        sessionId: string | undefined,
-        options: { repo?: string; includePatch?: boolean; includeNotes?: boolean; json?: boolean },
-      ) => {
-        parsedSessionId = sessionId;
-        parsedOptions = options;
-      },
-    );
+    command.action((sessionId: string | undefined, options: SessionCommandOptions<"review">) => {
+      parsedSessionId = sessionId;
+      parsedOptions = options;
+    });
 
     if (rest.includes("--help") || rest.includes("-h")) {
       return sessionCommandHelpText(command, spec);
@@ -773,35 +765,12 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
     const command = buildSessionCommand(SESSION_AGENT_COMMANDS.navigate);
 
     let parsedSessionId: string | undefined;
-    let parsedOptions: {
-      repo?: string;
-      file?: string;
-      hunk?: number;
-      oldLine?: number;
-      newLine?: number;
-      nextComment?: boolean;
-      prevComment?: boolean;
-      json?: boolean;
-    } = {};
+    let parsedOptions: SessionCommandOptions<"navigate"> = {};
 
-    command.action(
-      (
-        sessionId: string | undefined,
-        options: {
-          repo?: string;
-          file?: string;
-          hunk?: number;
-          oldLine?: number;
-          newLine?: number;
-          nextComment?: boolean;
-          prevComment?: boolean;
-          json?: boolean;
-        },
-      ) => {
-        parsedSessionId = sessionId;
-        parsedOptions = options;
-      },
-    );
+    command.action((sessionId: string | undefined, options: SessionCommandOptions<"navigate">) => {
+      parsedSessionId = sessionId;
+      parsedOptions = options;
+    });
 
     if (rest.includes("--help") || rest.includes("-h")) {
       return sessionCommandHelpText(command, SESSION_AGENT_COMMANDS.navigate);
@@ -864,18 +833,12 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
     const command = buildSessionCommand(SESSION_AGENT_COMMANDS.reload);
 
     let parsedSessionId: string | undefined;
-    let parsedOptions: { sessionPath?: string; repo?: string; source?: string; json?: boolean } =
-      {};
+    let parsedOptions: SessionCommandOptions<"reload"> = {};
 
-    command.action(
-      (
-        sessionId: string | undefined,
-        options: { sessionPath?: string; repo?: string; source?: string; json?: boolean },
-      ) => {
-        parsedSessionId = sessionId;
-        parsedOptions = options;
-      },
-    );
+    command.action((sessionId: string | undefined, options: SessionCommandOptions<"reload">) => {
+      parsedSessionId = sessionId;
+      parsedOptions = options;
+    });
 
     if (outerTokens.includes("--help") || outerTokens.includes("-h")) {
       return sessionCommandHelpText(command, SESSION_AGENT_COMMANDS.reload);
@@ -922,38 +885,13 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
       const command = buildSessionCommand(SESSION_AGENT_COMMANDS["comment-add"]);
 
       let parsedSessionId: string | undefined;
-      let parsedOptions: {
-        repo?: string;
-        file: string;
-        summary: string;
-        oldLine?: number;
-        newLine?: number;
-        rationale?: string;
-        markup?: string;
-        author?: string;
-        focus?: boolean;
-        json?: boolean;
-      } = {
+      let parsedOptions: SessionCommandOptions<"comment-add"> = {
         file: "",
         summary: "",
       };
 
       command.action(
-        (
-          sessionId: string | undefined,
-          options: {
-            repo?: string;
-            file: string;
-            summary: string;
-            oldLine?: number;
-            newLine?: number;
-            rationale?: string;
-            markup?: string;
-            author?: string;
-            focus?: boolean;
-            json?: boolean;
-          },
-        ) => {
+        (sessionId: string | undefined, options: SessionCommandOptions<"comment-add">) => {
           parsedSessionId = sessionId;
           parsedOptions = options;
         },
@@ -993,23 +931,10 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
       const command = buildSessionCommand(SESSION_AGENT_COMMANDS["comment-apply"]);
 
       let parsedSessionId: string | undefined;
-      let parsedOptions: {
-        repo?: string;
-        stdin?: boolean;
-        focus?: boolean;
-        json?: boolean;
-      } = {};
+      let parsedOptions: SessionCommandOptions<"comment-apply"> = {};
 
       command.action(
-        (
-          sessionId: string | undefined,
-          options: {
-            repo?: string;
-            stdin?: boolean;
-            focus?: boolean;
-            json?: boolean;
-          },
-        ) => {
+        (sessionId: string | undefined, options: SessionCommandOptions<"comment-apply">) => {
           parsedSessionId = sessionId;
           parsedOptions = options;
         },
@@ -1042,13 +967,10 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
       const command = buildSessionCommand(SESSION_AGENT_COMMANDS["comment-list"]);
 
       let parsedSessionId: string | undefined;
-      let parsedOptions: { repo?: string; file?: string; type?: string; json?: boolean } = {};
+      let parsedOptions: SessionCommandOptions<"comment-list"> = {};
 
       command.action(
-        (
-          sessionId: string | undefined,
-          options: { repo?: string; file?: string; type?: string; json?: boolean },
-        ) => {
+        (sessionId: string | undefined, options: SessionCommandOptions<"comment-list">) => {
           parsedSessionId = sessionId;
           parsedOptions = options;
         },
@@ -1084,9 +1006,9 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
       const command = buildSessionCommand(SESSION_AGENT_COMMANDS["comment-rm"]);
 
       let parsedTargets: string[] = [];
-      let parsedOptions: { repo?: string; json?: boolean } = {};
+      let parsedOptions: SessionCommandOptions<"comment-rm"> = {};
 
-      command.action((targets: string[], options: { repo?: string; json?: boolean }) => {
+      command.action((targets: string[], options: SessionCommandOptions<"comment-rm">) => {
         parsedTargets = targets;
         parsedOptions = options;
       });
@@ -1122,27 +1044,10 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
       const command = buildSessionCommand(SESSION_AGENT_COMMANDS["comment-clear"]);
 
       let parsedSessionId: string | undefined;
-      let parsedOptions: {
-        repo?: string;
-        file?: string;
-        includeUser?: boolean;
-        all?: boolean;
-        yes?: boolean;
-        json?: boolean;
-      } = {};
+      let parsedOptions: SessionCommandOptions<"comment-clear"> = {};
 
       command.action(
-        (
-          sessionId: string | undefined,
-          options: {
-            repo?: string;
-            file?: string;
-            includeUser?: boolean;
-            all?: boolean;
-            yes?: boolean;
-            json?: boolean;
-          },
-        ) => {
+        (sessionId: string | undefined, options: SessionCommandOptions<"comment-clear">) => {
           parsedSessionId = sessionId;
           parsedOptions = options;
         },
