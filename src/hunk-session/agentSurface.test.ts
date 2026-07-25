@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   agentOptionFlagName,
+  optionKeyFromFlag,
   type AgentCommandOption,
   SESSION_AGENT_COMMAND_LIST,
   SESSION_AGENT_COMMANDS,
@@ -55,6 +56,23 @@ describe("session agent command surface", () => {
     for (const spec of SESSION_AGENT_COMMAND_LIST) {
       for (const line of spec.synopsis) {
         expect(line.startsWith(`hunk ${spec.name}`)).toBe(true);
+      }
+    }
+  });
+
+  test("camelizes flag definitions into Commander option keys", () => {
+    expect(optionKeyFromFlag("--old-line <n>")).toBe("oldLine");
+    expect(optionKeyFromFlag("--next-comment")).toBe("nextComment");
+    expect(optionKeyFromFlag("--json")).toBe("json");
+  });
+
+  test("declares every constraint flag as an option on its command", () => {
+    for (const spec of SESSION_AGENT_COMMAND_LIST) {
+      const declared = new Set(spec.options.map(agentOptionFlagName));
+      for (const constraint of spec.constraints ?? []) {
+        for (const flag of constraint.flags) {
+          expect(declared).toContain(flag.split(" ")[0]!);
+        }
       }
     }
   });

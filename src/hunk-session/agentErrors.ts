@@ -6,8 +6,10 @@
  * throws. Throw sites import these builders instead of repeating string literals.
  */
 
+import type { AgentCommandConstraint } from "./agentSurface";
+
 /** Format flag choices as a human list: `--a, --b, or --c` for three, `--a or --b` for two. */
-function formatFlagChoices(flags: string[]) {
+function formatFlagChoices(flags: readonly string[]) {
   if (flags.length <= 2) {
     return flags.join(" or ");
   }
@@ -15,14 +17,13 @@ function formatFlagChoices(flags: string[]) {
   return `${flags.slice(0, -1).join(", ")}, or ${flags[flags.length - 1]}`;
 }
 
-/** "Exactly one of these flags" constraint violation, e.g. absolute navigation targets. */
-export function exactlyOneTargetMessage(label: string, flags: string[]) {
-  return `Specify exactly one ${label}: ${formatFlagChoices(flags)}.`;
-}
+/** The message thrown when one declared flag-group constraint is violated. */
+export function constraintViolationMessage(constraint: AgentCommandConstraint) {
+  if (constraint.kind === "exactly-one") {
+    return `Specify exactly one ${constraint.label}: ${formatFlagChoices(constraint.flags)}.`;
+  }
 
-/** "At most one of these flags" constraint violation, e.g. comment navigation directions. */
-export function atMostOneFlagMessage(flags: string[]) {
-  return `Specify either ${formatFlagChoices(flags)}, not both.`;
+  return `Specify either ${formatFlagChoices(constraint.flags)}, not both.`;
 }
 
 /** Reload invoked without the `--` separator or without a nested review command. */

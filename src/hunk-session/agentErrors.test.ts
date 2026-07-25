@@ -3,17 +3,16 @@ import { resolveSessionTarget } from "@hunk/session-broker-core";
 import {
   AGENT_ERROR_DOCS,
   agentErrorQuotePrefix,
-  atMostOneFlagMessage,
   COMMENT_APPLY_STDIN_MESSAGE,
-  exactlyOneTargetMessage,
+  constraintViolationMessage,
   NO_ACTIVE_SESSIONS_MESSAGE,
   noDiffFileMatchesMessage,
   RELOAD_SEPARATOR_MESSAGE,
 } from "./agentErrors";
 import {
-  COMMENT_DIRECTION_FLAGS,
-  COMMENT_TARGET_FLAGS,
-  NAVIGATE_TARGET_FLAGS,
+  COMMENT_DIRECTION_CONSTRAINT,
+  COMMENT_TARGET_CONSTRAINT,
+  NAVIGATE_TARGET_CONSTRAINT,
 } from "./agentSurface";
 
 function createTestBrokerSession(sessionId: string) {
@@ -39,16 +38,16 @@ function thrownMessage(callback: () => unknown) {
 
 describe("agent error messages", () => {
   test("formats exactly-one constraints with an Oxford-comma flag list", () => {
-    expect(exactlyOneTargetMessage("navigation target", NAVIGATE_TARGET_FLAGS)).toBe(
+    expect(constraintViolationMessage(NAVIGATE_TARGET_CONSTRAINT)).toBe(
       "Specify exactly one navigation target: --hunk <n>, --old-line <n>, or --new-line <n>.",
     );
-    expect(exactlyOneTargetMessage("comment target", COMMENT_TARGET_FLAGS)).toBe(
+    expect(constraintViolationMessage(COMMENT_TARGET_CONSTRAINT)).toBe(
       "Specify exactly one comment target: --old-line <n> or --new-line <n>.",
     );
   });
 
   test("formats at-most-one constraints as an either/or message", () => {
-    expect(atMostOneFlagMessage(COMMENT_DIRECTION_FLAGS)).toBe(
+    expect(constraintViolationMessage(COMMENT_DIRECTION_CONSTRAINT)).toBe(
       "Specify either --next-comment or --prev-comment, not both.",
     );
   });
@@ -64,8 +63,8 @@ describe("agent error messages", () => {
       thrownMessage(() => resolveSessionTarget(sessions, { sessionPath: "/tmp/missing" })),
       RELOAD_SEPARATOR_MESSAGE,
       COMMENT_APPLY_STDIN_MESSAGE,
-      exactlyOneTargetMessage("navigation target", NAVIGATE_TARGET_FLAGS),
-      atMostOneFlagMessage(COMMENT_DIRECTION_FLAGS),
+      constraintViolationMessage(NAVIGATE_TARGET_CONSTRAINT),
+      constraintViolationMessage(COMMENT_DIRECTION_CONSTRAINT),
     ];
 
     expect(realMessages).toHaveLength(AGENT_ERROR_DOCS.length);

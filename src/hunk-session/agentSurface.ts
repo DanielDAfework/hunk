@@ -38,6 +38,8 @@ export interface AgentCommandSpec {
   readonly options: readonly AgentCommandOption[];
   /** Canonical usage lines shared by `hunk session --help` and the generated skill. */
   readonly synopsis: readonly string[];
+  /** Flag-group rules the parser enforces; also rendered into synopsis fragments. */
+  readonly constraints?: readonly AgentCommandConstraint[];
   /** Copy-paste invocations appended to `--help` output and reused in the generated skill. */
   readonly examples?: readonly string[];
   /** Extra literal help lines (e.g. a stdin payload shape) appended after examples. */
@@ -83,6 +85,34 @@ export type SessionCommandOptions<Action extends SessionDaemonAction> = ParsedCo
   (typeof SESSION_AGENT_COMMANDS)[Action]
 >;
 
+/**
+ * One declared flag-group rule on a command. The same object drives three surfaces: the
+ * `(--a | --b)` synopsis fragment, the CLI validator, and the error message agents see — so a
+ * flag rename or group change propagates everywhere from this one declaration.
+ */
+export type AgentCommandConstraint =
+  | {
+      readonly kind: "exactly-one";
+      /** Names the choice in the error message, e.g. "navigation target". */
+      readonly label: string;
+      readonly flags: readonly string[];
+    }
+  | {
+      readonly kind: "at-most-one";
+      readonly flags: readonly string[];
+    };
+
+/** Render one constraint as its synopsis fragment, e.g. `(--hunk <n> | --old-line <n>)`. */
+export function constraintSynopsis(constraint: AgentCommandConstraint) {
+  return `(${constraint.flags.join(" | ")})`;
+}
+
+/** Camelize one flag definition into the key Commander stores its parsed value under. */
+export function optionKeyFromFlag(flag: string) {
+  const body = flag.split(" ")[0]!.replace(/^--/, "");
+  return body.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
+}
+
 /** Selector notation shared by every synopsis line that targets one live session. */
 export const SESSION_SELECTOR_SYNOPSIS = "(<session-id> | --repo <path>)";
 
@@ -90,13 +120,24 @@ export const SESSION_SELECTOR_SYNOPSIS = "(<session-id> | --repo <path>)";
 export const RELOAD_SELECTOR_SYNOPSIS = "(<session-id> | --repo <path> | --session-path <path>)";
 
 /** Absolute navigation targets: callers must pass exactly one. */
-export const NAVIGATE_TARGET_FLAGS = ["--hunk <n>", "--old-line <n>", "--new-line <n>"];
+export const NAVIGATE_TARGET_CONSTRAINT = {
+  kind: "exactly-one",
+  label: "navigation target",
+  flags: ["--hunk <n>", "--old-line <n>", "--new-line <n>"],
+} as const satisfies AgentCommandConstraint;
 
 /** Comment anchoring targets: callers must pass exactly one. */
-export const COMMENT_TARGET_FLAGS = ["--old-line <n>", "--new-line <n>"];
+export const COMMENT_TARGET_CONSTRAINT = {
+  kind: "exactly-one",
+  label: "comment target",
+  flags: ["--old-line <n>", "--new-line <n>"],
+} as const satisfies AgentCommandConstraint;
 
 /** Relative comment navigation directions: callers may pass at most one. */
-export const COMMENT_DIRECTION_FLAGS = ["--next-comment", "--prev-comment"];
+export const COMMENT_DIRECTION_CONSTRAINT = {
+  kind: "at-most-one",
+  flags: ["--next-comment", "--prev-comment"],
+} as const satisfies AgentCommandConstraint;
 
 const repoOption = {
   flag: "--repo <path>",
@@ -190,9 +231,10 @@ export const SESSION_AGENT_COMMANDS = {
       { flag: "--prev-comment", description: "jump to the previous annotated hunk" },
       jsonOption,
     ],
+    constraints: [NAVIGATE_TARGET_CONSTRAINT, COMMENT_DIRECTION_CONSTRAINT],
     synopsis: [
-      `hunk session navigate ${SESSION_SELECTOR_SYNOPSIS} --file <path> (--hunk <n> | --old-line <n> | --new-line <n>) [--json]`,
-      `hunk session navigate ${SESSION_SELECTOR_SYNOPSIS} (--next-comment | --prev-comment) [--json]`,
+      `hunk session navigate ${SESSION_SELECTOR_SYNOPSIS} --file <path> ${constraintSynopsis(NAVIGATE_TARGET_CONSTRAINT)} [--json]`,
+      `hunk session navigate ${SESSION_SELECTOR_SYNOPSIS} ${constraintSynopsis(COMMENT_DIRECTION_CONSTRAINT)} [--json]`,
     ],
     examples: [
       "hunk session navigate --repo . --file src/App.tsx --hunk 2",
@@ -250,8 +292,9 @@ export const SESSION_AGENT_COMMANDS = {
       { flag: "--focus", description: "add the note and focus the viewport on it" },
       jsonOption,
     ],
+    constraints: [COMMENT_TARGET_CONSTRAINT],
     synopsis: [
-      `hunk session comment add ${SESSION_SELECTOR_SYNOPSIS} --file <path> (--old-line <n> | --new-line <n>) --summary <text> [--rationale <text>] [--author <name>] [--markup <stml>] [--focus] [--json]`,
+      `hunk session comment add ${SESSION_SELECTOR_SYNOPSIS} --file <path> ${constraintSynopsis(COMMENT_TARGET_CONSTRAINT)} --summary <text> [--rationale <text>] [--author <name>] [--markup <stml>] [--focus] [--json]`,
     ],
     examples: [
       'hunk session comment add --repo . --file README.md --new-line 103 --summary "Tighten this wording"',

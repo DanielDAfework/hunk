@@ -13,19 +13,20 @@ import type {
 } from "./types";
 import { resolveBundledHunkReviewSkillPath } from "./paths";
 import {
+  type AgentCommandConstraint,
   type AgentCommandSpec,
   type SessionCommandOptions,
-  COMMENT_DIRECTION_FLAGS,
-  COMMENT_TARGET_FLAGS,
-  NAVIGATE_TARGET_FLAGS,
+  COMMENT_DIRECTION_CONSTRAINT,
+  COMMENT_TARGET_CONSTRAINT,
+  NAVIGATE_TARGET_CONSTRAINT,
+  optionKeyFromFlag,
   SESSION_AGENT_COMMANDS,
   SESSION_AGENT_COMMAND_LIST,
   SESSION_COMMENT_COMMAND_LIST,
 } from "../hunk-session/agentSurface";
 import {
-  atMostOneFlagMessage,
   COMMENT_APPLY_STDIN_MESSAGE,
-  exactlyOneTargetMessage,
+  constraintViolationMessage,
   RELOAD_SEPARATOR_MESSAGE,
 } from "../hunk-session/agentErrors";
 import { detectVcs } from "./vcs";
@@ -681,6 +682,17 @@ function sessionCommandHelpText(command: Command, spec: AgentCommandSpec): HelpC
   return { kind: "help", text: `${sections.join("\n\n")}\n` };
 }
 
+/** Throw the shared catalog message when a declared flag-group constraint is violated. */
+function enforceConstraint(constraint: AgentCommandConstraint, options: Record<string, unknown>) {
+  const provided = constraint.flags.filter(
+    (flag) => options[optionKeyFromFlag(flag)] !== undefined,
+  ).length;
+  const violated = constraint.kind === "exactly-one" ? provided !== 1 : provided > 1;
+  if (violated) {
+    throw new Error(constraintViolationMessage(constraint));
+  }
+}
+
 /** Render usage lines for a list of session commands as one indented help block. */
 function sessionUsageLines(specs: readonly AgentCommandSpec[]) {
   return specs.flatMap((spec) => spec.synopsis.map((line) => `  ${line}`));
@@ -780,9 +792,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
 
     /** Relative comment navigation mode. */
     if (parsedOptions.nextComment || parsedOptions.prevComment) {
-      if (parsedOptions.nextComment && parsedOptions.prevComment) {
-        throw new Error(atMostOneFlagMessage(COMMENT_DIRECTION_FLAGS));
-      }
+      enforceConstraint(COMMENT_DIRECTION_CONSTRAINT, parsedOptions);
 
       return {
         kind: "session",
@@ -800,14 +810,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
       );
     }
 
-    const selectors = [
-      parsedOptions.hunk !== undefined,
-      parsedOptions.oldLine !== undefined,
-      parsedOptions.newLine !== undefined,
-    ].filter(Boolean);
-    if (selectors.length !== 1) {
-      throw new Error(exactlyOneTargetMessage("navigation target", NAVIGATE_TARGET_FLAGS));
-    }
+    enforceConstraint(NAVIGATE_TARGET_CONSTRAINT, parsedOptions);
 
     return {
       kind: "session",
@@ -903,13 +906,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
 
       await parseStandaloneCommand(command, commentRest);
 
-      const selectors = [
-        parsedOptions.oldLine !== undefined,
-        parsedOptions.newLine !== undefined,
-      ].filter(Boolean);
-      if (selectors.length !== 1) {
-        throw new Error(exactlyOneTargetMessage("comment target", COMMENT_TARGET_FLAGS));
-      }
+      enforceConstraint(COMMENT_TARGET_CONSTRAINT, parsedOptions);
 
       return {
         kind: "session",
