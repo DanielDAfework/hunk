@@ -90,6 +90,10 @@ export const AGENT_ERROR_DOCS: AgentErrorDoc[] = [
     remedy: "pick one of `--hunk`, `--old-line`, or `--new-line`.",
   },
   {
+    quote: "Specify exactly one comment target",
+    remedy: "pass `comment add` one of `--old-line` or `--new-line`.",
+  },
+  {
     quote: "Specify either --next-comment or --prev-comment, not both.",
     remedy: "choose one comment-navigation direction.",
   },

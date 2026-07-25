@@ -64,12 +64,23 @@ describe("agent error messages", () => {
       RELOAD_SEPARATOR_MESSAGE,
       COMMENT_APPLY_STDIN_MESSAGE,
       constraintViolationMessage(NAVIGATE_TARGET_CONSTRAINT),
+      constraintViolationMessage(COMMENT_TARGET_CONSTRAINT),
       constraintViolationMessage(COMMENT_DIRECTION_CONSTRAINT),
     ];
 
+    // Quotes match messages by prefix rather than array position, so reordering
+    // AGENT_ERROR_DOCS cannot silently pair a quote with the wrong message.
     expect(realMessages).toHaveLength(AGENT_ERROR_DOCS.length);
-    for (const [index, doc] of AGENT_ERROR_DOCS.entries()) {
-      expect(realMessages[index]!).toStartWith(agentErrorQuotePrefix(doc));
+    for (const doc of AGENT_ERROR_DOCS) {
+      const prefix = agentErrorQuotePrefix(doc);
+      expect(realMessages.some((message) => message.startsWith(prefix))).toBe(true);
+    }
+
+    for (const message of realMessages) {
+      const claims = AGENT_ERROR_DOCS.filter((doc) =>
+        message.startsWith(agentErrorQuotePrefix(doc)),
+      );
+      expect(claims).toHaveLength(1);
     }
   });
 });

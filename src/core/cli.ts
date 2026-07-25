@@ -95,8 +95,15 @@ function buildCommonOptions(
     agentContext: options.agentContext,
     pager: options.pager ? true : undefined,
     watch: options.watch ? true : undefined,
-    experimental: options.experimental || argv[2] === "--experimental" ? true : undefined,
-    excludeUntracked: resolveBooleanFlag(argv, "--exclude-untracked", "--no-exclude-untracked"),
+    experimental:
+      options.experimental || argv[2] === AUXILIARY_AGENT_OPTIONS.experimental.flag
+        ? true
+        : undefined,
+    excludeUntracked: resolveBooleanFlag(
+      argv,
+      AUXILIARY_AGENT_OPTIONS.excludeUntracked.flag,
+      `--no-${AUXILIARY_AGENT_OPTIONS.excludeUntracked.flag.slice(2)}`,
+    ),
     lineNumbers: resolveBooleanFlag(argv, "--line-numbers", "--no-line-numbers"),
     tabWidth: options.tabWidth,
     wrapLines: resolveBooleanFlag(argv, "--wrap", "--no-wrap"),
@@ -444,7 +451,7 @@ async function parseDiffCommand(tokens: string[], argv: string[]): Promise<Parse
     )
     .addOption(
       new Option(
-        "--no-exclude-untracked",
+        `--no-${AUXILIARY_AGENT_OPTIONS.excludeUntracked.flag.slice(2)}`,
         "include untracked files in working tree reviews",
       ).hideHelp(),
     )
@@ -1293,7 +1300,7 @@ async function parseStashCommand(tokens: string[], argv: string[]): Promise<Pars
 /** Parse CLI arguments into one normalized input shape for the app loader layer. */
 export async function parseCli(argv: string[]): Promise<ParsedCliInput> {
   const rawArgs = argv.slice(2);
-  const prefixedExperimental = rawArgs[0] === "--experimental";
+  const prefixedExperimental = rawArgs[0] === AUXILIARY_AGENT_OPTIONS.experimental.flag;
   const args = prefixedExperimental ? rawArgs.slice(1) : rawArgs;
   const [commandName, ...rest] = args;
 

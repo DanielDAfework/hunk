@@ -21,12 +21,17 @@ const selectorSchema = z.strictObject({
 const sideSchema = z.enum(["old", "new"]);
 
 /**
- * Reload payloads embed a full parsed CLI input tree. Its deep shape is owned by the CLI parser
- * and re-validated by the receiving session when it runs the command, so the envelope only
- * requires one object here.
+ * Reload payloads embed a full parsed CLI input tree whose deep shape is owned by the CLI
+ * parser, so this envelope check is intentionally shallow: an object with a string `kind`
+ * discriminant. A well-formed-but-wrong tree still reaches the reload path, where thrown errors
+ * surface through the daemon's JSON error response rather than a schema rejection.
  */
 const nextInputSchema = z.custom<CliInput>(
-  (value) => typeof value === "object" && value !== null && !Array.isArray(value),
+  (value) =>
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as { kind?: unknown }).kind === "string",
 );
 
 const commentApplyItemSchema = z.strictObject({

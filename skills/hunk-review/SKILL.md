@@ -180,4 +180,5 @@ Guidelines:
 - **"Pass the replacement Hunk command after `--`"** -- include `--` before the nested `diff` / `show` command.
 - **"Pass --stdin to read batch comments from stdin JSON."** -- `comment apply` only reads its batch payload from stdin.
 - **"Specify exactly one navigation target"** -- pick one of `--hunk`, `--old-line`, or `--new-line`.
+- **"Specify exactly one comment target"** -- pass `comment add` one of `--old-line` or `--new-line`.
 - **"Specify either --next-comment or --prev-comment, not both."** -- choose one comment-navigation direction.
