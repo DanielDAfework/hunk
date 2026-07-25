@@ -113,6 +113,30 @@ export function optionKeyFromFlag(flag: string) {
   return body.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
 }
 
+/**
+ * Options owned by non-session commands (`hunk diff`, `hunk markup render`, shared review flags)
+ * that agent-facing docs also reference. `src/core/cli.ts` registers them from these constants,
+ * so the docs' flag-consistency tests verify real parser flags instead of a hand-kept allowlist.
+ */
+export const AUXILIARY_AGENT_OPTIONS = {
+  agentContext: {
+    flag: "--agent-context <path>",
+    description: "JSON sidecar with agent rationale",
+  },
+  excludeUntracked: {
+    flag: "--exclude-untracked",
+    description: "exclude untracked files from working tree reviews",
+  },
+  experimental: {
+    flag: "--experimental",
+    description: "enable experimental features (currently STML agent-note markup)",
+  },
+  markupWidth: {
+    flag: "--width <n>",
+    description: "layout width in columns",
+  },
+} as const satisfies Record<string, AgentCommandOption>;
+
 /** Selector notation shared by every synopsis line that targets one live session. */
 export const SESSION_SELECTOR_SYNOPSIS = "(<session-id> | --repo <path>)";
 

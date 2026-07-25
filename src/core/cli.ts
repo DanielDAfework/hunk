@@ -15,6 +15,7 @@ import { resolveBundledHunkReviewSkillPath } from "./paths";
 import {
   type AgentCommandConstraint,
   type AgentCommandSpec,
+  AUXILIARY_AGENT_OPTIONS,
   type SessionCommandOptions,
   COMMENT_DIRECTION_CONSTRAINT,
   COMMENT_TARGET_CONSTRAINT,
@@ -110,9 +111,15 @@ function applyCommonOptions(command: Command) {
   return command
     .option("--mode <mode>", "layout mode: auto, split, stack", parseLayoutMode)
     .option("--theme <theme>", "named theme override")
-    .option("--agent-context <path>", "JSON sidecar with agent rationale")
+    .option(
+      AUXILIARY_AGENT_OPTIONS.agentContext.flag,
+      AUXILIARY_AGENT_OPTIONS.agentContext.description,
+    )
     .option("--pager", "use pager-style chrome and controls")
-    .option("--experimental", "enable experimental features (currently STML agent-note markup)")
+    .option(
+      AUXILIARY_AGENT_OPTIONS.experimental.flag,
+      AUXILIARY_AGENT_OPTIONS.experimental.description,
+    )
     .option("--line-numbers", "show line numbers")
     .option("--no-line-numbers", "hide line numbers")
     .option("-x, --tab-width <columns>", "tab stop width: 1-16", parseTabWidth)
@@ -431,7 +438,10 @@ async function parseDiffCommand(tokens: string[], argv: string[]): Promise<Parse
   )
     .option("--staged", "show staged changes instead of the working tree")
     .option("--cached", "alias for --staged")
-    .option("--exclude-untracked", "exclude untracked files from working tree reviews")
+    .option(
+      AUXILIARY_AGENT_OPTIONS.excludeUntracked.flag,
+      AUXILIARY_AGENT_OPTIONS.excludeUntracked.description,
+    )
     .addOption(
       new Option(
         "--no-exclude-untracked",
@@ -1114,7 +1124,11 @@ async function parseMarkupCommand(tokens: string[]): Promise<ParsedCliInput> {
     const command = new Command("markup render")
       .description("preview experimental STML markup as terminal text")
       .argument("[file]", "markup file path, or - for stdin", "-")
-      .option("--width <n>", "layout width in columns", parsePositiveInt)
+      .option(
+        AUXILIARY_AGENT_OPTIONS.markupWidth.flag,
+        AUXILIARY_AGENT_OPTIONS.markupWidth.description,
+        parsePositiveInt,
+      )
       .option("--color <mode>", "auto, always, or never", "auto")
       .option("--theme <id>", "hunk theme used to resolve colors")
       .option("--json", "emit structured JSON");
