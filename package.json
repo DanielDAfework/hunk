@@ -54,6 +54,7 @@
     "build:prebuilt:artifact": "bun run build:bin && bun run ./scripts/build-prebuilt-artifact.ts",
     "stage:prebuilt:release": "bun run build:npm && bun run ./scripts/stage-prebuilt-npm.ts --artifact-root ./dist/release/artifacts",
     "install:bin": "bun run ./scripts/install-bin.ts",
+    "generate:skill": "bun run ./scripts/generate-skill.ts",
     "typecheck": "tsc --noEmit",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",

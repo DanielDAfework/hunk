@@ -12,6 +12,21 @@ import type {
   SessionCommentApplyItemInput,
 } from "./types";
 import { resolveBundledHunkReviewSkillPath } from "./paths";
+import {
+  type AgentCommandSpec,
+  COMMENT_DIRECTION_FLAGS,
+  COMMENT_TARGET_FLAGS,
+  NAVIGATE_TARGET_FLAGS,
+  SESSION_AGENT_COMMANDS,
+  SESSION_AGENT_COMMAND_LIST,
+  SESSION_COMMENT_COMMAND_LIST,
+} from "../hunk-session/agentSurface";
+import {
+  atMostOneFlagMessage,
+  COMMENT_APPLY_STDIN_MESSAGE,
+  exactlyOneTargetMessage,
+  RELOAD_SEPARATOR_MESSAGE,
+} from "../hunk-session/agentErrors";
 import { detectVcs } from "./vcs";
 import { parseTabWidth } from "./tabWidth";
 import { resolveCliVersion } from "./version";
@@ -624,6 +639,52 @@ function requireReloadableCliInput(input: ParsedCliInput): CliInput {
   return input;
 }
 
+/** Build one Commander command from its declarative agent-surface spec. */
+function buildSessionCommand(spec: AgentCommandSpec) {
+  const command = new Command(spec.name).description(spec.summary);
+
+  for (const positional of spec.positionals) {
+    if (positional.description) {
+      command.argument(positional.token, positional.description);
+    } else {
+      command.argument(positional.token);
+    }
+  }
+
+  for (const option of spec.options) {
+    const register = option.required
+      ? command.requiredOption.bind(command)
+      : command.option.bind(command);
+    if (option.parse === "positiveInt") {
+      register(option.flag, option.description, parsePositiveInt);
+    } else {
+      register(option.flag, option.description);
+    }
+  }
+
+  return command;
+}
+
+/** Render `--help` output for one session command, appending spec examples and extras. */
+function sessionCommandHelpText(command: Command, spec: AgentCommandSpec): HelpCommandInput {
+  const sections = [command.helpInformation().trimEnd()];
+
+  if (spec.examples && spec.examples.length > 0) {
+    sections.push(["Examples:", ...spec.examples.map((example) => `  ${example}`)].join("\n"));
+  }
+
+  if (spec.helpExtra && spec.helpExtra.length > 0) {
+    sections.push(spec.helpExtra.join("\n"));
+  }
+
+  return { kind: "help", text: `${sections.join("\n\n")}\n` };
+}
+
+/** Render usage lines for a list of session commands as one indented help block. */
+function sessionUsageLines(specs: AgentCommandSpec[]) {
+  return specs.flatMap((spec) => spec.synopsis.map((line) => `  ${line}`));
+}
+
 /** Parse `hunk session ...` as live-session daemon-backed commands. */
 async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
   const [subcommand, ...rest] = tokens;
@@ -637,30 +698,13 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
           "Inspect and control live Hunk review sessions through the local daemon.",
           "",
           "Commands:",
-          "  hunk session list",
-          "  hunk session get <session-id>",
-          "  hunk session get --repo <path>",
-          "  hunk session context <session-id>",
-          "  hunk session context --repo <path>",
-          "  hunk session review <session-id> [--include-patch] [--include-notes]",
-          "  hunk session review --repo <path> [--include-patch] [--include-notes]",
-          "  hunk session navigate (<session-id> | --repo <path>) --file <path> (--hunk <n> | --old-line <n> | --new-line <n>)",
-          "  hunk session navigate (<session-id> | --repo <path>) (--next-comment | --prev-comment)",
-          "  hunk session reload (<session-id> | --repo <path> | --session-path <path>) [--source <path>] -- diff [ref] [-- <pathspec...>]",
-          "  hunk session reload (<session-id> | --repo <path> | --session-path <path>) [--source <path>] -- show [ref] [-- <pathspec...>]",
-          "  hunk session comment add (<session-id> | --repo <path>) --file <path> (--old-line <n> | --new-line <n>) --summary <text> [--focus]",
-          "  hunk session comment apply (<session-id> | --repo <path>) --stdin [--focus]",
-          "  hunk session comment list (<session-id> | --repo <path>) [--type <live|all|ai|agent|user>]",
-          "  hunk session comment rm (<session-id> | --repo <path>) <comment-id>",
-          "  hunk session comment clear (<session-id> | --repo <path>) [--include-user|--all] --yes",
+          ...sessionUsageLines(SESSION_AGENT_COMMAND_LIST),
         ].join("\n") + "\n",
     };
   }
 
   if (subcommand === "list") {
-    const command = new Command("session list")
-      .description("list live Hunk sessions")
-      .option("--json", "emit structured JSON");
+    const command = buildSessionCommand(SESSION_AGENT_COMMANDS.list);
     let parsedOptions: { json?: boolean } = {};
 
     command.action((options: { json?: boolean }) => {
@@ -668,7 +712,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
     });
 
     if (rest.includes("--help") || rest.includes("-h")) {
-      return { kind: "help", text: `${command.helpInformation().trimEnd()}\n` };
+      return sessionCommandHelpText(command, SESSION_AGENT_COMMANDS.list);
     }
 
     await parseStandaloneCommand(command, rest);
@@ -680,23 +724,8 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
   }
 
   if (subcommand === "get" || subcommand === "context" || subcommand === "review") {
-    const command = new Command(`session ${subcommand}`)
-      .description(
-        subcommand === "get"
-          ? "show one live Hunk session"
-          : subcommand === "context"
-            ? "show the selected file and hunk for one live Hunk session"
-            : "export the live review model for one Hunk session",
-      )
-      .argument("[sessionId]")
-      .option("--repo <path>", "target the live session whose repo root matches this path")
-      .option("--json", "emit structured JSON");
-
-    if (subcommand === "review") {
-      command
-        .option("--include-patch", "include raw unified diff text for each file in review output")
-        .option("--include-notes", "include live review notes in review output");
-    }
+    const spec = SESSION_AGENT_COMMANDS[subcommand];
+    const command = buildSessionCommand(spec);
 
     let parsedSessionId: string | undefined;
     let parsedOptions: {
@@ -717,7 +746,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
     );
 
     if (rest.includes("--help") || rest.includes("-h")) {
-      return { kind: "help", text: `${command.helpInformation().trimEnd()}\n` };
+      return sessionCommandHelpText(command, spec);
     }
 
     await parseStandaloneCommand(command, rest);
@@ -741,17 +770,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
   }
 
   if (subcommand === "navigate") {
-    const command = new Command("session navigate")
-      .description("move a live Hunk session to one diff hunk")
-      .argument("[sessionId]")
-      .option("--file <path>", "diff file path as shown by Hunk")
-      .option("--repo <path>", "target the live session whose repo root matches this path")
-      .option("--hunk <n>", "1-based hunk number within the file", parsePositiveInt)
-      .option("--old-line <n>", "1-based line number on the old side", parsePositiveInt)
-      .option("--new-line <n>", "1-based line number on the new side", parsePositiveInt)
-      .option("--next-comment", "jump to the next annotated hunk")
-      .option("--prev-comment", "jump to the previous annotated hunk")
-      .option("--json", "emit structured JSON");
+    const command = buildSessionCommand(SESSION_AGENT_COMMANDS.navigate);
 
     let parsedSessionId: string | undefined;
     let parsedOptions: {
@@ -785,7 +804,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
     );
 
     if (rest.includes("--help") || rest.includes("-h")) {
-      return { kind: "help", text: `${command.helpInformation().trimEnd()}\n` };
+      return sessionCommandHelpText(command, SESSION_AGENT_COMMANDS.navigate);
     }
 
     await parseStandaloneCommand(command, rest);
@@ -793,7 +812,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
     /** Relative comment navigation mode. */
     if (parsedOptions.nextComment || parsedOptions.prevComment) {
       if (parsedOptions.nextComment && parsedOptions.prevComment) {
-        throw new Error("Specify either --next-comment or --prev-comment, not both.");
+        throw new Error(atMostOneFlagMessage(COMMENT_DIRECTION_FLAGS));
       }
 
       return {
@@ -818,9 +837,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
       parsedOptions.newLine !== undefined,
     ].filter(Boolean);
     if (selectors.length !== 1) {
-      throw new Error(
-        "Specify exactly one navigation target: --hunk <n>, --old-line <n>, or --new-line <n>.",
-      );
+      throw new Error(exactlyOneTargetMessage("navigation target", NAVIGATE_TARGET_FLAGS));
     }
 
     return {
@@ -844,13 +861,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
     const separatorIndex = rest.indexOf("--");
     const outerTokens = separatorIndex === -1 ? rest : rest.slice(0, separatorIndex);
 
-    const command = new Command("session reload")
-      .description("replace the contents of one live Hunk session")
-      .argument("[sessionId]")
-      .option("--repo <path>", "target the live session whose repo root matches this path")
-      .option("--session-path <path>", "target a live session rooted at a different path")
-      .option("--source <path>", "load the diff from this directory instead of the session's own")
-      .option("--json", "emit structured JSON");
+    const command = buildSessionCommand(SESSION_AGENT_COMMANDS.reload);
 
     let parsedSessionId: string | undefined;
     let parsedOptions: { sessionPath?: string; repo?: string; source?: string; json?: boolean } =
@@ -867,32 +878,16 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
     );
 
     if (outerTokens.includes("--help") || outerTokens.includes("-h")) {
-      return {
-        kind: "help",
-        text:
-          `${command.helpInformation().trimEnd()}\n\n` +
-          [
-            "Examples:",
-            "  hunk session reload --repo . -- diff",
-            "  hunk session reload --repo . -- diff main...feature -- src/ui",
-            "  hunk session reload --repo . -- show HEAD~1 -- README.md",
-            "  hunk session reload --session-path /path/to/session --source /path/to/repo -- diff",
-          ].join("\n") +
-          "\n",
-      };
+      return sessionCommandHelpText(command, SESSION_AGENT_COMMANDS.reload);
     }
 
     if (separatorIndex === -1) {
-      throw new Error(
-        "Pass the replacement Hunk command after `--`, for example `hunk session reload <session-id> -- diff`.",
-      );
+      throw new Error(RELOAD_SEPARATOR_MESSAGE);
     }
 
     const nestedTokens = rest.slice(separatorIndex + 1);
     if (nestedTokens.length === 0) {
-      throw new Error(
-        "Pass the replacement Hunk command after `--`, for example `hunk session reload <session-id> -- diff`.",
-      );
+      throw new Error(RELOAD_SEPARATOR_MESSAGE);
     }
 
     await parseStandaloneCommand(command, outerTokens);
@@ -919,32 +914,12 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
     if (!commentSubcommand || commentSubcommand === "--help" || commentSubcommand === "-h") {
       return {
         kind: "help",
-        text:
-          [
-            "Usage:",
-            "  hunk session comment add (<session-id> | --repo <path>) --file <path> (--old-line <n> | --new-line <n>) --summary <text> [--focus]",
-            "  hunk session comment apply (<session-id> | --repo <path>) --stdin [--focus]",
-            "  hunk session comment list (<session-id> | --repo <path>) [--file <path>] [--type <live|all|ai|agent|user>]",
-            "  hunk session comment rm (<session-id> | --repo <path>) <comment-id>",
-            "  hunk session comment clear (<session-id> | --repo <path>) [--file <path>] [--include-user|--all] --yes",
-          ].join("\n") + "\n",
+        text: ["Usage:", ...sessionUsageLines(SESSION_COMMENT_COMMAND_LIST)].join("\n") + "\n",
       };
     }
 
     if (commentSubcommand === "add") {
-      const command = new Command("session comment add")
-        .description("attach one live inline review note")
-        .argument("[sessionId]")
-        .requiredOption("--file <path>", "diff file path as shown by Hunk")
-        .requiredOption("--summary <text>", "short review note")
-        .option("--repo <path>", "target the live session whose repo root matches this path")
-        .option("--old-line <n>", "1-based line number on the old side", parsePositiveInt)
-        .option("--new-line <n>", "1-based line number on the new side", parsePositiveInt)
-        .option("--rationale <text>", "optional longer explanation")
-        .option("--markup <stml>", "experimental STML body (target session must opt in)")
-        .option("--author <name>", "optional author label")
-        .option("--focus", "add the note and focus the viewport on it")
-        .option("--json", "emit structured JSON");
+      const command = buildSessionCommand(SESSION_AGENT_COMMANDS["comment-add"]);
 
       let parsedSessionId: string | undefined;
       let parsedOptions: {
@@ -985,7 +960,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
       );
 
       if (commentRest.includes("--help") || commentRest.includes("-h")) {
-        return { kind: "help", text: `${command.helpInformation().trimEnd()}\n` };
+        return sessionCommandHelpText(command, SESSION_AGENT_COMMANDS["comment-add"]);
       }
 
       await parseStandaloneCommand(command, commentRest);
@@ -995,7 +970,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
         parsedOptions.newLine !== undefined,
       ].filter(Boolean);
       if (selectors.length !== 1) {
-        throw new Error("Specify exactly one comment target: --old-line <n> or --new-line <n>.");
+        throw new Error(exactlyOneTargetMessage("comment target", COMMENT_TARGET_FLAGS));
       }
 
       return {
@@ -1015,13 +990,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
     }
 
     if (commentSubcommand === "apply") {
-      const command = new Command("session comment apply")
-        .description("apply many live inline review notes from stdin JSON")
-        .argument("[sessionId]")
-        .option("--repo <path>", "target the live session whose repo root matches this path")
-        .option("--stdin", "read the comment batch from stdin as JSON")
-        .option("--focus", "apply the batch and focus the first note")
-        .option("--json", "emit structured JSON");
+      const command = buildSessionCommand(SESSION_AGENT_COMMANDS["comment-apply"]);
 
       let parsedSessionId: string | undefined;
       let parsedOptions: {
@@ -1047,31 +1016,12 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
       );
 
       if (commentRest.includes("--help") || commentRest.includes("-h")) {
-        return {
-          kind: "help",
-          text:
-            `${command.helpInformation().trimEnd()}\n\n` +
-            [
-              "Stdin JSON shape:",
-              "  {",
-              '    "comments": [',
-              "      {",
-              '        "filePath": "README.md",',
-              '        "hunk": 2,',
-              '        "summary": "Explain this hunk",',
-              '        "rationale": "Optional detail",',
-              '        "author": "Pi"',
-              "      }",
-              "    ]",
-              "  }",
-            ].join("\n") +
-            "\n",
-        };
+        return sessionCommandHelpText(command, SESSION_AGENT_COMMANDS["comment-apply"]);
       }
 
       await parseStandaloneCommand(command, commentRest);
       if (!parsedOptions.stdin) {
-        throw new Error("Pass --stdin to read batch comments from stdin JSON.");
+        throw new Error(COMMENT_APPLY_STDIN_MESSAGE);
       }
 
       const comments = parseSessionCommentApplyPayload(
@@ -1089,13 +1039,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
     }
 
     if (commentSubcommand === "list") {
-      const command = new Command("session comment list")
-        .description("list live inline review notes")
-        .argument("[sessionId]")
-        .option("--repo <path>", "target the live session whose repo root matches this path")
-        .option("--file <path>", "filter comments to one diff file")
-        .option("--type <type>", "filter to live, all, ai, agent, or user comments")
-        .option("--json", "emit structured JSON");
+      const command = buildSessionCommand(SESSION_AGENT_COMMANDS["comment-list"]);
 
       let parsedSessionId: string | undefined;
       let parsedOptions: { repo?: string; file?: string; type?: string; json?: boolean } = {};
@@ -1111,7 +1055,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
       );
 
       if (commentRest.includes("--help") || commentRest.includes("-h")) {
-        return { kind: "help", text: `${command.helpInformation().trimEnd()}\n` };
+        return sessionCommandHelpText(command, SESSION_AGENT_COMMANDS["comment-list"]);
       }
 
       await parseStandaloneCommand(command, commentRest);
@@ -1137,11 +1081,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
     }
 
     if (commentSubcommand === "rm") {
-      const command = new Command("session comment rm")
-        .description("remove one inline review note")
-        .argument("[targets...]", "<session-id> <comment-id>, or <comment-id> with --repo")
-        .option("--repo <path>", "target the live session whose repo root matches this path")
-        .option("--json", "emit structured JSON");
+      const command = buildSessionCommand(SESSION_AGENT_COMMANDS["comment-rm"]);
 
       let parsedTargets: string[] = [];
       let parsedOptions: { repo?: string; json?: boolean } = {};
@@ -1152,7 +1092,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
       });
 
       if (commentRest.includes("--help") || commentRest.includes("-h")) {
-        return { kind: "help", text: `${command.helpInformation().trimEnd()}\n` };
+        return sessionCommandHelpText(command, SESSION_AGENT_COMMANDS["comment-rm"]);
       }
 
       await parseStandaloneCommand(command, commentRest);
@@ -1179,15 +1119,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
     }
 
     if (commentSubcommand === "clear") {
-      const command = new Command("session comment clear")
-        .description("clear inline review notes")
-        .argument("[sessionId]")
-        .option("--repo <path>", "target the live session whose repo root matches this path")
-        .option("--file <path>", "clear only one diff file's comments")
-        .option("--include-user", "also clear human notes created with the TUI `c` action")
-        .option("--all", "clear both live agent comments and human user notes")
-        .option("--yes", "confirm destructive comment clearing")
-        .option("--json", "emit structured JSON");
+      const command = buildSessionCommand(SESSION_AGENT_COMMANDS["comment-clear"]);
 
       let parsedSessionId: string | undefined;
       let parsedOptions: {
@@ -1217,7 +1149,7 @@ async function parseSessionCommand(tokens: string[]): Promise<ParsedCliInput> {
       );
 
       if (commentRest.includes("--help") || commentRest.includes("-h")) {
-        return { kind: "help", text: `${command.helpInformation().trimEnd()}\n` };
+        return sessionCommandHelpText(command, SESSION_AGENT_COMMANDS["comment-clear"]);
       }
 
       await parseStandaloneCommand(command, commentRest);
