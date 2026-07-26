@@ -23,10 +23,10 @@ on:
       - "src/session-broker/brokerConfig.ts"
       - "src/ui/lib/shikiThemes.ts"
       - ".github/workflows/website.yml"
+      - "vercel.json"
   push:
     branches:
       - main
-      - docs/starlight-website
     paths:
       - "website/**"
       - "package.json"
@@ -45,6 +45,7 @@ on:
       - "src/session-broker/brokerConfig.ts"
       - "src/ui/lib/shikiThemes.ts"
       - ".github/workflows/website.yml"
+      - "vercel.json"
 
 concurrency:
   group: website-${{ github.workflow }}-${{ github.ref }}
@@ -52,7 +53,7 @@ concurrency:
 
 jobs:
   build:
-    name: Check and build docs
+    name: Check and build website
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
