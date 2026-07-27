@@ -1,0 +1,20 @@
+---
+import Search from "@astrojs/starlight/components/Search.astro";
+import BrandHeader from "../BrandHeader.astro";
+---
+
+<BrandHeader current="docs" context="docs">
+  <div slot="tools" class="docs-header-tools print:hidden">
+    <Search />
+  </div>
+</BrandHeader>
+
+<style>
+  .docs-header-tools {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 14px;
+  }
+
+</style>

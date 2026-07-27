@@ -1,0 +1,31 @@
+---
+interface Props {
+  current?: "home" | "docs";
+  context?: "marketing" | "docs";
+}
+
+const { current, context = "marketing" } = Astro.props;
+const hasTools = Astro.slots.has("tools");
+const REPO = "https://github.com/modem-dev/hunk";
+const DISCORD = "https://discord.gg/WZFjaP6Gt8";
+const installHref = context === "docs" ? "/docs/start/install/" : "/#install";
+---
+
+<div class="brand-header-inner" data-context={context}>
+  <a class="brand-logo" href="/" aria-label="Hunk home">hunk</a>
+  <div class="brand-header-actions">
+    <nav class="brand-nav" aria-label="Main navigation">
+      <a href={installHref}>Install</a>
+      <a href="/docs/" aria-current={current === "docs" ? "page" : undefined}>Docs</a>
+      <a class="brand-discord" href={DISCORD}>Discord</a>
+      <a href={REPO}>GitHub ↗</a>
+    </nav>
+    {
+      hasTools && (
+        <div class="brand-tools">
+          <slot name="tools" />
+        </div>
+      )
+    }
+  </div>
+</div>

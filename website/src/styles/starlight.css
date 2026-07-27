@@ -1,24 +1,9 @@
-@import "@fontsource-variable/jetbrains-mono";
+@import "./brand.css";
 
 :root {
-  --hunk-bg: #f4f1ea;
-  --hunk-paper: #fffdf8;
-  --hunk-panel: #e9e4d8;
-  --hunk-ink: #16140f;
-  --hunk-body: #3a352b;
-  --hunk-muted: #6b6557;
-  --hunk-rule: #dcd6c8;
-  --hunk-accent: #1f7a35;
-  --hunk-accent-soft: #bfe9c6;
-  --hunk-accent-ink: #0d3a18;
-  --hunk-strong-border: #16140f;
-  --hunk-shadow: #16140f;
-  --hunk-button-ink: #fffdf8;
-
-  --sl-font:
-    "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
-    Consolas, "Liberation Mono", monospace;
-  --sl-font-mono: var(--sl-font);
+  --sl-font: var(--hunk-font);
+  --sl-font-mono: var(--hunk-font);
+  --sl-nav-height: 4.625rem;
   --sl-color-accent-low: var(--hunk-accent-soft);
   --sl-color-accent: var(--hunk-accent);
   --sl-color-accent-high: var(--hunk-accent-ink);
@@ -42,39 +27,11 @@
 }
 
 :root[data-theme="dark"] {
-  --hunk-bg: #0c0e10;
-  --hunk-paper: #14181b;
-  --hunk-panel: #1b1f24;
-  --hunk-ink: #f2f4f6;
-  --hunk-body: #c3c9cf;
-  --hunk-muted: #9aa4af;
-  --hunk-rule: #262d34;
-  --hunk-accent: #5dd06a;
-  --hunk-accent-soft: #2c6b34;
-  --hunk-accent-ink: #b9f2c0;
-  --hunk-strong-border: #3a444e;
-  --hunk-shadow: #050607;
-  --hunk-button-ink: #0c0e10;
-
-  --sl-color-accent-low: var(--hunk-accent-soft);
-  --sl-color-accent: var(--hunk-accent);
-  --sl-color-accent-high: var(--hunk-accent-ink);
-  --sl-color-text-accent: var(--hunk-accent);
-  --sl-color-white: var(--hunk-ink);
-  --sl-color-gray-1: var(--hunk-ink);
-  --sl-color-gray-2: var(--hunk-body);
-  --sl-color-gray-3: var(--hunk-muted);
   --sl-color-gray-4: #6b7681;
-  --sl-color-gray-5: var(--hunk-rule);
   --sl-color-gray-6: var(--hunk-paper);
   --sl-color-gray-7: var(--hunk-panel);
-  --sl-color-black: var(--hunk-bg);
-  --sl-color-bg: var(--hunk-bg);
   --sl-color-bg-nav: rgba(12, 14, 16, 0.96);
   --sl-color-bg-sidebar: var(--hunk-paper);
-  --sl-color-bg-inline-code: var(--hunk-panel);
-  --sl-color-hairline-light: var(--hunk-rule);
-  --sl-color-hairline: var(--hunk-rule);
   --sl-color-hairline-shade: #1d2329;
 }
 
@@ -100,11 +57,26 @@ h4,
 
 h1 {
   color: var(--hunk-ink);
+  font-size: clamp(2.25rem, 4vw, 3rem);
+  line-height: 1;
   letter-spacing: -0.04em;
 }
 
 h2 {
+  color: var(--hunk-ink);
   letter-spacing: -0.03em;
+}
+
+h3,
+h4 {
+  color: var(--hunk-ink);
+  letter-spacing: -0.015em;
+}
+
+.sl-markdown-content > p,
+.sl-markdown-content > ul,
+.sl-markdown-content > ol {
+  max-width: 48rem;
 }
 
 a:focus-visible,
@@ -131,6 +103,7 @@ code:not(pre code) {
 }
 
 header.header {
+  padding: 0;
   border-bottom: 1.5px solid var(--hunk-strong-border);
 }
 
@@ -145,6 +118,12 @@ header.header {
   border-inline-end-color: var(--hunk-rule);
 }
 
+.sidebar-content summary {
+  color: var(--hunk-ink);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
 .sidebar-content a {
   border-radius: 0.25rem;
 }
@@ -155,8 +134,7 @@ header.header {
 }
 
 site-search button,
-starlight-menu-button button,
-starlight-theme-select select {
+starlight-menu-button button {
   border: 1.5px solid var(--hunk-strong-border);
   border-radius: 0.5rem;
   background: var(--hunk-paper);
@@ -166,7 +144,7 @@ starlight-theme-select select {
 }
 
 .hero h1 {
-  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  font-size: clamp(2.25rem, 5vw, 3.5rem);
   line-height: 1;
 }
 
@@ -214,7 +192,17 @@ starlight-theme-select select {
   color: var(--hunk-accent-ink);
 }
 
-.sl-link-card,
+.sl-link-card {
+  border: 1.5px solid var(--hunk-strong-border);
+  border-radius: 0;
+  background: var(--hunk-paper);
+  box-shadow: none;
+}
+
+.sl-link-card:hover {
+  background: color-mix(in srgb, var(--hunk-paper) 82%, var(--hunk-accent-soft));
+}
+
 .pagination-links > a {
   border: 1.5px solid var(--hunk-strong-border);
   border-radius: 0.5rem;
@@ -270,7 +258,6 @@ starlight-theme-select select {
 
 @media (hover: hover) {
   .sl-link-button:hover,
-  .sl-link-card:hover,
   .pagination-links > a:hover {
     transform: translate(2px, 2px);
     box-shadow: 1px 1px 0 var(--hunk-shadow);
@@ -279,7 +266,6 @@ starlight-theme-select select {
 
 @media (prefers-reduced-motion: reduce) {
   .sl-link-button,
-  .sl-link-card,
   .pagination-links > a {
     transition: none;
   }

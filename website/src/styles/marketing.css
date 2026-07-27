@@ -1,9 +1,7 @@
-@import "@fontsource-variable/jetbrains-mono/index.css";
+@import "./brand.css";
 
 :root {
-  --mono:
-    "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
-    "Liberation Mono", monospace;
+  --mono: var(--hunk-font);
 }
 
 * {
@@ -22,8 +20,8 @@ body {
 
 body {
   overflow-x: hidden;
-  background: #f4f1ea;
-  color: #16140f;
+  background: var(--hunk-bg);
+  color: var(--hunk-ink);
   font-family: var(--mono);
   font-size: 15px;
   line-height: 1.65;
@@ -43,7 +41,7 @@ a {
 
 button:focus-visible,
 a:focus-visible {
-  outline: 3px solid #1f7a35;
+  outline: 3px solid var(--hunk-accent);
   outline-offset: 3px;
 }
 
@@ -67,46 +65,30 @@ a:focus-visible {
   position: relative;
   z-index: 2;
   min-height: 100vh;
-  background: #f4f1ea;
-  color: #16140f;
+  background: var(--hunk-bg);
+  color: var(--hunk-ink);
   font-family: var(--mono);
-  --acc: #1f7a35;
+  --acc: var(--hunk-accent);
   --del: #c0392b;
-  --paper: #fffdf8;
-  --rule: #dcd6c8;
-  --soft: #6b6557;
-  --ink: #16140f;
+  --paper: var(--hunk-paper);
+  --rule: var(--hunk-rule);
+  --soft: var(--hunk-muted);
+  --ink: var(--hunk-ink);
 }
 
 .marketing ::selection {
-  color: #0d3a18;
-  background: #bfe9c6;
+  color: var(--hunk-accent-ink);
+  background: var(--hunk-accent-soft);
 }
 
 .marketing .top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   max-width: 960px;
-  margin: 0 auto;
-  padding: 22px 36px;
+  height: 74px;
+  margin-inline: auto;
   border-bottom: 1.5px solid var(--ink);
 }
 
-.marketing .logo {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.marketing .top nav {
-  display: flex;
-  gap: 22px;
-  font-size: 13.5px;
-}
-
 .marketing .top nav a:hover,
-.marketing .foot-links a:hover,
 .marketing .says figcaption a:hover {
   color: var(--acc);
 }
@@ -119,7 +101,7 @@ a:focus-visible {
 
 .marketing h1 {
   margin: 0 0 24px;
-  font-size: clamp(34px, 7vw, 72px);
+  font-size: clamp(32px, 6vw, 60px);
   font-weight: 700;
   line-height: 0.99;
   letter-spacing: -0.04em;
@@ -148,7 +130,7 @@ a:focus-visible {
 .marketing .sub {
   max-width: 500px;
   margin: 0 0 30px;
-  color: #3a352b;
+  color: var(--hunk-body);
   font-size: 16.5px;
   line-height: 1.6;
 }
@@ -239,7 +221,7 @@ a:focus-visible {
   gap: 6px;
   padding: 10px 14px;
   border-bottom: 1.5px solid var(--ink);
-  background: #e9e4d8;
+  background: var(--hunk-panel);
 }
 
 .marketing .dot {
@@ -294,7 +276,7 @@ a:focus-visible {
 }
 
 .marketing .tpill:hover {
-  background: #fff;
+  background: var(--hunk-paper-hover);
 }
 
 .marketing .tpill.on {
@@ -389,7 +371,7 @@ a:focus-visible {
 }
 
 .marketing .grid article:hover {
-  background: #fff;
+  background: var(--hunk-paper-hover);
 }
 
 .marketing .num {
@@ -406,7 +388,7 @@ a:focus-visible {
 
 .marketing .grid p {
   margin: 0;
-  color: #3a352b;
+  color: var(--hunk-body);
   font-size: 13.5px;
   line-height: 1.6;
 }
@@ -478,46 +460,8 @@ a:focus-visible {
 
 .marketing .req {
   margin: 0;
-  color: #3a352b;
+  color: var(--hunk-body);
   font-size: 13.5px;
-}
-
-.marketing .bottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  max-width: 960px;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin: 0 auto;
-  padding: 26px 36px 52px;
-  border-top: 1.5px solid var(--ink);
-  font-size: 12.5px;
-}
-
-.marketing .foot-links {
-  display: flex;
-  gap: 18px;
-  flex-wrap: wrap;
-}
-
-.marketing .modem {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--soft);
-}
-
-.marketing .modem img {
-  display: block;
-  width: auto;
-  height: 16px;
-  opacity: 0.82;
-  transition: 0.15s;
-}
-
-.marketing .modem:hover img {
-  opacity: 1;
 }
 
 @media (max-width: 760px) {
@@ -530,23 +474,17 @@ a:focus-visible {
     font-size: 12.5px;
   }
 
-  .marketing .top,
   .marketing .intro,
   .marketing .paper,
   .marketing .says,
   .marketing .feats,
-  .marketing .install,
-  .marketing .bottom {
+  .marketing .install {
     padding-right: 20px;
     padding-left: 20px;
   }
 }
 
 @media (max-width: 680px) {
-  .marketing .top {
-    align-items: flex-start;
-  }
-
   .marketing .top nav {
     justify-content: flex-end;
     flex-wrap: wrap;

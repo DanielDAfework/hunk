@@ -38,6 +38,13 @@ export default defineConfig({
       lastUpdated: true,
       pagination: true,
       customCss: ["./src/styles/starlight.css"],
+      components: {
+        Footer: "./src/components/docs/DocsFooter.astro",
+        Header: "./src/components/docs/DocsHeader.astro",
+        MobileMenuFooter: "./src/components/docs/DocsMobileMenuFooter.astro",
+        Sidebar: "./src/components/docs/DocsSidebar.astro",
+        ThemeProvider: "./src/components/docs/LightThemeProvider.astro",
+      },
       sidebar: [
         {
           label: "Start here",

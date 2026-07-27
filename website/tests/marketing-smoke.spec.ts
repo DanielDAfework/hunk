@@ -15,6 +15,51 @@ test("marketing page links into documentation and preserves core calls to action
   await expect(page.getByRole("button", { name: "Copy: npm i -g hunkdiff" })).toBeVisible();
 });
 
+test("marketing and docs share the canonical brand shell", async ({ page }) => {
+  await page.goto("/");
+  const marketingStyles = await page.locator("body").evaluate((body) => {
+    const styles = getComputedStyle(body);
+    return { background: styles.backgroundColor, font: styles.fontFamily };
+  });
+  await expect(page.getByRole("link", { name: "Hunk home" })).toHaveAttribute("href", "/");
+  await expect(page.locator(".brand-footer")).toHaveCount(1);
+
+  await page.goto("/docs/");
+  const docsStyles = await page.locator("body").evaluate((body) => {
+    const styles = getComputedStyle(body);
+    return { background: styles.backgroundColor, font: styles.fontFamily };
+  });
+  expect(docsStyles).toEqual(marketingStyles);
+  const docsHeader = await page.locator(".brand-header-inner[data-context='docs']").boundingBox();
+  expect(docsHeader?.width).toBe(await page.evaluate(() => window.innerWidth));
+  await expect(page.getByRole("link", { name: "Hunk home" })).toHaveAttribute("href", "/");
+  await expect(page.locator(".brand-nav a[href='/docs/start/install/']")).toHaveCount(1);
+  await expect(page.locator(".brand-footer")).toHaveCount(0);
+});
+
+test("shared headers stay usable at narrow and tablet breakpoints", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.goto("/");
+  const marketingNavigation = page.getByRole("navigation", { name: "Main navigation" });
+  await expect(marketingNavigation.getByRole("link", { name: "Discord" })).toBeHidden();
+  const marketingHeader = await page.locator(".top").boundingBox();
+  const marketingNav = await marketingNavigation.boundingBox();
+  expect(marketingHeader).not.toBeNull();
+  expect(marketingNav).not.toBeNull();
+  expect(marketingNav!.y + marketingNav!.height).toBeLessThanOrEqual(
+    marketingHeader!.y + marketingHeader!.height,
+  );
+
+  await page.setViewportSize({ width: 780, height: 800 });
+  await page.goto("/docs/");
+  await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeHidden();
+  const search = await page.getByRole("button", { name: "Search" }).boundingBox();
+  const menu = await page.locator("starlight-menu-button button").boundingBox();
+  expect(search).not.toBeNull();
+  expect(menu).not.toBeNull();
+  expect(search!.x + search!.width).toBeLessThanOrEqual(menu!.x);
+});
+
 test("install command copies with accessible feedback", async ({ context, page }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/");

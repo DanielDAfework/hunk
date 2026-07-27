@@ -1,11 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
-
-/** Open responsive navigation controls when the desktop sidebar is collapsed. */
-async function openMobileMenuIfNeeded(page: Page) {
-  const menu = page.getByRole("button", { name: "Menu" });
-  if (await menu.isVisible()) await menu.click();
-}
+import { expect, test } from "@playwright/test";
 
 test("responsive navigation and on-page table of contents are usable", async ({
   page,
@@ -17,7 +11,7 @@ test("responsive navigation and on-page table of contents are usable", async ({
   const quickStartLink = mainNavigation.getByRole("link", { name: "Quick start", exact: true });
   if (testInfo.project.name.startsWith("mobile")) {
     await expect(quickStartLink).toBeHidden();
-    const menu = page.getByRole("button", { name: "Menu" });
+    const menu = page.locator("starlight-menu-button button");
     await expect(menu).toBeVisible();
     await menu.click();
     await expect(quickStartLink).toBeVisible();
@@ -33,14 +27,28 @@ test("responsive navigation and on-page table of contents are usable", async ({
   }
 });
 
-test("theme choice persists while navigating", async ({ page }) => {
+test("documentation stays in the canonical light theme", async ({ page }) => {
   await page.goto("/docs/start/quick-start/");
-  await openMobileMenuIfNeeded(page);
-  const picker = page.getByLabel("Select theme").filter({ visible: true });
-  await picker.selectOption("dark");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.getByLabel("Select theme")).toHaveCount(0);
   await page.goto("/docs/agents/review-with-an-agent/");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+});
+
+test("left sidebar credits Modem at its bottom", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/docs/start/quick-start/");
+  const sidebar = page.locator("#starlight__sidebar");
+  const modem = page.getByRole("link", { name: "Built by Modem" });
+  await expect(modem).toBeVisible();
+  const sidebarBounds = await sidebar.boundingBox();
+  const modemBounds = await modem.boundingBox();
+  expect(sidebarBounds).not.toBeNull();
+  expect(modemBounds).not.toBeNull();
+  expect(modemBounds!.y + modemBounds!.height).toBeLessThanOrEqual(
+    sidebarBounds!.y + sidebarBounds!.height,
+  );
+  expect(modemBounds!.y).toBeGreaterThan(sidebarBounds!.y + sidebarBounds!.height / 2);
 });
 
 test("local Pagefind search opens and returns a documentation route", async ({ page }) => {
