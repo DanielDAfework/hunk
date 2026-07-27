@@ -1,23 +1,9 @@
 ---
 /**
  * Positions Hunk against the two things people already use to read a diff:
- * a prettier pager, or a GUI that is not in the terminal.
+ * a prettier pager, or a GUI that is not in the terminal. The table carries
+ * the argument on its own, so it ships without surrounding prose.
  */
-const stances = [
-  {
-    label: "Not a pager",
-    body: "delta and diff-so-fancy make git diff prettier. Hunk gives the changeset structure — a file sidebar, hunk navigation, and layouts you can change while reading.",
-  },
-  {
-    label: "Not a Git client",
-    body: "lazygit and gitui stage, commit, branch, and push. Hunk does one thing: read a changeset well, whoever or whatever wrote it.",
-  },
-  {
-    label: "Not a web app",
-    body: "No browser tab, no account, no telemetry, and no waiting for a pull request to exist before you can review the work.",
-  },
-] as const;
-
 const columns = ["Pagers", "IDE & web review", "hunk"] as const;
 
 /** Each row is [capability, pager, gui, hunk]. "yes" and "no" render as marks. */
@@ -36,17 +22,6 @@ const rows = [
 const cell = (value: string) =>
   value === "yes" ? { mark: "✓", label: "Yes" } : value === "no" ? { mark: "—", label: "No" } : null;
 ---
-
-<div class="stances">
-  {
-    stances.map(({ label, body }) => (
-      <article>
-        <h3>{label}</h3>
-        <p>{body}</p>
-      </article>
-    ))
-  }
-</div>
 
 <div class="table-scroll" tabindex="0" role="region" aria-labelledby="compare-caption">
   <table class="compare">

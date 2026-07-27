@@ -54,14 +54,6 @@ const features = [
   ],
 ] as const;
 
-/** Documented support surfaces, kept to claims the docs actually back up. */
-const worksWith = [
-  ["Version control", "Git · Jujutsu · Sapling · plain files · .patch and .diff"],
-  ["Drops into", "git pager · git difftool · jj and sl pager · stdin pipelines"],
-  ["Agents", "Any agent that can run a shell command"],
-  ["Platforms", "macOS · Linux · Windows · over SSH · inside tmux"],
-] as const;
-
 const quotes = [
   {
     who: "Mitchell Hashimoto, creator of Ghostty & Vagrant",
@@ -234,15 +226,9 @@ const formattedStars =
         </section>
 
         <section class="band why" id="why" aria-labelledby="why-title">
-          <div class="band-head">
-            <div>
-              <p class="kicker"># why hunk</p>
-              <h2 id="why-title">Most terminal diff tools are pagers. Hunk is a review tool.</h2>
-            </div>
-            <p class="band-lede">
-              A pager prints a diff and scrolls. Reviewing means moving through a changeset — file to
-              file, hunk to hunk — while the reasoning behind it stays in view.
-            </p>
+          <div class="band-head tight">
+            <p class="kicker"># why hunk</p>
+            <h2 id="why-title">Most terminal diff tools are pagers. Hunk is a review tool.</h2>
           </div>
           <Comparison />
         </section>
@@ -264,23 +250,10 @@ const formattedStars =
             Then <b>hunk diff</b> to review your working tree, or <b>hunk show</b> to review a commit.
             npm installs require Node.js 18 or newer.
           </p>
-          <dl class="works">
-            {
-              worksWith.map(([label, value]) => (
-                <div>
-                  <dt>{label}</dt>
-                  <dd>{value}</dd>
-                </div>
-              ))
-            }
-          </dl>
         </section>
 
         <section class="last">
-          <h2>Install hunk. Run <span class="mark">hunk diff</span>. Read the whole change.</h2>
-          <p>
-            Then press <b>]</b> and keep pressing it until you have seen every hunk your agent wrote.
-          </p>
+          <h2>Try hunk on your next changeset.</h2>
           <div class="cta">
             <a class="ghost" href="#install">Install hunk</a>
             <a class="plain" href="/docs/start/quick-start/">Read the quick start</a>
