@@ -542,44 +542,41 @@ a:focus-visible {
   line-height: 1.55;
 }
 
-/* Agent section: the command flow next to what it produces on screen. */
+/* Agent section: the screenshot carries it, the commands just say who runs what. */
 .marketing .agent-cols {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.82fr);
-  align-items: start;
-  gap: 34px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr);
+  align-items: center;
+  gap: 40px;
 }
 
-.marketing .agent-flow ol {
+.marketing .agent-flow dl {
   margin: 0;
-  padding: 20px 22px;
-  border: 1.5px solid var(--ink);
-  border-radius: 10px;
-  background: var(--paper);
-  box-shadow: 4px 4px 0 var(--ink);
-  list-style: none;
-  counter-reset: step;
-}
-
-.marketing .agent-flow li + li {
-  margin-top: 16px;
-  padding-top: 16px;
   border-top: 1.5px solid var(--rule);
 }
 
-.marketing .agent-flow .hash {
-  display: block;
+.marketing .agent-flow dl > div {
+  padding: 14px 0;
+  border-bottom: 1.5px solid var(--rule);
+}
+
+.marketing .agent-flow dt {
   color: var(--soft);
-  font-size: 12px;
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.marketing .agent-flow dd {
+  margin: 8px 0 0;
 }
 
 .marketing .agent-flow code {
   display: block;
-  margin-top: 5px;
   overflow-wrap: anywhere;
   font-family: var(--mono);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .marketing .agent-flow code::before {
@@ -622,17 +619,6 @@ a:focus-visible {
   box-shadow: 4px 4px 0 var(--ink);
 }
 
-.marketing .agent-shot figcaption {
-  margin-top: 14px;
-  color: var(--soft);
-  font-size: 12.5px;
-  line-height: 1.55;
-}
-
-.marketing .agent-shot code {
-  font-family: var(--mono);
-  color: var(--ink);
-}
 
 /* Comparison: the capability table carries the section by itself. */
 .marketing .table-scroll {

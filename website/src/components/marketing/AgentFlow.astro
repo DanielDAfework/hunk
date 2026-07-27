@@ -1,63 +1,47 @@
 ---
 /**
- * The agent story gets its own section because it is the reason Hunk exists,
- * and a single feature card cannot carry it.
+ * The agent story is carried by the screenshot. The commands only answer
+ * "who runs what", so they stay as short as that question.
  */
-const steps = [
-  { comment: "you, in the repo — keep this window open", command: "hunk diff" },
-  { comment: "the agent, in its own shell", command: "hunk skill path" },
-  { comment: "read structure without flooding its context", command: "hunk session review --repo . --json" },
+const roles = [
+  { who: "You", commands: ["hunk diff"] },
   {
-    comment: "move your visible window to the hunk it means",
-    command: "hunk session navigate --repo . --file src/App.tsx --hunk 2",
+    who: "Your agent",
+    commands: ["hunk session review --repo . --json", "hunk session comment add --repo ."],
   },
-  {
-    comment: "leave a note that renders beside the code",
-    command: 'hunk session comment add --repo . --new-line 42 --summary "Check this boundary"',
-  },
-] as const;
-
-const links = [
-  { href: "/docs/agents/review-with-an-agent/", label: "Review with an agent" },
-  { href: "/docs/agents/live-session-control/", label: "Live session control" },
-  { href: "/docs/agents/review-skill/", label: "The review skill" },
 ] as const;
 ---
 
 <div class="agent-cols">
-  <div class="agent-flow">
-    <ol>
-      {
-        steps.map(({ comment, command }) => (
-          <li>
-            <span class="hash"># {comment}</span>
-            <code>{command}</code>
-          </li>
-        ))
-      }
-    </ol>
-    <p class="pills">
-      {
-        links.map(({ href, label }) => (
-          <a href={href}>
-            {label} <span aria-hidden="true">→</span>
-          </a>
-        ))
-      }
-    </p>
-  </div>
-
   <figure class="agent-shot">
     <img
-      src="/docs/images/agent-comments.webp"
-      alt="A Hunk review with agent rationale rendered directly beside the annotated diff hunk"
-      width="960"
-      height="1000"
+      src="/agent-note-zoom.webp"
+      alt="An agent note explaining a change, rendered in the diff directly above the lines it describes"
+      width="924"
+      height="486"
       loading="lazy"
     />
-    <figcaption>
-      Agent notes stay attached to the hunk they explain. <code>&#123;</code> and <code>&#125;</code>
-      walk between annotated hunks without losing the changeset.
-    </figcaption>
   </figure>
+
+  <div class="agent-flow">
+    <dl>
+      {
+        roles.map(({ who, commands }) => (
+          <div>
+            <dt>{who}</dt>
+            <dd>
+              {commands.map((command) => (
+                <code>{command}</code>
+              ))}
+            </dd>
+          </div>
+        ))
+      }
+    </dl>
+    <p class="pills">
+      <a href="/docs/agents/review-with-an-agent/">
+        How agent review works <span aria-hidden="true">→</span>
+      </a>
+    </p>
+  </div>
 </div>

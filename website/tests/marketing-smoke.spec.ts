@@ -99,9 +99,9 @@ test("feature cards deep-link into the matching documentation page", async ({ pa
     "href",
     "/docs/workflows/watch-mode/",
   );
-  await expect(page.getByRole("link", { name: /Live session control/ })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: /Inline agent annotations/ })).toHaveAttribute(
     "href",
-    "/docs/agents/live-session-control/",
+    "/docs/agents/comments-and-annotations/",
   );
 });
 
