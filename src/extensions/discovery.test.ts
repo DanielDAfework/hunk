@@ -20,6 +20,12 @@ function writeExtensionFile(...segments: string[]) {
   return path;
 }
 
+/** Write one folder extension's `package.json`, creating the folder as needed. */
+function writeExtensionManifest(dir: string, contents: string) {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "package.json"), contents);
+}
+
 /** Create a repo root discovery can find without shelling out to a VCS. */
 function createRepo(prefix: string) {
   const repo = createTempDir(prefix);
@@ -209,6 +215,120 @@ describe("extension discovery", () => {
     });
 
     expect(candidates).toEqual([{ id: "themed", path: globalPath, origin: "global" }]);
+  });
+});
+
+describe("folder extension manifests", () => {
+  test("prefers a package.json manifest over the index fallback when scanning", () => {
+    const globalDir = createTempDir("hunk-ext-manifest-scan-");
+    const folder = join(globalDir, "manifest-ext");
+    const entry = writeExtensionFile(folder, "src", "main.ts");
+    writeExtensionManifest(folder, `{"hunk": {"extensions": ["./src/main.ts"]}}`);
+    // The index is only reached when no manifest declares entries.
+    writeExtensionFile(folder, "index.ts");
+
+    const candidates = discoverExtensions({
+      cwd: globalDir,
+      repoRoot: undefined,
+      globalExtensionsDir: globalDir,
+      env: {},
+    });
+
+    // A single declared entry still answers to the folder's name, so
+    // `[extension.manifest-ext]` keeps working.
+    expect(candidates).toEqual([{ id: "manifest-ext", path: entry, origin: "global" }]);
+  });
+
+  test("resolves a manifest for an explicit folder path", () => {
+    const root = createTempDir("hunk-ext-manifest-explicit-");
+    const folder = join(root, "manifest-ext");
+    const entry = writeExtensionFile(folder, "src", "main.ts");
+    writeExtensionManifest(folder, `{"hunk": {"extensions": ["./src/main.ts"]}}`);
+
+    const candidates = discoverExtensions({
+      cwd: root,
+      repoRoot: undefined,
+      globalExtensionsDir: undefined,
+      configPaths: ["manifest-ext"],
+      env: {},
+    });
+
+    expect(candidates).toEqual([{ id: "manifest-ext", path: entry, origin: "config" }]);
+  });
+
+  test("keeps manifest order and per-file ids when a manifest declares several entries", () => {
+    const root = createTempDir("hunk-ext-manifest-multi-");
+    const folder = join(root, "multi-ext");
+    const alpha = writeExtensionFile(folder, "alpha.ts");
+    const beta = writeExtensionFile(folder, "beta.ts");
+    // Declared out of alphabetical order on purpose: a folder's entries sort as
+    // one unit at the folder's position and keep the order the manifest gave.
+    writeExtensionManifest(folder, `{"hunk": {"extensions": ["./beta.ts", "./alpha.ts"]}}`);
+
+    const candidates = discoverExtensions({
+      cwd: root,
+      repoRoot: undefined,
+      globalExtensionsDir: undefined,
+      flagPaths: [folder],
+      env: {},
+    });
+
+    expect(candidates).toEqual([
+      { id: "beta", path: beta, origin: "flag" },
+      { id: "alpha", path: alpha, origin: "flag" },
+    ]);
+  });
+
+  test("falls back to the index entry when package.json is malformed", () => {
+    const root = createTempDir("hunk-ext-manifest-broken-");
+    const folder = join(root, "broken-manifest");
+    const index = writeExtensionFile(folder, "index.ts");
+    writeExtensionManifest(folder, `{ not json`);
+
+    const candidates = discoverExtensions({
+      cwd: root,
+      repoRoot: undefined,
+      globalExtensionsDir: undefined,
+      flagPaths: [folder],
+      env: {},
+    });
+
+    expect(candidates).toEqual([{ id: "broken-manifest", path: index, origin: "flag" }]);
+  });
+
+  test("falls back to the index entry for a package.json without a hunk field", () => {
+    const root = createTempDir("hunk-ext-manifest-plain-");
+    const folder = join(root, "plain-package");
+    const index = writeExtensionFile(folder, "index.ts");
+    writeExtensionManifest(folder, `{"name": "x", "dependencies": {}}`);
+
+    const candidates = discoverExtensions({
+      cwd: root,
+      repoRoot: undefined,
+      globalExtensionsDir: undefined,
+      flagPaths: [folder],
+      env: {},
+    });
+
+    expect(candidates).toEqual([{ id: "plain-package", path: index, origin: "flag" }]);
+  });
+
+  test("keeps a manifest entry pointing at a missing file so the host can report it", () => {
+    const root = createTempDir("hunk-ext-manifest-missing-");
+    const folder = join(root, "missing-entry");
+    writeExtensionManifest(folder, `{"hunk": {"extensions": ["./src/main.ts"]}}`);
+
+    const candidates = discoverExtensions({
+      cwd: root,
+      repoRoot: undefined,
+      globalExtensionsDir: undefined,
+      flagPaths: [folder],
+      env: {},
+    });
+
+    expect(candidates).toEqual([
+      { id: "missing-entry", path: join(folder, "src", "main.ts"), origin: "flag" },
+    ]);
   });
 });
 

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
+import { basename, isAbsolute, join, resolve } from "node:path";
 import { resolveGlobalExtensionsDir } from "../core/paths";
 import { findVcsRepoRootCandidate } from "../core/vcs";
 import { deriveExtensionId, type ExtensionCandidate, type ExtensionOrigin } from "./types";
@@ -8,6 +8,26 @@ import { deriveExtensionId, type ExtensionCandidate, type ExtensionOrigin } from
 /** Entry-file suffixes Hunk will import directly, in preference order. */
 const EXTENSION_ENTRY_SUFFIXES = [".ts", ".js", ".mjs"] as const;
 const EXTENSION_INDEX_BASENAMES = EXTENSION_ENTRY_SUFFIXES.map((suffix) => `index${suffix}`);
+/** `package.json` field a folder extension declares its entry files under. */
+const EXTENSION_MANIFEST_FIELD = "hunk";
+
+/**
+ * One entry file discovery found, with the identity and sort position it carries.
+ *
+ * `sortKey` keeps a folder's entries together: every entry a manifest declares
+ * sorts at the folder's own position, so a multi-entry extension stays in
+ * manifest order instead of being scattered by its individual file paths.
+ */
+interface DiscoveredExtensionEntry {
+  id: string;
+  path: string;
+  sortKey: string;
+}
+
+/** Describe one standalone entry file, which sorts and is named by its own path. */
+function toStandaloneEntry(path: string): DiscoveredExtensionEntry {
+  return { id: deriveExtensionId(path), path, sortKey: path };
+}
 
 export interface DiscoverExtensionsOptions {
   cwd?: string;
@@ -58,32 +78,103 @@ function findFolderExtensionIndex(dir: string) {
 }
 
 /**
+ * Read the entry paths one folder extension declares in its `package.json`.
+ *
+ * The manifest field is `"hunk": { "extensions": ["./src/index.ts"] }`, and each
+ * declared path resolves against the folder. A declared path that does not exist
+ * is kept rather than filtered out, matching the posture for explicit paths: the
+ * host reports it as a load issue instead of the entry silently vanishing.
+ *
+ * Anything that goes wrong — no `package.json`, an unreadable one, malformed
+ * JSON, or a field of the wrong shape — means "no manifest", so a folder that
+ * merely happens to ship a `package.json` still falls back to its index entry.
+ */
+function readManifestEntryPaths(dir: string) {
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(fs.readFileSync(join(dir, "package.json"), "utf8"));
+  } catch {
+    return undefined;
+  }
+
+  if (typeof manifest !== "object" || manifest === null) {
+    return undefined;
+  }
+
+  const section = (manifest as Record<string, unknown>)[EXTENSION_MANIFEST_FIELD];
+  if (typeof section !== "object" || section === null) {
+    return undefined;
+  }
+
+  const declared = (section as Record<string, unknown>).extensions;
+  if (!Array.isArray(declared)) {
+    return undefined;
+  }
+
+  // Non-string items are skipped rather than fatal; one bad array item should
+  // not cost the folder the entries it declared correctly.
+  return declared
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => resolve(dir, entry));
+}
+
+/**
+ * Resolve the entry files of one folder extension.
+ *
+ * A `package.json` manifest wins over the `index.{ts,js,mjs}` fallback, and may
+ * declare several entries. A manifest that declares no usable entry is treated
+ * as no manifest at all, so such a folder still loads its index if it has one.
+ *
+ * A single-entry manifest keeps the folder's name as the extension id — the
+ * same id the index fallback would produce — so `[extension.<id>]` config tables
+ * stay keyed by the folder the user installed, whatever the entry file is
+ * called. Multiple entries have no single owner, so each is named by its own
+ * file stem; entry files should be named distinctly for that reason.
+ *
+ * Returns an empty list when the folder is not an extension at all.
+ */
+function resolveFolderExtensionEntries(dir: string): DiscoveredExtensionEntry[] {
+  const manifestPaths = readManifestEntryPaths(dir);
+
+  if (manifestPaths && manifestPaths.length > 0) {
+    const folderName = basename(dir);
+    return manifestPaths.map((path) => ({
+      id:
+        manifestPaths.length === 1 && folderName.length > 0 ? folderName : deriveExtensionId(path),
+      path,
+      sortKey: dir,
+    }));
+  }
+
+  const folderIndex = findFolderExtensionIndex(dir);
+  return folderIndex ? [toStandaloneEntry(folderIndex)] : [];
+}
+
+/**
  * Scan one extensions directory for entry files.
  *
- * Matches `<dir>/*.{ts,js,mjs}` plus exactly one level of
- * `<dir>/<name>/index.{ts,js,mjs}`, so folder extensions can keep helper
- * modules beside their entry file without being scanned as entries themselves.
+ * Matches `<dir>/*.{ts,js,mjs}` plus exactly one level of folder extensions —
+ * either a `package.json` manifest or `<dir>/<name>/index.{ts,js,mjs}` — so
+ * folder extensions can keep helper modules beside their entry file without
+ * being scanned as entries themselves.
  */
-function scanExtensionsDir(dir: string) {
-  const entryPaths: string[] = [];
+function scanExtensionsDir(dir: string): DiscoveredExtensionEntry[] {
+  const entries: DiscoveredExtensionEntry[] = [];
 
   for (const entry of readSortedDirEntries(dir)) {
     const entryPath = join(dir, entry.name);
 
     if (entry.isDirectory()) {
-      const folderIndex = findFolderExtensionIndex(entryPath);
-      if (folderIndex) {
-        entryPaths.push(folderIndex);
-      }
+      entries.push(...resolveFolderExtensionEntries(entryPath));
       continue;
     }
 
     if (EXTENSION_ENTRY_SUFFIXES.some((suffix) => entry.name.endsWith(suffix))) {
-      entryPaths.push(entryPath);
+      entries.push(toStandaloneEntry(entryPath));
     }
   }
 
-  return entryPaths;
+  return entries;
 }
 
 /**
@@ -110,25 +201,26 @@ function expandHomePath(path: string) {
 /**
  * Expand one explicit path into entry files.
  *
- * A directory holding its own `index.{ts,js,mjs}` is one folder extension and
- * expands to just that entry: its helper modules sit beside the index and must
- * not be loaded as separate extensions. Only a directory without an index is a
- * container of extensions and gets scanned. Anything else is taken as a literal
- * entry file so a mistyped path still reaches the host and is reported as a
- * load issue rather than vanishing.
+ * A directory that resolves as a folder extension — by `package.json` manifest
+ * or by its own `index.{ts,js,mjs}` — expands to just those entries: its helper
+ * modules sit beside the entry file and must not be loaded as separate
+ * extensions. Only a directory that is not a folder extension is a container of
+ * extensions and gets scanned. Anything else is taken as a literal entry file so
+ * a mistyped path still reaches the host and is reported as a load issue rather
+ * than vanishing.
  */
-function expandExplicitPath(path: string, cwd: string) {
+function expandExplicitPath(path: string, cwd: string): DiscoveredExtensionEntry[] {
   const homeExpanded = expandHomePath(path);
   const resolvedPath = isAbsolute(homeExpanded)
     ? resolve(homeExpanded)
     : resolve(cwd, homeExpanded);
 
   if (!isDirectory(resolvedPath)) {
-    return [resolvedPath];
+    return [toStandaloneEntry(resolvedPath)];
   }
 
-  const folderIndex = findFolderExtensionIndex(resolvedPath);
-  return folderIndex ? [folderIndex] : scanExtensionsDir(resolvedPath);
+  const folderEntries = resolveFolderExtensionEntries(resolvedPath);
+  return folderEntries.length > 0 ? folderEntries : scanExtensionsDir(resolvedPath);
 }
 
 /**
@@ -145,22 +237,22 @@ export function discoverExtensions(options: DiscoverExtensionsOptions = {}): Ext
   const repoRoot = options.repoRoot ?? findVcsRepoRootCandidate(cwd);
   const globalExtensionsDir = options.globalExtensionsDir ?? resolveGlobalExtensionsDir(env);
 
-  const groups: Array<{ origin: ExtensionOrigin; paths: string[] }> = [
+  const groups: Array<{ origin: ExtensionOrigin; entries: DiscoveredExtensionEntry[] }> = [
     {
       origin: "flag",
-      paths: (options.flagPaths ?? []).flatMap((path) => expandExplicitPath(path, cwd)),
+      entries: (options.flagPaths ?? []).flatMap((path) => expandExplicitPath(path, cwd)),
     },
     {
       origin: "config",
-      paths: (options.configPaths ?? []).flatMap((path) => expandExplicitPath(path, cwd)),
+      entries: (options.configPaths ?? []).flatMap((path) => expandExplicitPath(path, cwd)),
     },
     {
       origin: "global",
-      paths: globalExtensionsDir ? scanExtensionsDir(globalExtensionsDir) : [],
+      entries: globalExtensionsDir ? scanExtensionsDir(globalExtensionsDir) : [],
     },
     {
       origin: "repo",
-      paths: [
+      entries: [
         ...(repoRoot ? scanExtensionsDir(join(repoRoot, ".hunk", "extensions")) : []),
         // Repo config contributes arbitrary paths, so treat them with the same
         // trust posture as `.hunk/extensions` rather than as user intent.
@@ -175,13 +267,18 @@ export function discoverExtensions(options: DiscoverExtensionsOptions = {}): Ext
   const seenPaths = new Set<string>();
 
   for (const group of groups) {
-    for (const path of [...group.paths].sort((a, b) => a.localeCompare(b))) {
-      if (seenPaths.has(path)) {
+    // Sorting by `sortKey` rather than by path keeps every entry of one folder
+    // extension at the folder's position, and the sort's stability preserves
+    // the order a manifest declared them in.
+    const sorted = [...group.entries].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
+    for (const entry of sorted) {
+      if (seenPaths.has(entry.path)) {
         continue;
       }
 
-      seenPaths.add(path);
-      candidates.push({ id: deriveExtensionId(path), path, origin: group.origin });
+      seenPaths.add(entry.path);
+      candidates.push({ id: entry.id, path: entry.path, origin: group.origin });
     }
   }
 

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { Changeset } from "../core/types";
 import { getVcsOperation } from "../core/vcs";
 import type { VcsAdapter } from "../core/vcs/types";
+import { discoverExtensions } from "./discovery";
 import { loadExtensions } from "./host";
 import { createExtensionNotificationHub } from "./notifications";
 import { deriveExtensionId, type ExtensionCandidate, type ExtensionOrigin } from "./types";
@@ -15,6 +16,14 @@ function createTempDir(prefix: string) {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   tempDirs.push(dir);
   return dir;
+}
+
+/** Write one file on disk, creating parent directories as needed. */
+function writeTestFile(dir: string, fileName: string, source: string) {
+  const path = join(dir, fileName);
+  mkdirSync(join(path, ".."), { recursive: true });
+  writeFileSync(path, source);
+  return path;
 }
 
 /**
@@ -29,9 +38,7 @@ function createTestExtension(
   source: string,
   origin: ExtensionOrigin = "flag",
 ): ExtensionCandidate {
-  const path = join(dir, fileName);
-  mkdirSync(join(path, ".."), { recursive: true });
-  writeFileSync(path, source);
+  const path = writeTestFile(dir, fileName, source);
   return { id: deriveExtensionId(path), path, origin };
 }
 
@@ -123,6 +130,56 @@ export default function (hunk: { registerFileLanguage: (e: string, l: string) =>
     ]);
     expect(result.registry.fileLanguages).toEqual([
       { extensionId: "folder-ext", extension: "proof", language: "graphql" },
+    ]);
+  });
+
+  test("loads a manifest folder extension against its own node_modules", async () => {
+    const root = createTempDir("hunk-host-manifest-dep-");
+    const folder = join(root, "dep-ext");
+    writeTestFile(
+      folder,
+      "package.json",
+      `{"name":"dep-ext","hunk":{"extensions":["./src/index.ts"]},"dependencies":{"fake-dep":"1.0.0"}}`,
+    );
+    // A hand-written dependency stands in for an installed one: the point is
+    // that the entry file resolves imports from the extension's own folder.
+    writeTestFile(
+      join(folder, "node_modules", "fake-dep"),
+      "package.json",
+      `{"name":"fake-dep","version":"1.0.0","main":"index.js"}`,
+    );
+    writeTestFile(
+      join(folder, "node_modules", "fake-dep"),
+      "index.js",
+      `module.exports = { language: "graphql" };\n`,
+    );
+    const entryPath = writeTestFile(
+      folder,
+      join("src", "index.ts"),
+      `import fakeDep from "fake-dep";
+
+export default function (hunk: { registerFileLanguage: (e: string, l: string) => void }) {
+  hunk.registerFileLanguage("dep", fakeDep.language);
+}
+`,
+    );
+
+    // Going through discovery is the point: the manifest is what turns the
+    // folder into this one entry, and what keeps the folder's name as the id.
+    const candidates = discoverExtensions({
+      cwd: root,
+      repoRoot: undefined,
+      globalExtensionsDir: undefined,
+      flagPaths: [folder],
+      env: {},
+    });
+    const result = await loadExtensions({ candidates, cwd: root });
+
+    expect(candidates).toEqual([{ id: "dep-ext", path: entryPath, origin: "flag" }]);
+    expect(result.issues).toEqual([]);
+    expect(result.loaded).toEqual([{ id: "dep-ext", sourcePath: entryPath, origin: "flag" }]);
+    expect(result.registry.fileLanguages).toEqual([
+      { extensionId: "dep-ext", extension: "dep", language: "graphql" },
     ]);
   });
 
