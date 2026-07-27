@@ -603,63 +603,6 @@ a:focus-visible {
 }
 
 
-/* Comparison: the capability table carries the section by itself. */
-.marketing .table-scroll {
-  overflow-x: auto;
-}
-
-.marketing .compare {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  text-align: left;
-}
-
-.marketing .compare th,
-.marketing .compare td {
-  padding: 12px 14px;
-  border-bottom: 1.5px solid var(--rule);
-  font-weight: 400;
-}
-
-.marketing .compare thead th {
-  border-bottom: 1.5px solid var(--ink);
-  color: var(--soft);
-  font-size: 11.5px;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.marketing .compare tbody th {
-  min-width: 260px;
-  color: var(--ink);
-}
-
-.marketing .compare td {
-  color: var(--soft);
-  text-align: center;
-  white-space: nowrap;
-}
-
-.marketing .compare td.yes {
-  color: var(--acc);
-  font-weight: 700;
-}
-
-.marketing .compare .own {
-  background: #eef5ec;
-}
-
-.marketing .compare thead th.own {
-  color: var(--acc);
-}
-
-.marketing .compare tbody tr:last-child th,
-.marketing .compare tbody tr:last-child td {
-  border-bottom: 1.5px solid var(--ink);
-}
-
 /* Closing call to action: one line, then the way in. */
 .marketing .last {
   max-width: 960px;
@@ -793,10 +736,6 @@ a:focus-visible {
   .marketing .last {
     padding-right: 20px;
     padding-left: 20px;
-  }
-
-  .marketing .compare tbody th {
-    min-width: 200px;
   }
 }
 

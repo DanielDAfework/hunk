@@ -105,14 +105,17 @@ test("feature cards deep-link into the matching documentation page", async ({ pa
   );
 });
 
-test("comparison table marks every capability for each tool class", async ({ page }) => {
+test("the agent section shows a note screenshot beside the commands that make it", async ({
+  page,
+}) => {
   await page.goto("/");
-  const row = page
-    .getByRole("row")
-    .filter({ has: page.getByRole("rowheader", { name: "Jump file to file, hunk to hunk" }) });
 
-  await expect(row.getByRole("cell")).toHaveCount(3);
-  await expect(row.getByRole("cell").last()).toContainText("Yes");
+  await expect(page.getByRole("heading", { name: /Your agent reviews with you/ })).toBeVisible();
+  await expect(page.locator(".agent-shot img")).toHaveAttribute("src", "/agent-note-zoom.webp");
+  await expect(page.getByRole("link", { name: /How agent review works/ })).toHaveAttribute(
+    "href",
+    "/docs/agents/review-with-an-agent/",
+  );
 });
 
 test("marketing page has no serious automated accessibility violations", async ({ page }) => {
