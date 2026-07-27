@@ -94,6 +94,38 @@ export default function (hunk: HunkExtensionAPI) {
     ).toBe("transformed");
   });
 
+  test("loads a folder extension whose index imports a sibling module", async () => {
+    const dir = createTempDir("hunk-host-folder-");
+    // The helper is written first so the index's relative import resolves.
+    createTestExtension(
+      dir,
+      join("folder-ext", "helper.ts"),
+      `export const language = "graphql";\n`,
+    );
+    const candidate = createTestExtension(
+      dir,
+      join("folder-ext", "index.ts"),
+      `import { language } from "./helper";
+
+export default function (hunk: { registerFileLanguage: (e: string, l: string) => void }) {
+  hunk.registerFileLanguage("proof", language);
+}
+`,
+      "config",
+    );
+
+    const result = await loadExtensions({ candidates: [candidate], cwd: dir });
+
+    // The id comes from the folder, and the sibling import resolved at load time.
+    expect(result.issues).toEqual([]);
+    expect(result.loaded).toEqual([
+      { id: "folder-ext", sourcePath: candidate.path, origin: "config" },
+    ]);
+    expect(result.registry.fileLanguages).toEqual([
+      { extensionId: "folder-ext", extension: "proof", language: "graphql" },
+    ]);
+  });
+
   test("awaits an async factory before sealing the API", async () => {
     const dir = createTempDir("hunk-host-async-");
     const candidate = createTestExtension(

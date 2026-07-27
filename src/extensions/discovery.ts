@@ -45,6 +45,19 @@ function readSortedDirEntries(dir: string) {
 }
 
 /**
+ * Return the index entry directly inside one folder extension, if it has one.
+ *
+ * Preference order follows `EXTENSION_INDEX_BASENAMES`, so a folder shipping
+ * both a source and a built entry resolves to the same one everywhere.
+ */
+function findFolderExtensionIndex(dir: string) {
+  const indexBasename = EXTENSION_INDEX_BASENAMES.find((basename) =>
+    fs.existsSync(join(dir, basename)),
+  );
+  return indexBasename ? join(dir, indexBasename) : undefined;
+}
+
+/**
  * Scan one extensions directory for entry files.
  *
  * Matches `<dir>/*.{ts,js,mjs}` plus exactly one level of
@@ -58,11 +71,9 @@ function scanExtensionsDir(dir: string) {
     const entryPath = join(dir, entry.name);
 
     if (entry.isDirectory()) {
-      const indexBasename = EXTENSION_INDEX_BASENAMES.find((basename) =>
-        fs.existsSync(join(entryPath, basename)),
-      );
-      if (indexBasename) {
-        entryPaths.push(join(entryPath, indexBasename));
+      const folderIndex = findFolderExtensionIndex(entryPath);
+      if (folderIndex) {
+        entryPaths.push(folderIndex);
       }
       continue;
     }
@@ -99,16 +110,25 @@ function expandHomePath(path: string) {
 /**
  * Expand one explicit path into entry files.
  *
- * A directory is scanned with the standard patterns; anything else is taken as
- * a literal entry file so a mistyped path still reaches the host and is
- * reported as a load issue rather than vanishing.
+ * A directory holding its own `index.{ts,js,mjs}` is one folder extension and
+ * expands to just that entry: its helper modules sit beside the index and must
+ * not be loaded as separate extensions. Only a directory without an index is a
+ * container of extensions and gets scanned. Anything else is taken as a literal
+ * entry file so a mistyped path still reaches the host and is reported as a
+ * load issue rather than vanishing.
  */
 function expandExplicitPath(path: string, cwd: string) {
   const homeExpanded = expandHomePath(path);
   const resolvedPath = isAbsolute(homeExpanded)
     ? resolve(homeExpanded)
     : resolve(cwd, homeExpanded);
-  return isDirectory(resolvedPath) ? scanExtensionsDir(resolvedPath) : [resolvedPath];
+
+  if (!isDirectory(resolvedPath)) {
+    return [resolvedPath];
+  }
+
+  const folderIndex = findFolderExtensionIndex(resolvedPath);
+  return folderIndex ? [folderIndex] : scanExtensionsDir(resolvedPath);
 }
 
 /**

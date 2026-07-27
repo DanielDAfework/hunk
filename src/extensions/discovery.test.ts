@@ -116,6 +116,58 @@ describe("extension discovery", () => {
     expect(candidates.map((candidate) => candidate.path)).toEqual([dirEntry, fileEntry]);
   });
 
+  test("loads an explicit folder-extension path as one extension, not as a container", () => {
+    const root = createTempDir("hunk-ext-folder-");
+    const folderIndex = writeExtensionFile(root, "my-ext", "index.ts");
+    // A helper beside the index is part of that extension, not an entry of its own.
+    writeExtensionFile(root, "my-ext", "helper.ts");
+
+    const candidates = discoverExtensions({
+      cwd: root,
+      repoRoot: undefined,
+      globalExtensionsDir: undefined,
+      configPaths: ["my-ext"],
+      env: {},
+    });
+
+    expect(candidates).toEqual([{ id: "my-ext", path: folderIndex, origin: "config" }]);
+  });
+
+  test("prefers index.ts over index.js for an explicit folder-extension path", () => {
+    const root = createTempDir("hunk-ext-folder-index-");
+    const typescriptIndex = writeExtensionFile(root, "dual", "index.ts");
+    writeExtensionFile(root, "dual", "index.js");
+
+    const candidates = discoverExtensions({
+      cwd: root,
+      repoRoot: undefined,
+      globalExtensionsDir: undefined,
+      flagPaths: [join(root, "dual")],
+      env: {},
+    });
+
+    expect(candidates).toEqual([{ id: "dual", path: typescriptIndex, origin: "flag" }]);
+  });
+
+  test("scans an explicit directory without an index as a container of extensions", () => {
+    const root = createTempDir("hunk-ext-container-");
+    const first = writeExtensionFile(root, "pack", "alpha.ts");
+    const second = writeExtensionFile(root, "pack", "beta.ts");
+
+    const candidates = discoverExtensions({
+      cwd: root,
+      repoRoot: undefined,
+      globalExtensionsDir: undefined,
+      flagPaths: [join(root, "pack")],
+      env: {},
+    });
+
+    expect(candidates).toEqual([
+      { id: "alpha", path: first, origin: "flag" },
+      { id: "beta", path: second, origin: "flag" },
+    ]);
+  });
+
   test("keeps a missing explicit path so the host can report it", () => {
     const root = createTempDir("hunk-ext-missing-");
     const missing = join(root, "absent.ts");

@@ -44,6 +44,11 @@ A directory source matches `*.ts`, `*.js`, `*.mjs` directly inside it, plus one
 level of `<name>/index.{ts,js,mjs}` so a folder extension can keep helper
 modules beside its entry file.
 
+Pointing `--extension` or `[extensions] paths` straight at a directory works
+either way: a directory containing `index.{ts,js,mjs}` loads as that one folder
+extension, so its helper modules stay helpers. A directory with no index is
+treated as a directory _of_ extensions and scanned with the patterns above.
+
 An extension's **id** is its file stem, or its folder name for
 `<name>/index.ts`. The id is what `[extension.<id>]` config tables key off, so
 moving a single-file extension into a folder of the same name keeps its config
@@ -557,7 +562,8 @@ hunk diff --extension ./collapse-generated.ts
 ## CLI flags and config reference
 
 ```bash
-hunk diff --extension ./path/to/entry.ts   # load one entry file or directory (repeatable)
+hunk diff --extension ./path/to/entry.ts   # load one entry file (repeatable)
+hunk diff --extension ./my-ext             # a folder extension: loads ./my-ext/index.ts
 hunk diff --no-extensions                  # disable user extensions for this run
 ```
 
