@@ -347,11 +347,47 @@ a:focus-visible {
 }
 
 .marketing .feats h2,
-.marketing .install h2 {
+.marketing .install h2,
+.marketing .band h2 {
   margin: 0 0 30px;
   font-size: clamp(22px, 3.4vw, 34px);
   font-weight: 700;
   letter-spacing: -0.03em;
+  line-height: 1.12;
+}
+
+/* Monospace section labels give the long page rhythm without extra chrome. */
+.marketing .kicker {
+  margin: 0 0 10px;
+  color: var(--soft);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.marketing .band {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 36px 104px;
+}
+
+/* Title on the left, the paragraph that qualifies it on the right. */
+.marketing .band-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  align-items: end;
+  gap: 20px 48px;
+  margin-bottom: 34px;
+}
+
+.marketing .band-head h2 {
+  margin: 0;
+}
+
+.marketing .band-lede {
+  margin: 0;
+  color: #3a352b;
+  font-size: 13.5px;
+  line-height: 1.6;
 }
 
 .marketing .grid {
@@ -362,16 +398,31 @@ a:focus-visible {
   border-left: 1.5px solid var(--ink);
 }
 
-.marketing .grid article {
+.marketing .feat {
+  display: block;
   padding: 22px 20px;
   border-right: 1.5px solid var(--ink);
   border-bottom: 1.5px solid var(--ink);
   background: var(--paper);
+  color: inherit;
   transition: 0.12s;
 }
 
-.marketing .grid article:hover {
+.marketing .feat:hover {
   background: var(--hunk-paper-hover);
+}
+
+.marketing .feat .more {
+  display: block;
+  margin-top: 12px;
+  color: var(--soft);
+  font-size: 12px;
+  transition: 0.12s;
+}
+
+.marketing .feat:hover .more,
+.marketing .feat:focus-visible .more {
+  color: var(--acc);
 }
 
 .marketing .num {
@@ -391,6 +442,345 @@ a:focus-visible {
   color: var(--hunk-body);
   font-size: 13.5px;
   line-height: 1.6;
+}
+
+/* Community videos: thumbnails link out, so no third-party player script loads. */
+.marketing .vgrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  border-top: 1.5px solid var(--ink);
+  border-left: 1.5px solid var(--ink);
+}
+
+.marketing .vcard {
+  display: block;
+  border-right: 1.5px solid var(--ink);
+  border-bottom: 1.5px solid var(--ink);
+  background: var(--paper);
+  transition: 0.12s;
+}
+
+.marketing .vcard:hover {
+  background: #fff;
+}
+
+.marketing .vthumb {
+  position: relative;
+  display: block;
+  border-bottom: 1.5px solid var(--ink);
+  background: #0c0e10;
+  aspect-ratio: 16 / 9;
+}
+
+.marketing .vthumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.marketing .vplay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  margin: auto;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  background: var(--acc);
+  box-shadow: 2px 2px 0 var(--ink);
+  color: var(--paper);
+  transition: 0.12s;
+}
+
+.marketing .vcard:hover .vplay,
+.marketing .vcard:focus-visible .vplay {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+.marketing .vplay svg {
+  width: 16px;
+  height: 16px;
+  margin-left: 2px;
+}
+
+.marketing .vbody {
+  display: block;
+  padding: 16px 20px 20px;
+}
+
+.marketing .vmeta {
+  display: block;
+  color: var(--soft);
+  font-size: 11.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.marketing .vtitle {
+  display: block;
+  margin: 8px 0 6px;
+  font-size: 14.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.marketing .vblurb {
+  display: block;
+  color: #3a352b;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* Agent section: the command flow next to what it produces on screen. */
+.marketing .agent-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.82fr);
+  align-items: start;
+  gap: 34px;
+}
+
+.marketing .agent-flow ol {
+  margin: 0;
+  padding: 20px 22px;
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 4px 4px 0 var(--ink);
+  list-style: none;
+  counter-reset: step;
+}
+
+.marketing .agent-flow li + li {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1.5px solid var(--rule);
+}
+
+.marketing .agent-flow .hash {
+  display: block;
+  color: var(--soft);
+  font-size: 12px;
+}
+
+.marketing .agent-flow code {
+  display: block;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.marketing .agent-flow code::before {
+  color: var(--acc);
+  content: "$ ";
+}
+
+.marketing .pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 16px 0 0;
+}
+
+.marketing .pills a {
+  padding: 5px 11px;
+  border: 1.5px solid var(--ink);
+  border-radius: 6px;
+  background: var(--paper);
+  font-size: 12px;
+  transition: 0.12s;
+}
+
+.marketing .pills a:hover {
+  border-color: var(--acc);
+  background: var(--acc);
+  color: var(--paper);
+}
+
+.marketing .agent-shot {
+  margin: 0;
+}
+
+.marketing .agent-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  box-shadow: 4px 4px 0 var(--ink);
+}
+
+.marketing .agent-shot figcaption {
+  margin-top: 14px;
+  color: var(--soft);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.marketing .agent-shot code {
+  font-family: var(--mono);
+  color: var(--ink);
+}
+
+/* Comparison: three stances, then the capability table that backs them up. */
+.marketing .stances {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1.5px solid var(--ink);
+  border-left: 1.5px solid var(--ink);
+}
+
+.marketing .stances article {
+  padding: 20px;
+  border-right: 1.5px solid var(--ink);
+  border-bottom: 1.5px solid var(--ink);
+  background: var(--paper);
+}
+
+.marketing .stances h3 {
+  margin: 0 0 8px;
+  color: var(--soft);
+  font-size: 11.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.marketing .stances p {
+  margin: 0;
+  color: #3a352b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.marketing .table-scroll {
+  overflow-x: auto;
+  margin-top: 34px;
+}
+
+.marketing .compare {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+
+.marketing .compare th,
+.marketing .compare td {
+  padding: 12px 14px;
+  border-bottom: 1.5px solid var(--rule);
+  font-weight: 400;
+}
+
+.marketing .compare thead th {
+  border-bottom: 1.5px solid var(--ink);
+  color: var(--soft);
+  font-size: 11.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.marketing .compare tbody th {
+  min-width: 260px;
+  color: var(--ink);
+}
+
+.marketing .compare td {
+  color: var(--soft);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.marketing .compare td.yes {
+  color: var(--acc);
+  font-weight: 700;
+}
+
+.marketing .compare .own {
+  background: #eef5ec;
+}
+
+.marketing .compare thead th.own {
+  color: var(--acc);
+}
+
+.marketing .compare tbody tr:last-child th,
+.marketing .compare tbody tr:last-child td {
+  border-bottom: 1.5px solid var(--ink);
+}
+
+/* Documented support surfaces, tucked under the install commands. */
+.marketing .works {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  margin: 34px 0 0;
+  border-top: 1.5px solid var(--rule);
+  border-left: 1.5px solid var(--rule);
+}
+
+.marketing .works > div {
+  padding: 14px 16px;
+  border-right: 1.5px solid var(--rule);
+  border-bottom: 1.5px solid var(--rule);
+}
+
+.marketing .works dt {
+  color: var(--soft);
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.marketing .works dd {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* Closing call to action: one concrete first run, not a slogan. */
+.marketing .last {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 36px 104px;
+}
+
+.marketing .last h2 {
+  margin: 0 0 12px;
+  font-size: clamp(22px, 3.6vw, 36px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.marketing .last p {
+  max-width: 520px;
+  margin: 0 0 26px;
+  color: #3a352b;
+  font-size: 14px;
+}
+
+.marketing .plain {
+  display: inline-flex;
+  align-items: center;
+  padding: 11px 4px;
+  color: var(--soft);
+  font-size: 14px;
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 5px;
+  transition: 0.12s;
+}
+
+.marketing .plain:hover {
+  color: var(--acc);
+  text-decoration-color: var(--acc);
 }
 
 .marketing .install {
@@ -464,8 +854,31 @@ a:focus-visible {
   font-size: 13.5px;
 }
 
+@media (max-width: 980px) {
+  .marketing .band-head {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 14px;
+  }
+
+  .marketing .band-lede {
+    max-width: 620px;
+  }
+
+  .marketing .agent-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .marketing .agent-shot {
+    max-width: 560px;
+  }
+}
+
 @media (max-width: 760px) {
-  .marketing .grid {
+  .marketing .grid,
+  .marketing .vgrid,
+  .marketing .stances,
+  .marketing .works {
     grid-template-columns: 1fr;
   }
 
@@ -478,9 +891,15 @@ a:focus-visible {
   .marketing .paper,
   .marketing .says,
   .marketing .feats,
-  .marketing .install {
+  .marketing .band,
+  .marketing .install,
+  .marketing .last {
     padding-right: 20px;
     padding-left: 20px;
+  }
+
+  .marketing .compare tbody th {
+    min-width: 200px;
   }
 }
 

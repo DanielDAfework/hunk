@@ -15,3 +15,14 @@ magick source.png -resize '960x>' -strip -quality 82 public/docs/images/agent-co
 ```
 
 `public/og.png` is the shared 1200×630 social card for the landing page and documentation. Keep it aligned with the site metadata and paper/green theme.
+
+## Community video thumbnails
+
+`public/video-*.webp` are self-hosted copies of the YouTube thumbnails for the walkthroughs listed in `src/components/marketing/CommunityVideos.astro`. Hosting them here keeps the landing page free of third-party requests, so refresh them by hand when a creator changes their thumbnail:
+
+```bash
+curl -sfL https://i.ytimg.com/vi/<video-id>/maxresdefault.jpg -o /tmp/thumb.jpg
+magick /tmp/thumb.jpg -resize '900x>' -strip -quality 80 public/video-<channel>.webp
+```
+
+Durations in that component are hardcoded because they never change once a video is published. Verify them against the video before adding a new card.

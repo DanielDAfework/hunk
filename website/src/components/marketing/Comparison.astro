@@ -1,0 +1,94 @@
+---
+/**
+ * Positions Hunk against the two things people already use to read a diff:
+ * a prettier pager, or a GUI that is not in the terminal.
+ */
+const stances = [
+  {
+    label: "Not a pager",
+    body: "delta and diff-so-fancy make git diff prettier. Hunk gives the changeset structure — a file sidebar, hunk navigation, and layouts you can change while reading.",
+  },
+  {
+    label: "Not a Git client",
+    body: "lazygit and gitui stage, commit, branch, and push. Hunk does one thing: read a changeset well, whoever or whatever wrote it.",
+  },
+  {
+    label: "Not a web app",
+    body: "No browser tab, no account, no telemetry, and no waiting for a pull request to exist before you can review the work.",
+  },
+] as const;
+
+const columns = ["Pagers", "IDE & web review", "hunk"] as const;
+
+/** Each row is [capability, pager, gui, hunk]. "yes" and "no" render as marks. */
+const rows = [
+  ["Runs in your terminal", "yes", "no", "yes"],
+  ["Whole changeset in one navigable stream", "scroll only", "yes", "yes"],
+  ["Jump file to file, hunk to hunk", "no", "yes", "yes"],
+  ["Split, stack, and wrap on demand", "no", "varies", "yes"],
+  ["Agent reasoning beside the code it explains", "no", "no", "yes"],
+  ["Live reload while an agent edits", "no", "varies", "yes"],
+  ["Agents can drive the review you are looking at", "no", "no", "yes"],
+  ["Git, Jujutsu, and Sapling", "Git", "varies", "yes"],
+] as const;
+
+/** Marks stay text for screen readers; the visual mark is decorative. */
+const cell = (value: string) =>
+  value === "yes" ? { mark: "✓", label: "Yes" } : value === "no" ? { mark: "—", label: "No" } : null;
+---
+
+<div class="stances">
+  {
+    stances.map(({ label, body }) => (
+      <article>
+        <h3>{label}</h3>
+        <p>{body}</p>
+      </article>
+    ))
+  }
+</div>
+
+<div class="table-scroll" tabindex="0" role="region" aria-labelledby="compare-caption">
+  <table class="compare">
+    <caption id="compare-caption" class="sr-only">
+      How Hunk compares with pager-based diffs and GUI review tools
+    </caption>
+    <thead>
+      <tr>
+        <th scope="col">Capability</th>
+        {
+          columns.map((column, index) => (
+            <th scope="col" class:list={[{ own: index === columns.length - 1 }]}>
+              {column}
+            </th>
+          ))
+        }
+      </tr>
+    </thead>
+    <tbody>
+      {
+        rows.map(([capability, ...values]) => (
+          <tr>
+            <th scope="row">{capability}</th>
+            {values.map((value, index) => {
+              const marked = cell(value);
+              const own = index === values.length - 1;
+              return (
+                <td class:list={[{ own, yes: value === "yes", no: value === "no" }]}>
+                  {marked ? (
+                    <>
+                      <span aria-hidden="true">{marked.mark}</span>
+                      <span class="sr-only">{marked.label}</span>
+                    </>
+                  ) : (
+                    value
+                  )}
+                </td>
+              );
+            })}
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</div>

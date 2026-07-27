@@ -1,0 +1,63 @@
+---
+/**
+ * The agent story gets its own section because it is the reason Hunk exists,
+ * and a single feature card cannot carry it.
+ */
+const steps = [
+  { comment: "you, in the repo — keep this window open", command: "hunk diff" },
+  { comment: "the agent, in its own shell", command: "hunk skill path" },
+  { comment: "read structure without flooding its context", command: "hunk session review --repo . --json" },
+  {
+    comment: "move your visible window to the hunk it means",
+    command: "hunk session navigate --repo . --file src/App.tsx --hunk 2",
+  },
+  {
+    comment: "leave a note that renders beside the code",
+    command: 'hunk session comment add --repo . --new-line 42 --summary "Check this boundary"',
+  },
+] as const;
+
+const links = [
+  { href: "/docs/agents/review-with-an-agent/", label: "Review with an agent" },
+  { href: "/docs/agents/live-session-control/", label: "Live session control" },
+  { href: "/docs/agents/review-skill/", label: "The review skill" },
+] as const;
+---
+
+<div class="agent-cols">
+  <div class="agent-flow">
+    <ol>
+      {
+        steps.map(({ comment, command }) => (
+          <li>
+            <span class="hash"># {comment}</span>
+            <code>{command}</code>
+          </li>
+        ))
+      }
+    </ol>
+    <p class="pills">
+      {
+        links.map(({ href, label }) => (
+          <a href={href}>
+            {label} <span aria-hidden="true">→</span>
+          </a>
+        ))
+      }
+    </p>
+  </div>
+
+  <figure class="agent-shot">
+    <img
+      src="/docs/images/agent-comments.webp"
+      alt="A Hunk review with agent rationale rendered directly beside the annotated diff hunk"
+      width="960"
+      height="1000"
+      loading="lazy"
+    />
+    <figcaption>
+      Agent notes stay attached to the hunk they explain. <code>&#123;</code> and <code>&#125;</code>
+      walk between annotated hunks without losing the changeset.
+    </figcaption>
+  </figure>
+</div>

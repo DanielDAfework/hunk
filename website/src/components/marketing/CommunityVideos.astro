@@ -1,0 +1,48 @@
+---
+/**
+ * Independent walkthroughs, linked out rather than embedded.
+ * Self-hosted thumbnails keep the landing page free of third-party player scripts.
+ */
+const videos = [
+  {
+    href: "https://www.youtube.com/watch?v=FFfz81XM57k",
+    thumb: "/video-jilles.webp",
+    channel: "Jilles",
+    length: "5:14",
+    title: "Hunk changed the way I write and review code with my agent",
+    blurb: "Why the diff becomes the main artifact once an agent is writing the code.",
+  },
+  {
+    href: "https://www.youtube.com/watch?v=-4fJbIF8WAs",
+    thumb: "/video-devops-toolbox.webp",
+    channel: "DevOps Toolbox",
+    length: "13:33",
+    title: "I Was Definitely Using The Wrong Terminal Code Reviewer",
+    blurb: "A longer hands-on tour — layouts, themes, keyboard and mouse, and daily use.",
+  },
+] as const;
+---
+
+<div class="vgrid">
+  {
+    videos.map(({ href, thumb, channel, length, title, blurb }) => (
+      <a class="vcard" href={href} target="_blank" rel="noopener noreferrer">
+        <span class="vthumb">
+          <img src={thumb} alt="" width="900" height="506" loading="lazy" draggable="false" />
+          <span class="vplay" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </span>
+        </span>
+        <span class="vbody">
+          <span class="vmeta">
+            {channel} · {length}
+          </span>
+          <span class="vtitle">{title}</span>
+          <span class="vblurb">{blurb}</span>
+        </span>
+      </a>
+    ))
+  }
+</div>

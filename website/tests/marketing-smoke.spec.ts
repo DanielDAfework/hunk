@@ -83,6 +83,38 @@ test("theme previews switch without loading every screenshot up front", async ({
   await expect(midnightShot).toHaveAttribute("src", "/shot-midnight.webp");
 });
 
+test("community videos link out without embedding a third-party player", async ({ page }) => {
+  await page.goto("/");
+  const videos = page.getByRole("link", { name: /Hunk changed the way I write/ });
+
+  await expect(videos).toHaveAttribute("href", "https://www.youtube.com/watch?v=FFfz81XM57k");
+  await expect(videos.locator("img")).toHaveAttribute("src", "/video-jilles.webp");
+  await expect(page.locator("iframe")).toHaveCount(0);
+});
+
+test("feature cards deep-link into the matching documentation page", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.getByRole("link", { name: /Watch mode/ })).toHaveAttribute(
+    "href",
+    "/docs/workflows/watch-mode/",
+  );
+  await expect(page.getByRole("link", { name: /Live session control/ })).toHaveAttribute(
+    "href",
+    "/docs/agents/live-session-control/",
+  );
+});
+
+test("comparison table marks every capability for each tool class", async ({ page }) => {
+  await page.goto("/");
+  const row = page
+    .getByRole("row")
+    .filter({ has: page.getByRole("rowheader", { name: "Jump file to file, hunk to hunk" }) });
+
+  await expect(row.getByRole("cell")).toHaveCount(3);
+  await expect(row.getByRole("cell").last()).toContainText("Yes");
+});
+
 test("marketing page has no serious automated accessibility violations", async ({ page }) => {
   await page.goto("/");
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
