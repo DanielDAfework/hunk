@@ -14,4 +14,4 @@ magick source.png -resize '1400x>' -strip -quality 82 public/docs/images/review-
 magick source.png -resize '960x>' -strip -quality 82 public/docs/images/agent-comments.webp
 ```
 
-`public/og.png` is the 1200×630 marketing social card. `public/docs/og.png` is the documentation social card. Keep both aligned with their route-specific metadata and the paper/green theme.
+`public/og.png` is the shared 1200×630 social card for the landing page and documentation. Keep it aligned with the site metadata and paper/green theme.

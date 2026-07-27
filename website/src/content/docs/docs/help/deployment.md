@@ -56,7 +56,6 @@ curl --fail https://hunk.dev/sitemap-index.xml
 curl --fail https://hunk.dev/pagefind/pagefind.js
 curl --fail https://hunk.dev/docs/hunk-review-skill.md
 curl --fail https://hunk.dev/og.png
-curl --fail https://hunk.dev/docs/og.png
 ```
 
 In a browser, confirm the landing page links to the docs, theme previews switch, the install command copies, documentation search returns results, theme selection persists across docs navigation, and a GitHub edit link opens the matching source file.

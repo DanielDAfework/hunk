@@ -8,9 +8,9 @@ const EDIT_PREFIX = "https://github.com/modem-dev/hunk/edit/main/";
 const DOCS_HEAD_TAGS = [
   '<link rel="icon" href="/docs/favicon.svg"',
   '<meta property="og:type" content="website"',
-  '<meta property="og:image" content="https://hunk.dev/docs/og.png"',
+  '<meta property="og:image" content="https://hunk.dev/og.png"',
   '<meta name="twitter:card" content="summary_large_image"',
-  '<meta name="twitter:image" content="https://hunk.dev/docs/og.png"',
+  '<meta name="twitter:image" content="https://hunk.dev/og.png"',
 ] as const;
 const MARKETING_HEAD_TAGS = [
   '<link rel="icon" href="/icon.png"',
@@ -33,7 +33,6 @@ const REQUIRED_ASSETS = [
   "shot-zenburn.webp",
   "docs/favicon.svg",
   "docs/hunk-review-skill.md",
-  "docs/og.png",
   "pagefind/pagefind.js",
 ] as const;
 

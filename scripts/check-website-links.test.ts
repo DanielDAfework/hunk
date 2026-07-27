@@ -19,7 +19,6 @@ const REQUIRED_ASSETS = [
   "shot-zenburn.webp",
   "docs/favicon.svg",
   "docs/hunk-review-skill.md",
-  "docs/og.png",
 ] as const;
 
 afterEach(() => {
@@ -44,14 +43,14 @@ function createWebsiteFixture() {
   const marketingHead =
     '<link rel="icon" href="/icon.png"><meta property="og:type" content="website"><meta property="og:image" content="https://hunk.dev/og.png"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://hunk.dev/og.png">';
   const docsHead =
-    '<link rel="icon" href="/docs/favicon.svg"><meta property="og:type" content="website"><meta property="og:image" content="https://hunk.dev/docs/og.png"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://hunk.dev/docs/og.png">';
+    '<link rel="icon" href="/docs/favicon.svg"><meta property="og:type" content="website"><meta property="og:image" content="https://hunk.dev/og.png"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://hunk.dev/og.png">';
   writeFileSync(
     join(dist, "index.html"),
     `<html><head><title>Hunk</title><meta name="description" content="Hunk"><link rel="canonical" href="https://hunk.dev/">${marketingHead}</head><body><main id="install"><a href="/docs/">Docs</a><img src="/og.png"></main></body></html>`,
   );
   writeFileSync(
     join(dist, "docs", "index.html"),
-    `<html><head><title>Docs</title><meta name="description" content="Docs"><link rel="canonical" href="https://hunk.dev/docs/">${docsHead}</head><body id="_top"><a href="/docs/guide/#step">Guide</a><a href="/">Home</a><img src="/docs/og.png"></body></html>`,
+    `<html><head><title>Docs</title><meta name="description" content="Docs"><link rel="canonical" href="https://hunk.dev/docs/">${docsHead}</head><body id="_top"><a href="/docs/guide/#step">Guide</a><a href="/">Home</a><img src="/og.png"></body></html>`,
   );
   writeFileSync(
     join(dist, "docs", "guide", "index.html"),
