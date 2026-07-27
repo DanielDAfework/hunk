@@ -58,8 +58,9 @@ failing that if it has an `index.{ts,js,mjs}`. The manifest field is `hunk`:
 
 The manifest wins over the `index.*` fallback, and its paths resolve against the
 folder. It may list more than one entry, in which case each entry loads as its
-own extension in the order the manifest gives — name those files distinctly,
-because each one is then identified by its own file stem.
+own extension in the order the manifest gives. Each one is identified by its
+file stem; when stems collide, later entries receive a numeric suffix while
+avoiding ids already claimed by other entries in the manifest.
 
 Because the manifest is a real `package.json`, a folder extension may depend on
 npm packages: declare them, install them into the folder's own `node_modules`,

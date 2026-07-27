@@ -118,6 +118,31 @@ function readManifestEntryPaths(dir: string) {
     .map((entry) => resolve(dir, entry));
 }
 
+/** Assign deterministic, distinct ids to every entry in one manifest. */
+function deriveManifestEntryIds(paths: readonly string[]) {
+  const baseIds = paths.map((path) => deriveExtensionId(path));
+  // Reserve natural stems up front so a generated suffix cannot steal a later entry's id.
+  const reservedIds = new Set(baseIds);
+  const assignedIds = new Set<string>();
+
+  return baseIds.map((baseId) => {
+    if (!assignedIds.has(baseId)) {
+      assignedIds.add(baseId);
+      return baseId;
+    }
+
+    let suffix = 2;
+    let id = `${baseId}-${suffix}`;
+    while (reservedIds.has(id) || assignedIds.has(id)) {
+      suffix += 1;
+      id = `${baseId}-${suffix}`;
+    }
+
+    assignedIds.add(id);
+    return id;
+  });
+}
+
 /**
  * Resolve the entry files of one folder extension.
  *
@@ -128,8 +153,8 @@ function readManifestEntryPaths(dir: string) {
  * A single-entry manifest keeps the folder's name as the extension id — the
  * same id the index fallback would produce — so `[extension.<id>]` config tables
  * stay keyed by the folder the user installed, whatever the entry file is
- * called. Multiple entries have no single owner, so each is named by its own
- * file stem; entry files should be named distinctly for that reason.
+ * called. Multiple entries are named by file stem, with a numeric suffix when
+ * stems collide so configuration and registry ownership remain unambiguous.
  *
  * Returns an empty list when the folder is not an extension at all.
  */
@@ -138,9 +163,12 @@ function resolveFolderExtensionEntries(dir: string): DiscoveredExtensionEntry[] 
 
   if (manifestPaths && manifestPaths.length > 0) {
     const folderName = basename(dir);
-    return manifestPaths.map((path) => ({
+    const manifestIds = deriveManifestEntryIds(manifestPaths);
+    return manifestPaths.map((path, index) => ({
       id:
-        manifestPaths.length === 1 && folderName.length > 0 ? folderName : deriveExtensionId(path),
+        manifestPaths.length === 1 && folderName.length > 0
+          ? folderName
+          : (manifestIds[index] ?? deriveExtensionId(path)),
       path,
       sortKey: dir,
     }));

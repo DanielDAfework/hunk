@@ -279,6 +279,32 @@ describe("folder extension manifests", () => {
     ]);
   });
 
+  test("disambiguates duplicate ids within a multi-entry manifest", () => {
+    const root = createTempDir("hunk-ext-manifest-duplicate-ids-");
+    const folder = join(root, "multi-ext");
+    const typescriptEntry = writeExtensionFile(folder, "alpha.ts");
+    const javascriptEntry = writeExtensionFile(folder, "alpha.js");
+    const reservedSuffixEntry = writeExtensionFile(folder, "alpha-2.ts");
+    writeExtensionManifest(
+      folder,
+      `{"hunk": {"extensions": ["./alpha.ts", "./alpha.js", "./alpha-2.ts"]}}`,
+    );
+
+    const candidates = discoverExtensions({
+      cwd: root,
+      repoRoot: undefined,
+      globalExtensionsDir: undefined,
+      flagPaths: [folder],
+      env: {},
+    });
+
+    expect(candidates).toEqual([
+      { id: "alpha", path: typescriptEntry, origin: "flag" },
+      { id: "alpha-3", path: javascriptEntry, origin: "flag" },
+      { id: "alpha-2", path: reservedSuffixEntry, origin: "flag" },
+    ]);
+  });
+
   test("falls back to the index entry when package.json is malformed", () => {
     const root = createTempDir("hunk-ext-manifest-broken-");
     const folder = join(root, "broken-manifest");
