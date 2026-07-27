@@ -1,8 +1,9 @@
 # Writing Hunk extensions
 
-A Hunk extension is one TypeScript (or JavaScript) file that default-exports a
-function. Hunk imports it at startup and hands it an API object. There is no
-manifest and no build step.
+A Hunk extension entry is one TypeScript (or JavaScript) file that
+default-exports a function. Hunk imports it at startup and hands it an API
+object. An entry may stand alone or be declared by a folder's optional
+`package.json` manifest; no build step is required.
 
 ```ts
 // ~/.config/hunk/extensions/hello.ts
