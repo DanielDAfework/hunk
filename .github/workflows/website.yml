@@ -5,47 +5,9 @@ env:
 
 on:
   pull_request:
-    paths:
-      - "website/**"
-      - "package.json"
-      - "bun.lock"
-      - "scripts/generate-docs.ts"
-      - "scripts/generate-docs.test.ts"
-      - "scripts/check-website-links.ts"
-      - "scripts/check-website-links.test.ts"
-      - "src/core/cli.ts"
-      - "src/core/config.ts"
-      - "src/core/legacySyntaxScopes.ts"
-      - "src/core/tabWidth.ts"
-      - "src/hunk-session/agentSurface.ts"
-      - "src/hunk-session/agentErrors.ts"
-      - "src/hunk-review/skillDocument.ts"
-      - "src/session-broker/brokerConfig.ts"
-      - "src/ui/lib/shikiThemes.ts"
-      - ".github/workflows/website.yml"
-      - "vercel.json"
   push:
     branches:
       - main
-    paths:
-      - "website/**"
-      - "package.json"
-      - "bun.lock"
-      - "scripts/generate-docs.ts"
-      - "scripts/generate-docs.test.ts"
-      - "scripts/check-website-links.ts"
-      - "scripts/check-website-links.test.ts"
-      - "src/core/cli.ts"
-      - "src/core/config.ts"
-      - "src/core/legacySyntaxScopes.ts"
-      - "src/core/tabWidth.ts"
-      - "src/hunk-session/agentSurface.ts"
-      - "src/hunk-session/agentErrors.ts"
-      - "src/hunk-review/skillDocument.ts"
-      - "src/session-broker/brokerConfig.ts"
-      - "src/ui/lib/shikiThemes.ts"
-      - ".github/workflows/website.yml"
-      - "vercel.json"
 
 concurrency:
   group: website-${{ github.workflow }}-${{ github.ref }}
