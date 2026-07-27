@@ -450,7 +450,7 @@ a:focus-visible {
 }
 
 .marketing .vcard:hover {
-  background: #fff;
+  background: var(--hunk-paper-hover);
 }
 
 .marketing .vthumb {
@@ -520,7 +520,7 @@ a:focus-visible {
 
 .marketing .vblurb {
   display: block;
-  color: #3a352b;
+  color: var(--hunk-body);
   font-size: 13px;
   line-height: 1.55;
 }
