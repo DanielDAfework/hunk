@@ -602,7 +602,6 @@ a:focus-visible {
   box-shadow: 4px 4px 0 var(--ink);
 }
 
-
 /* Closing call to action: one line, then the way in. */
 .marketing .last {
   max-width: 960px;
