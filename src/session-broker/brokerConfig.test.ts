@@ -7,6 +7,20 @@ import {
 } from "./brokerConfig";
 
 describe("Hunk session daemon config", () => {
+  test("formats IPv6 literal origins with URL authority brackets", () => {
+    expect(
+      resolveSessionBrokerConfig({
+        HUNK_MCP_HOST: "::1",
+        HUNK_MCP_PORT: "49000",
+      }),
+    ).toMatchObject({
+      host: "::1",
+      port: 49000,
+      httpOrigin: "http://[::1]:49000",
+      wsOrigin: "ws://[::1]:49000",
+    });
+  });
+
   test("accepts loopback hosts without an unsafe override", () => {
     expect(isLoopbackHost("127.0.0.1")).toBe(true);
     expect(isLoopbackHost("127.1.2.3")).toBe(true);

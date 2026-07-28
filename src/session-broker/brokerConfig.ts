@@ -60,10 +60,13 @@ export function resolveSessionBrokerConfig(
     );
   }
 
+  // URL authorities require brackets around literal IPv6 addresses, unlike socket APIs.
+  const urlHost = isIP(host) === 6 ? `[${host}]` : host;
+
   return {
     host,
     port,
-    httpOrigin: `http://${host}:${port}`,
-    wsOrigin: `ws://${host}:${port}`,
+    httpOrigin: `http://${urlHost}:${port}`,
+    wsOrigin: `ws://${urlHost}:${port}`,
   };
 }
