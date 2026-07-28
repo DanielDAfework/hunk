@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { dirname, join } from "node:path";
 import { sanitizeTerminalLine } from "../lib/terminalText";
-import { BUNDLED_SHIKI_THEME_IDS, LEGACY_THEME_ID_ALIASES } from "../ui/lib/shikiThemes";
+import { BUNDLED_SHIKI_THEME_IDS, LEGACY_THEME_ID_ALIASES } from "./themeCatalog";
 import {
   createInvalidThemeIdNotice,
   createThemeCollisionNotice,

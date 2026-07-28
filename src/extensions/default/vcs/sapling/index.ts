@@ -7,7 +7,7 @@ import {
   listSlUntrackedFiles,
   resolveSlRepoRoot,
   runSlText,
-} from "../../../../core/sl";
+} from "../../../../core/vcs/sapling";
 import {
   HUNK_CORE_VCS_DETECTION_PRIORITY,
   type ExtensionVcsAdapter,
@@ -18,7 +18,7 @@ import {
  * Hunk's Sapling backend, as a bundled extension.
  *
  * Like the Jujutsu one, this file sees only the published contract plus its own
- * helpers in `src/core/sl.ts`.
+ * helpers in `src/core/vcs/sapling.ts`.
  */
 
 /** Return the last path segment for review titles. */

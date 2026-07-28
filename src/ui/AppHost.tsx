@@ -1,18 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { loadConfiguredSessionBootstrap } from "../app/sessionBootstrap";
 import { resolveConfiguredCliInput } from "../core/config";
-import { collectSessionCustomThemes } from "../core/customThemes";
-import { loadAppBootstrap } from "../core/loaders";
 import { resolveRuntimeCliInput } from "../core/terminal";
 import type { StartupNotice } from "../core/startupNotice";
 import type { AppBootstrap, CliInput } from "../core/types";
-import {
-  applyExtensionChangesetTransforms,
-  applyExtensionRegistrations,
-  createUnknownVcsNotice,
-  reportExtensionApplyIssues,
-  resolveDetectedVcsIdWithExtensions,
-  resolveSessionVcsId,
-} from "../extensions/apply";
+import { createUnknownVcsNotice, reportExtensionApplyIssues } from "../extensions/apply";
 import {
   emitExtensionEvent,
   emitExtensionEventBounded,
@@ -147,62 +139,28 @@ export function AppHost({
       }
 
       const extensions = extensionsRef.current;
-      // Registrations are reapplied every reload so a pass that added extensions
-      // contributes exactly what a fresh launch would have.
-      const applied = applyExtensionRegistrations(extensions);
+      const {
+        applied,
+        bootstrap: nextBootstrap,
+        input: reloadInput,
+        sessionVcs,
+      } = await loadConfiguredSessionBootstrap({
+        configured,
+        cwd,
+        extensions,
+        loadAtCwd: true,
+      });
       if (extensions) {
         reportExtensionApplyIssues(applied.issues, extensions.context);
       }
-
-      // Extensions are loaded once per process, so a reload re-merges the same registry themes
-      // instead of dropping them from the selector.
-      const sessionThemes = collectSessionCustomThemes(
-        configured.customThemes,
-        extensions?.registry.themes,
-      );
-
-      // Config resolution above ran before extension adapters were in hand, exactly
-      // as it does on first launch — so repeat both VCS steps `prepareStartupPlan`
-      // performs, in the same order. Without them, a reload into an
-      // extension-backed repository (a daemon cross-directory reload, say)
-      // resolves to the backend config guessed without extensions and reviews the
-      // wrong thing, while first launch in that same directory works.
-      const sessionVcs = resolveSessionVcsId(
-        configured.input.options.vcs,
-        cwd,
-        applied.vcsAdapters,
-      );
-      const detectedVcsId = resolveDetectedVcsIdWithExtensions(
-        cwd,
-        applied.vcsAdapters,
-        configured.explicitVcsId,
-      );
-      const reloadVcsId = detectedVcsId ?? sessionVcs.vcsId;
-      const reloadInput =
-        reloadVcsId === configured.input.options.vcs
-          ? configured.input
-          : { ...configured.input, options: { ...configured.input.options, vcs: reloadVcsId } };
-
-      const nextBootstrap = await loadAppBootstrap(reloadInput, {
-        cwd,
-        customThemes: sessionThemes.themes,
-        vcsAdapters: applied.vcsAdapters,
-      });
-      nextBootstrap.changeset = await applyExtensionChangesetTransforms(
-        extensions,
-        nextBootstrap.changeset,
-      );
-      nextBootstrap.extensions = extensions;
       nextBootstrap.startupNotices =
         sessionVcs.unknownVcsId !== undefined
           ? [
               ...(configured.startupNotices ?? []),
               // Names the backend the reload really used, detection override included.
-              createUnknownVcsNotice(sessionVcs.unknownVcsId, String(reloadVcsId)),
+              createUnknownVcsNotice(sessionVcs.unknownVcsId, String(reloadInput.options.vcs)),
             ]
           : configured.startupNotices;
-      nextBootstrap.viewPreferencesConfigPath = configured.viewPreferencesConfigPath;
-      nextBootstrap.keybindings = configured.keybindings;
       const nextSnapshot = createInitialSessionSnapshot(nextBootstrap);
 
       let sessionId = "local-session";

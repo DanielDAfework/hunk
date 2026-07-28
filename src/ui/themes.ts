@@ -11,7 +11,7 @@ import {
   getBundledShikiThemeForeground,
   type BundledShikiThemeDiffColors,
   type BundledShikiThemeId,
-} from "./lib/shikiThemes";
+} from "../core/themeCatalog";
 import type { AppTheme, SyntaxColors, ThemeBase } from "./themes/types";
 
 export type { AppTheme, SyntaxColors, ThemeBase } from "./themes/types";

@@ -5,10 +5,10 @@ import {
   type ExtensionVcsDiffInput,
   type ExtensionVcsShowInput,
   type ExtensionVcsStashShowInput,
-} from "../extension-api/types";
+} from "../../extension-api/types";
 import { LARGE_DIFF_FILE_MAX_BYTES, LARGE_DIFF_FILE_MAX_LINES } from "./largeFile";
-import { escapeUntrackedPatchPath } from "./patch/normalize";
-import { normalizePathForOS } from "../lib/osPath";
+import { escapeUntrackedPatchPath } from "../patch/normalize";
+import { normalizePathForOS } from "../../lib/osPath";
 
 /**
  * Every Git command Hunk runs, and the failures they translate into.

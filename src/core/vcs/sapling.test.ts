@@ -2,8 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildSlDiffArgs, runSlText } from "./sl";
-import type { VcsDiffCommandInput } from "./types";
+import { buildSlDiffArgs, runSlText } from "./sapling";
+import type { VcsDiffCommandInput } from "../types";
 
 const slAvailable = (() => {
   try {

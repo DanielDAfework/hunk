@@ -1,5 +1,5 @@
 import type { RegisteredTheme } from "../extensions/types";
-import { BUNDLED_SHIKI_THEME_IDS, resolveBundledShikiThemeId } from "../ui/lib/shikiThemes";
+import { BUNDLED_SHIKI_THEME_IDS, resolveBundledShikiThemeId } from "./themeCatalog";
 import { LEGACY_CUSTOM_SYNTAX_COLOR_KEYS } from "./legacySyntaxScopes";
 import type { StartupNotice } from "./startupNotice";
 import type { NamedCustomThemeConfig } from "./types";

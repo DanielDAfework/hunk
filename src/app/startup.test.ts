@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { createEmptyExtensionLoadResult } from "../extensions/types";
-import type { HunkConfigResolution } from "./config";
-import { HunkUserError } from "./errors";
+import type { HunkConfigResolution } from "../core/config";
+import { HunkUserError } from "../core/errors";
 import { prepareStartupPlan } from "./startup";
-import type { AppBootstrap, CliInput, NamedCustomThemeConfig, ParsedCliInput } from "./types";
+import type { AppBootstrap, CliInput, NamedCustomThemeConfig, ParsedCliInput } from "../core/types";
 
 /**
  * Build a config resolution for tests that are not exercising config layering.

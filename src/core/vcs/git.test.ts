@@ -15,7 +15,7 @@ import {
   runGitText,
   shouldSkipLargeTrackedDiff,
 } from "./git";
-import type { VcsDiffCommandInput } from "./types";
+import type { VcsDiffCommandInput } from "../types";
 
 const tempDirs: string[] = [];
 

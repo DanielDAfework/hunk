@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createFileSourceFetcher, SourceTextTooLargeError } from "./fileSource";
-import { readGitFileSource } from "./gitSource";
+import { readGitFileSource } from "./vcs/gitSource";
 
 const tempDirs: string[] = [];
 

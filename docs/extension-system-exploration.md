@@ -120,7 +120,7 @@ seams in very different states of readiness:
 - Pierre's `setCustomExtension` (`src/core/fileLanguage.ts`) is already used at
   import time for `.mts`/`.cts`; extending it to plugin-declared mappings is
   trivial.
-- `StartupDeps` (`src/core/startup.ts`) fully injects the startup pipeline
+- `StartupDeps` (`src/app/startup.ts`) fully injects the startup pipeline
   (currently only tests use it), and unknown TOML keys are silently ignored, so
   an `[extensions]` config section is backward-compatible on day one.
 

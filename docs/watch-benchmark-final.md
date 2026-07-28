@@ -259,7 +259,7 @@ Fourteen commits implement the production change:
 - `c152100`, `0659a30`, `d36c33f`, `fd00dd6` add resource fallback, Git ignored-root pruning, native recursive selection, and a bounded readiness deadline
 - `f6165bd`, `4f35a0e` stabilize cross-platform and sidecar watch coverage
 
-Production implementation/seams are in `src/core/watch.ts`, `watchPlan.ts`, `watchController.ts`, `watchObserver.ts`, `src/core/vcs/*`, `src/core/git.ts`, loader/type plumbing, `src/ui/hooks/useWatchedInput.ts`, and the App/AppHost integration. Matching unit, filesystem, AppHost, helper, and PTY coverage lives beside those files and in `test/helpers/watchTest.ts` and `test/pty/watch.test.ts`. CI and PR CI add a compiled-binary watch PTY check. README documents continuous observation with fallback.
+Production implementation/seams are in `src/core/watch.ts`, `watchPlan.ts`, `watchController.ts`, `watchObserver.ts`, `src/core/vcs/*`, loader/type plumbing, `src/ui/hooks/useWatchedInput.ts`, and the App/AppHost integration. Matching unit, filesystem, AppHost, helper, and PTY coverage lives beside those files and in `test/helpers/watchTest.ts` and `test/pty/watch.test.ts`. CI and PR CI add a compiled-binary watch PTY check. README documents continuous observation with fallback.
 
 The only new runtime dependency is `chokidar@^4.0.3` (and transitive `readdirp@4.1.2`), recorded in `package.json`, `bun.lock`, and `nix/bun.lock.nix`. The two user-visible patch changesets are `.changeset/calm-files-watch.md` and `.changeset/native-recursive-watch.md`. Existing benchmark fixture imports received small type/data updates, but no benchmark runner is a production runtime dependency.
 

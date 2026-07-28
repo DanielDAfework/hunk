@@ -4,8 +4,8 @@ import {
   HunkExtensionUserError,
   type ExtensionVcsDiffInput,
   type ExtensionVcsShowInput,
-} from "../extension-api/types";
-import { normalizePathForOS } from "../lib/osPath";
+} from "../../extension-api/types";
+import { normalizePathForOS } from "../../lib/osPath";
 
 export type SlBackedInput = ExtensionVcsDiffInput | ExtensionVcsShowInput;
 

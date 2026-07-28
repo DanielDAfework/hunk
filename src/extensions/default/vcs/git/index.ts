@@ -19,9 +19,9 @@ import {
   shouldSkipLargeTrackedDiff,
   type GitBackedInput,
   type GitDiffEndpoints,
-} from "../../../../core/git";
-import { gitEndpointSourceSpec, readGitFileSource } from "../../../../core/gitSource";
-import { inspectLargeUntrackedFile } from "../../../../core/largeFile";
+} from "../../../../core/vcs/git";
+import { gitEndpointSourceSpec, readGitFileSource } from "../../../../core/vcs/gitSource";
+import { inspectLargeUntrackedFile } from "../../../../core/vcs/largeFile";
 import {
   HUNK_CORE_VCS_DETECTION_PRIORITY,
   type ExtensionVcsAdapter,
@@ -40,8 +40,8 @@ import {
  * file sources, skipped-too-large placeholders, untracked files, watch plans,
  * rich failures — so it is deliberately written the way a third-party backend
  * would be: it sees only the published `hunkdiff/extension` contract plus its
- * own implementation helpers in `src/core/git.ts`, `src/core/gitSource.ts`, and
- * `src/core/largeFile.ts`. Nothing here reaches into the diff engine or the
+ * own implementation helpers in `src/core/vcs/git.ts`, `src/core/vcs/gitSource.ts`, and
+ * `src/core/vcs/largeFile.ts`. Nothing here reaches into the diff engine or the
  * adapter registry. If something Git needs cannot be said in these types, the
  * published contract is missing it, and that is the point of shipping it this
  * way.

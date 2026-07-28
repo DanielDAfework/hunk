@@ -2,7 +2,7 @@
 
 import { formatCliError } from "./core/errors";
 import { pagePlainText } from "./core/pager";
-import { prepareStartupPlan } from "./core/startup";
+import { prepareStartupPlan } from "./app/startup";
 import { sanitizeTerminalText } from "./lib/terminalText";
 import { serveSessionBrokerDaemon } from "./session-broker/brokerServer";
 import { runSessionCommand } from "./session/commands";

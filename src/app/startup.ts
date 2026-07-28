@@ -1,38 +1,31 @@
-import {
-  applyExtensionChangesetTransforms,
-  applyExtensionRegistrations,
-  createExtensionApplyNotices,
-  createUnknownVcsNotice,
-  resolveDetectedVcsIdWithExtensions,
-  resolveSessionVcsId,
-} from "../extensions/apply";
+import { loadConfiguredSessionBootstrap, type SessionBootstrapResult } from "./sessionBootstrap";
+import { createExtensionApplyNotices, createUnknownVcsNotice } from "../extensions/apply";
 import { loadBundledExtensions } from "../extensions/default/vcs";
 import {
   createExtensionLoadNotices,
   loadStartupExtensions,
   mergeStartupNotices,
 } from "../extensions/startup";
-import { resolveConfiguredCliInput } from "./config";
-import { collectSessionCustomThemes } from "./customThemes";
-import { HunkUserError } from "./errors";
-import { loadAppBootstrap } from "./loaders";
-import { looksLikePatchInput } from "./pager";
-import { detectTerminalThemeModeFromBackground } from "./themeDetection";
+import { resolveConfiguredCliInput } from "../core/config";
+import { HunkUserError } from "../core/errors";
+import { loadAppBootstrap } from "../core/loaders";
+import { looksLikePatchInput } from "../core/pager";
+import { detectTerminalThemeModeFromBackground } from "../core/themeDetection";
 import {
   openControllingTerminal,
   resolveRuntimeCliInput,
   usesPipedPatchInput,
   type ControllingTerminal,
-} from "./terminal";
+} from "../core/terminal";
 import type {
   AppBootstrap,
   CliInput,
   MarkupRenderCommandInput,
   ParsedCliInput,
   SessionCommandInput,
-} from "./types";
-import { canReloadInput } from "./watch";
-import { parseCli } from "./cli";
+} from "../core/types";
+import { canReloadInput } from "../core/watch";
+import { parseCli } from "../core/cli";
 
 export type StartupPlan =
   | {
@@ -279,66 +272,33 @@ export async function prepareStartupPlan(
     cliExtensionPaths: cliInput.options.extensionPaths,
   });
 
-  // Extension themes join the config-defined ones here, so the rest of the app sees one
-  // ordered theme list instead of two sources it would have to reconcile itself.
-  const sessionThemes = collectSessionCustomThemes(
-    configured.customThemes,
-    extensionResult.registry.themes,
-  );
-
-  // File languages register globally; VCS adapters are threaded into loading below.
-  const applied = applyExtensionRegistrations(extensionResult);
-  // Config accepts any `vcs` id because it resolves before extensions load. Settle
-  // that choice now: honor it when a loaded backend owns it, otherwise fall back
-  // to detection and tell the user, instead of dropping it in silence.
-  const sessionVcs = resolveSessionVcsId(cliInput.options.vcs, startupCwd, applied.vcsAdapters);
-  if (sessionVcs.vcsId !== cliInput.options.vcs) {
-    cliInput = { ...cliInput, options: { ...cliInput.options, vcs: sessionVcs.vcsId } };
-  }
-
-  // Config detected the checkout before extension backends existed, so detection
-  // runs again over the full adapter list: the nearest checkout wins whoever
-  // registered it. An explicit `vcs` this session owns is left alone.
-  const detectedVcsId = resolveDetectedVcsIdWithExtensions(
-    startupCwd,
-    applied.vcsAdapters,
-    configured.explicitVcsId,
-  );
-  if (detectedVcsId !== undefined && detectedVcsId !== cliInput.options.vcs) {
-    cliInput = { ...cliInput, options: { ...cliInput.options, vcs: detectedVcsId } };
-  }
-
-  // Built after both steps so the notice names the backend the session really
-  // loads with, not the intermediate fallback detection first proposed.
-  const unknownVcsNotices =
-    sessionVcs.unknownVcsId !== undefined
-      ? [createUnknownVcsNotice(sessionVcs.unknownVcsId, String(cliInput.options.vcs))]
-      : [];
-
-  let bootstrap: AppBootstrap;
+  let preparedSession: SessionBootstrapResult;
   try {
-    bootstrap = await loadAppBootstrapImpl(cliInput, {
-      customThemes: sessionThemes.themes,
-      vcsAdapters: applied.vcsAdapters,
+    preparedSession = await loadConfiguredSessionBootstrap({
+      configured,
+      cwd: startupCwd,
+      extensions: extensionResult,
+      initialThemeMode,
+      loadAppBootstrapImpl,
     });
   } catch (error) {
     controllingTerminal?.close();
     throw error;
   }
+  const { applied, bootstrap, input: resolvedInput, sessionThemes, sessionVcs } = preparedSession;
+  cliInput = resolvedInput;
 
-  // Transforms run on the loaded changeset so the sidebar and review stream both
-  // follow whatever the extensions produced, with no separate pre-transform copy.
-  bootstrap.changeset = await applyExtensionChangesetTransforms(
-    extensionResult,
-    bootstrap.changeset,
-  );
+  // Built after adapter resolution so the notice names the backend the session really loads with.
+  const unknownVcsNotices =
+    sessionVcs.unknownVcsId !== undefined
+      ? [createUnknownVcsNotice(sessionVcs.unknownVcsId, String(cliInput.options.vcs))]
+      : [];
 
   // Bundled extensions load with the VCS adapters, well before this point, so a
   // failure there is reported here rather than lost. It should be unreachable —
   // these factories are Hunk's own — but the isolation contract is the contract.
   const bundledNotices = createExtensionLoadNotices(loadBundledExtensions().issues);
 
-  bootstrap.initialThemeMode = initialThemeMode ?? bootstrap.initialThemeMode;
   bootstrap.startupNotices = mergeStartupNotices(
     // Keep the resolved array identity when extensions contributed no theme notices.
     sessionThemes.notices.length > 0 ||
@@ -355,10 +315,6 @@ export async function prepareStartupPlan(
       : configured.startupNotices,
     extensionResult,
   );
-  bootstrap.viewPreferencesConfigPath = configured.viewPreferencesConfigPath;
-  bootstrap.keybindings = configured.keybindings;
-  bootstrap.extensions = extensionResult;
-
   controllingTerminal ??= usesPipedPatchInputImpl(cliInput) ? openControllingTerminalImpl() : null;
 
   return {

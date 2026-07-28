@@ -6,7 +6,7 @@ import {
   readFileSourceSpec,
   readStreamTextWithLimit,
   type FileSourceSpec,
-} from "./fileSource";
+} from "../fileSource";
 import type { GitDiffEndpoint } from "./git";
 
 /**

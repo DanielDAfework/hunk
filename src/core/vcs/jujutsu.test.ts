@@ -2,8 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildJjDiffArgs, runJjText } from "./jj";
-import type { VcsDiffCommandInput } from "./types";
+import { buildJjDiffArgs, runJjText } from "./jujutsu";
+import type { VcsDiffCommandInput } from "../types";
 
 const tempDirs: string[] = [];
 // Windows subprocess setup can exceed Bun's default 5s timeout while generating enough jj changes.
