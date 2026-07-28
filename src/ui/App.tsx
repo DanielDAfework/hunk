@@ -49,7 +49,7 @@ import type {
   HunkSessionBrokerClient,
   ReloadedSessionResult,
   ReloadSessionOptions,
-} from "../hunk-session/types";
+} from "../session/types";
 import { MenuBar } from "./components/chrome/MenuBar";
 import { ConfirmDialog, confirmDialogHeight } from "./components/chrome/ConfirmDialog";
 import { ExtensionDialog } from "./components/chrome/ExtensionDialog";

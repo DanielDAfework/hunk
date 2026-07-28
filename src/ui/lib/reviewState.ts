@@ -7,9 +7,9 @@
  * tested without React state in the loop.
  */
 import { findDiffFileByPath, findHunkIndexForLine, hunkLineRange } from "../../core/liveComments";
-import { noDiffFileMatchesMessage } from "../../hunk-session/agentErrors";
+import { noDiffFileMatchesMessage } from "../../session/agent/errors";
 import type { AgentAnnotation, DiffFile } from "../../core/types";
-import type { NavigateToHunkToolInput, SelectedHunkSummary } from "../../hunk-session/types";
+import type { NavigateToHunkToolInput, SelectedHunkSummary } from "../../session/types";
 import { filterReviewFiles, mergeFileAnnotationsByFileId } from "./files";
 import {
   buildAnnotatedHunkCursors,

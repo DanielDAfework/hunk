@@ -6,8 +6,8 @@ import {
   createTestSessionFileSummary,
   createTestSessionReview as buildTestSessionReview,
   createTestSessionSnapshot,
-} from "../../test/helpers/session-daemon-fixtures";
-import type { SessionCommandInput, SessionSelectorInput } from "../core/types";
+} from "../../../test/helpers/session-daemon-fixtures";
+import type { SessionCommandInput, SessionSelectorInput } from "../../core/types";
 import {
   runSessionCommand,
   setSessionCommandTestHooks,

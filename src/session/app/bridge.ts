@@ -7,7 +7,7 @@ import type {
   NavigatedSelectionResult,
   ReloadedSessionResult,
   RemovedCommentResult,
-} from "./types";
+} from "../types";
 
 export interface HunkSessionBridgeHandlers {
   addLiveComment: (

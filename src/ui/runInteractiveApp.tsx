@@ -13,14 +13,14 @@ import { resolveStartupUpdateNotice } from "../core/updateNotice";
 import {
   createInitialSessionSnapshot,
   createSessionRegistration,
-} from "../hunk-session/sessionRegistration";
+} from "../session/app/registration";
 import type {
   HunkSessionCommandResult,
   HunkSessionInfo,
   HunkSessionServerMessage,
   HunkSessionState,
-} from "../hunk-session/types";
-import { SessionBrokerClient } from "../session-broker/brokerClient";
+} from "../session/types";
+import { SessionBrokerClient } from "../session/broker/brokerClient";
 import { AppHost } from "./AppHost";
 
 export interface InteractiveAppInput {

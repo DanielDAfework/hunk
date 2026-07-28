@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createServer } from "node:net";
 import { platform } from "node:os";
-import type { SessionCommandInput } from "../core/types";
-import { createTestListedSession } from "../../test/helpers/session-daemon-fixtures";
+import type { SessionCommandInput } from "../../core/types";
+import { createTestListedSession } from "../../../test/helpers/session-daemon-fixtures";
 import {
   runSessionCommand,
   setSessionCommandTestHooks,

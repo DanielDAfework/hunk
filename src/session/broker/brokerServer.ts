@@ -10,10 +10,7 @@ import {
   isLoopbackHost,
   resolveSessionBrokerConfig,
 } from "./brokerConfig";
-import {
-  createHunkSessionBrokerState,
-  type HunkSessionBrokerState,
-} from "../hunk-session/brokerAdapter";
+import { createHunkSessionBrokerState, type HunkSessionBrokerState } from "./state";
 import type {
   AppliedCommentBatchResult,
   AppliedCommentResult,
@@ -23,13 +20,13 @@ import type {
   NavigatedSelectionResult,
   ReloadedSessionResult,
   RemovedCommentResult,
-} from "../hunk-session/types";
+} from "../types";
 import {
   MAX_HTTP_BODY_BYTES,
   PayloadTooLargeError,
   readRequestTextWithLimit,
 } from "@hunk/session-broker-core";
-import { listHunkSessionNotes } from "../hunk-session/projections";
+import { listHunkSessionNotes } from "./projections";
 import {
   HUNK_SESSION_API_PATH,
   HUNK_SESSION_API_VERSION,
@@ -38,8 +35,8 @@ import {
   type SessionDaemonAction,
   type SessionDaemonCapabilities,
   type SessionDaemonResponse,
-} from "../session/protocol";
-import { parseSessionDaemonRequest } from "../session/protocolSchemas";
+} from "../agent/protocol";
+import { parseSessionDaemonRequest } from "../agent/protocolSchemas";
 
 const DEFAULT_STALE_SESSION_TTL_MS = 45_000;
 const DEFAULT_STALE_SESSION_SWEEP_INTERVAL_MS = 15_000;

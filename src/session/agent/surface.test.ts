@@ -7,7 +7,7 @@ import {
   SESSION_AGENT_COMMANDS,
   SESSION_COMMENT_COMMAND_LIST,
   type SessionCommandOptions,
-} from "./agentSurface";
+} from "./surface";
 
 const FLAG_TOKEN_PATTERN = /--[a-z][a-z-]*/g;
 

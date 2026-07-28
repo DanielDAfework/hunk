@@ -1,14 +1,14 @@
 import { useEffect, useMemo } from "react";
 import type { CliInput, DiffFile } from "../../core/types";
 import { hunkLineRange } from "../../core/liveComments";
-import { createHunkSessionBridge } from "../../hunk-session/bridge";
+import { createHunkSessionBridge } from "../../session/app/bridge";
 import type {
   HunkSessionBrokerClient,
   ReloadedSessionResult,
   ReloadSessionOptions,
   SessionLiveCommentSummary,
   SessionReviewNoteSummary,
-} from "../../hunk-session/types";
+} from "../../session/types";
 import type { ReviewController } from "./useReviewController";
 
 /** Bridge one live Hunk review session to the local session daemon. */

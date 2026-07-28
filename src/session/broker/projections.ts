@@ -8,7 +8,7 @@ import type {
   SessionReview,
   SessionReviewNoteSummary,
   SessionReviewFile,
-} from "./types";
+} from "../types";
 
 export interface HunkSessionEntryLike {
   registration: HunkSessionRegistration;

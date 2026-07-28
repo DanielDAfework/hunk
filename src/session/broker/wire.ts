@@ -1,5 +1,5 @@
-import { EXPERIMENTAL_FEATURES, type ExperimentalFeature } from "../core/experimental";
-import type { CliInput } from "../core/types";
+import { EXPERIMENTAL_FEATURES, type ExperimentalFeature } from "../../core/experimental";
+import type { CliInput } from "../../core/types";
 import {
   MAX_REGISTRATION_FILES,
   MAX_REGISTRATION_HUNKS_PER_FILE,
@@ -11,7 +11,7 @@ import {
   parseSessionSnapshotEnvelope,
   utf8ByteLength,
 } from "@hunk/session-broker-core";
-import type { HunkSessionRegistration, HunkSessionSnapshot } from "./types";
+import type { HunkSessionRegistration, HunkSessionSnapshot } from "../types";
 import type {
   HunkSessionInfo,
   HunkSessionState,
@@ -19,7 +19,7 @@ import type {
   SessionReviewNoteSummary,
   SessionReviewFile,
   SessionReviewHunk,
-} from "./types";
+} from "../types";
 
 const REVIEW_INPUT_KINDS = new Set<CliInput["kind"]>([
   "vcs",

@@ -9,7 +9,7 @@ import type {
   SessionReview,
   SessionReviewFile,
   SessionReviewHunk,
-} from "../../src/hunk-session/types";
+} from "../../src/session/types";
 
 export function createTestSessionFileSummary(
   overrides: Partial<SessionFileSummary> = {},

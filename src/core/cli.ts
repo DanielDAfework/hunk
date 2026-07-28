@@ -24,12 +24,12 @@ import {
   SESSION_AGENT_COMMANDS,
   SESSION_AGENT_COMMAND_LIST,
   SESSION_COMMENT_COMMAND_LIST,
-} from "../hunk-session/agentSurface";
+} from "../session/agent/surface";
 import {
   COMMENT_APPLY_STDIN_MESSAGE,
   constraintViolationMessage,
   RELOAD_SEPARATOR_MESSAGE,
-} from "../hunk-session/agentErrors";
+} from "../session/agent/errors";
 import { detectVcs } from "./vcs";
 import { DEFAULT_TAB_WIDTH, parseTabWidth } from "./tabWidth";
 import { resolveCliVersion } from "./version";

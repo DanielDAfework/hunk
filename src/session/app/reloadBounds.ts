@@ -1,7 +1,7 @@
 import { isAbsolute, relative, resolve } from "node:path";
-import { resolveCanonicalPath } from "../core/paths";
-import { findVcsRepoRootCandidate } from "../core/vcs";
-import type { AppBootstrap, CliInput, CommonOptions } from "../core/types";
+import { resolveCanonicalPath } from "../../core/paths";
+import { findVcsRepoRootCandidate } from "../../core/vcs";
+import type { AppBootstrap, CliInput, CommonOptions } from "../../core/types";
 
 /**
  * Session reload filesystem policy:

@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { createTestDiffFile } from "../../test/helpers/diff-helpers";
-import type { AppBootstrap } from "../core/types";
+import { createTestDiffFile } from "../../../test/helpers/diff-helpers";
+import type { AppBootstrap } from "../../core/types";
 import { SESSION_BROKER_REGISTRATION_VERSION } from "@hunk/session-broker-core";
 import {
   createInitialSessionSnapshot,
   createSessionRegistration,
   updateSessionRegistration,
-} from "./sessionRegistration";
+} from "./registration";
 
 function createBootstrap(overrides: Partial<AppBootstrap> = {}): AppBootstrap {
   const file = createTestDiffFile({

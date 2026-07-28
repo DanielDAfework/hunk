@@ -4,14 +4,14 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { CONFIG_REFERENCE_OPTIONS } from "../src/core/config";
 import { renderHunkReviewSkill } from "../src/hunk-review/skillDocument";
-import { SESSION_AGENT_COMMAND_LIST } from "../src/hunk-session/agentSurface";
+import { SESSION_AGENT_COMMAND_LIST } from "../src/session/agent/surface";
 import {
   DEFAULT_SESSION_BROKER_HOST,
   DEFAULT_SESSION_BROKER_PORT,
   SESSION_BROKER_HOST_ENV,
   SESSION_BROKER_PORT_ENV,
   UNSAFE_ALLOW_REMOTE_SESSION_BROKER_ENV,
-} from "../src/session-broker/brokerConfig";
+} from "../src/session/broker/brokerConfig";
 import { LEGACY_THEME_ID_ALIASES } from "../src/core/themeCatalog";
 import {
   generateDocsArtifacts,

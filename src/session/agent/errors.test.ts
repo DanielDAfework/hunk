@@ -8,12 +8,12 @@ import {
   NO_ACTIVE_SESSIONS_MESSAGE,
   noDiffFileMatchesMessage,
   RELOAD_SEPARATOR_MESSAGE,
-} from "./agentErrors";
+} from "./errors";
 import {
   COMMENT_DIRECTION_CONSTRAINT,
   COMMENT_TARGET_CONSTRAINT,
   NAVIGATE_TARGET_CONSTRAINT,
-} from "./agentSurface";
+} from "./surface";
 
 function createTestBrokerSession(sessionId: string) {
   return {

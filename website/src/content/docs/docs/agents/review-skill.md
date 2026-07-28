@@ -19,7 +19,7 @@ For agents that need a stable web-readable URL, use the [generated Hunk review s
 
 The checked-in `skills/hunk-review/SKILL.md` is rendered from typed command metadata and agent error definitions in Hunk's source. Parser help, examples, constraints, and common remedies therefore share ownership instead of drifting as separate handwritten copies.
 
-Do not edit the generated skill directly. Contributors change `src/hunk-review/skillDocument.ts`, `src/hunk-session/agentSurface.ts`, or `src/hunk-session/agentErrors.ts`, then run:
+Do not edit the generated skill directly. Contributors change `src/hunk-review/skillDocument.ts`, `src/session/agent/surface.ts`, or `src/session/agent/errors.ts`, then run:
 
 ```bash
 bun run generate:skill

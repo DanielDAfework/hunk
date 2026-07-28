@@ -6,7 +6,7 @@
  * throws. Throw sites import these builders instead of repeating string literals.
  */
 
-import type { AgentCommandConstraint } from "./agentSurface";
+import type { AgentCommandConstraint } from "./surface";
 
 /** Format flag choices as a human list: `--a, --b, or --c` for three, `--a or --b` for two. */
 function formatFlagChoices(flags: readonly string[]) {

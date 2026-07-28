@@ -22,7 +22,7 @@ import {
   resolveCommentTarget,
 } from "../../core/liveComments";
 import { SourceTextTooLargeError } from "../../core/fileSource";
-import { noDiffFileMatchesMessage } from "../../hunk-session/agentErrors";
+import { noDiffFileMatchesMessage } from "../../session/agent/errors";
 import type { AgentAnnotation, DiffFile, LayoutMode, UserNoteLineTarget } from "../../core/types";
 import type {
   AppliedCommentBatchResult,
@@ -36,7 +36,7 @@ import type {
   RemovedCommentResult,
   SessionLiveCommentSummary,
   SessionReviewNoteSummary,
-} from "../../hunk-session/types";
+} from "../../session/types";
 import type { FileSourceStatus } from "../diff/expandCollapsedRows";
 import { selectGapForKeyboardToggle } from "../diff/expandCollapsedRows";
 import { trailingCollapsedLines } from "../diff/pierre";

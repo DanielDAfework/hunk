@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { createTestListedSession } from "../../test/helpers/session-daemon-fixtures";
-import type { HunkSessionBrokerState } from "../hunk-session/brokerAdapter";
-import type { SessionDaemonRequest } from "../session/protocol";
+import { createTestListedSession } from "../../../test/helpers/session-daemon-fixtures";
+import type { HunkSessionBrokerState } from "./state";
+import type { SessionDaemonRequest } from "../agent/protocol";
 import {
   formatDaemonServeError,
   handleSessionApiRequest,

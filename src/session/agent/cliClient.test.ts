@@ -8,13 +8,13 @@ import {
   createTestSessionReviewFile,
   createTestSessionReviewHunk,
   createTestSessionSnapshot,
-} from "../../test/helpers/session-daemon-fixtures";
-import type { SessionSelectorInput } from "../core/types";
+} from "../../../test/helpers/session-daemon-fixtures";
+import type { SessionSelectorInput } from "../../core/types";
 import {
   HUNK_SESSION_API_PATH,
   HUNK_SESSION_API_VERSION,
   HUNK_SESSION_DAEMON_VERSION,
-} from "../session/protocol";
+} from "./protocol";
 import {
   createHttpHunkSessionCliClient,
   formatClearCommentsOutput,
@@ -28,7 +28,7 @@ import {
   formatRemoveCommentOutput,
   formatReviewOutput,
   formatSessionOutput,
-} from "./cli";
+} from "./cliClient";
 
 const selector = { sessionId: "session-1" } satisfies SessionSelectorInput;
 const originalFetch = globalThis.fetch;

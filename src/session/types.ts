@@ -2,7 +2,7 @@ import type { ExperimentalFeature } from "../core/experimental";
 import type { CommentTargetInput, DiffSide } from "../core/liveComments";
 import type { CliInput, ReviewNoteSource } from "../core/types";
 import type { SessionReloadReason } from "../extensions/types";
-import type { SessionBrokerClient } from "../session-broker/brokerClient";
+import type { SessionBrokerClient } from "../session/broker/brokerClient";
 import type {
   SessionClientMessage,
   SessionRegistration,

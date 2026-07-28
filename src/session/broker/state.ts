@@ -13,7 +13,7 @@ import type {
   SelectedSessionContext,
   SessionLiveCommentSummary,
   SessionReview,
-} from "./types";
+} from "../types";
 import { parseSessionRegistration, parseSessionSnapshot } from "./wire";
 import { SessionBrokerState, type SessionBrokerViewAdapter } from "@hunk/session-broker-core";
 

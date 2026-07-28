@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { resolveExperimentalFeatures } from "../core/experimental";
-import { summarizeHunk } from "../core/hunkSummary";
-import { hunkLineRange } from "../core/liveComments";
-import type { AppBootstrap } from "../core/types";
+import { resolveExperimentalFeatures } from "../../core/experimental";
+import { summarizeHunk } from "../../core/hunkSummary";
+import { hunkLineRange } from "../../core/liveComments";
+import type { AppBootstrap } from "../../core/types";
 import {
   SESSION_BROKER_REGISTRATION_VERSION,
   resolveSessionTerminalMetadata,
 } from "@hunk/session-broker-core";
-import type { HunkSessionRegistration, HunkSessionSnapshot, SessionReviewFile } from "./types";
+import type { HunkSessionRegistration, HunkSessionSnapshot, SessionReviewFile } from "../types";
 
 /** Resolve the TTY device path for the current process, if available. */
 function ttyname(): string | undefined {

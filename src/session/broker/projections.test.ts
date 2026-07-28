@@ -3,7 +3,7 @@ import {
   createTestSessionLiveComment,
   createTestSessionRegistration,
   createTestSessionSnapshot,
-} from "../../test/helpers/session-daemon-fixtures";
+} from "../../../test/helpers/session-daemon-fixtures";
 import {
   buildHunkSessionReview,
   buildListedHunkSession,

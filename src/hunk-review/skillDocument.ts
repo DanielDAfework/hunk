@@ -1,5 +1,5 @@
-import { AGENT_ERROR_DOCS } from "../hunk-session/agentErrors";
-import { SESSION_AGENT_COMMANDS, type AgentCommandSpec } from "../hunk-session/agentSurface";
+import { AGENT_ERROR_DOCS } from "../session/agent/errors";
+import { SESSION_AGENT_COMMANDS, type AgentCommandSpec } from "../session/agent/surface";
 
 /**
  * Deterministic renderer for `skills/hunk-review/SKILL.md`.

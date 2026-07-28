@@ -10,7 +10,7 @@ import type {
   HunkSessionRegistration,
   HunkSessionServerMessage,
   HunkSessionSnapshot,
-} from "../hunk-session/types";
+} from "../session/types";
 import { LEGACY_CUSTOM_SYNTAX_NOTICE } from "../core/startupNotice";
 import type { AppBootstrap, LayoutMode } from "../core/types";
 import { createTestVcsAppBootstrap } from "../../test/helpers/app-bootstrap";

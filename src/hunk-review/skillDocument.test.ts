@@ -5,7 +5,7 @@ import {
   agentOptionFlagName,
   AUXILIARY_AGENT_OPTIONS,
   SESSION_AGENT_COMMAND_LIST,
-} from "../hunk-session/agentSurface";
+} from "../session/agent/surface";
 import { renderHunkReviewSkill } from "./skillDocument";
 
 const SKILL_PATH = join(import.meta.dir, "..", "..", "skills", "hunk-review", "SKILL.md");

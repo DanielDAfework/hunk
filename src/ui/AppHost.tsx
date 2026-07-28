@@ -14,12 +14,12 @@ import { loadStartupExtensions } from "../extensions/startup";
 import {
   createInitialSessionSnapshot,
   updateSessionRegistration,
-} from "../hunk-session/sessionRegistration";
+} from "../session/app/registration";
 import {
   createSessionReloadBounds,
   validateSessionReloadWithinBounds,
-} from "../hunk-session/sessionFileBounds";
-import type { HunkSessionBrokerClient, ReloadSessionOptions } from "../hunk-session/types";
+} from "../session/app/reloadBounds";
+import type { HunkSessionBrokerClient, ReloadSessionOptions } from "../session/types";
 import { App } from "./App";
 import { useStartupNotices } from "./hooks/useStartupNotices";
 import type { WatchedInputRuntime } from "./hooks/useWatchedInput";

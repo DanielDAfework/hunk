@@ -2,17 +2,17 @@ import type {
   SessionCommandInput,
   SessionCommandOutput,
   SessionSelectorInput,
-} from "../core/types";
-import type { SessionLiveCommentSummary, SessionReviewNoteSummary } from "../hunk-session/types";
-import { NO_ACTIVE_SESSIONS_MESSAGE } from "../hunk-session/agentErrors";
+} from "../../core/types";
+import type { SessionLiveCommentSummary, SessionReviewNoteSummary } from "../types";
+import { NO_ACTIVE_SESSIONS_MESSAGE } from "./errors";
 import {
   ensureSessionBrokerAvailable,
   isSessionBrokerHealthy,
   isLoopbackPortReachable,
   readSessionBrokerHealth,
   waitForSessionBrokerShutdown,
-} from "../session-broker/brokerLauncher";
-import { resolveSessionBrokerConfig } from "../session-broker/brokerConfig";
+} from "../broker/brokerLauncher";
+import { resolveSessionBrokerConfig } from "../broker/brokerConfig";
 import { matchesSessionSelector, normalizeSessionSelector } from "@hunk/session-broker-core";
 import {
   createHttpHunkSessionCliClient,
@@ -30,7 +30,7 @@ import {
   formatSessionOutput,
   stringifyJson,
   type HunkSessionCliClient,
-} from "../hunk-session/cli";
+} from "./cliClient";
 import { reportHunkDaemonUpgradeRestart } from "./capabilities";
 import { HUNK_SESSION_API_VERSION, type SessionDaemonAction } from "./protocol";
 

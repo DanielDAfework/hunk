@@ -7,7 +7,7 @@ import { testRender } from "@opentui/react/test-utils";
 import { act } from "react";
 import { loadAppBootstrap } from "../core/loaders";
 import type { AppBootstrap, CliInput } from "../core/types";
-import type { HunkSessionBrokerClient } from "../hunk-session/types";
+import type { HunkSessionBrokerClient } from "../session/types";
 import {
   applyExtensionRegistrations,
   resolveDetectedVcsIdWithExtensions,

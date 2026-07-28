@@ -1,8 +1,8 @@
-import { HunkUserError } from "../core/errors";
+import { HunkUserError } from "../../core/errors";
 import {
   resolveSessionBrokerConfig,
   type ResolvedSessionBrokerConfig,
-} from "../session-broker/brokerConfig";
+} from "../broker/brokerConfig";
 
 export const HUNK_SESSION_DAEMON_HTTP_TIMEOUT_MS = 5_000;
 

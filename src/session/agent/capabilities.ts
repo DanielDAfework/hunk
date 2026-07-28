@@ -1,7 +1,7 @@
 import {
   resolveSessionBrokerConfig,
   type ResolvedSessionBrokerConfig,
-} from "../session-broker/brokerConfig";
+} from "../broker/brokerConfig";
 import {
   HUNK_SESSION_API_VERSION,
   HUNK_SESSION_CAPABILITIES_PATH,

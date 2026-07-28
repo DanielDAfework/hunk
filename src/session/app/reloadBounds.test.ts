@@ -2,8 +2,8 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, test } from "bun:test";
-import type { AppBootstrap, CliInput } from "../core/types";
-import { createSessionReloadBounds, validateSessionReloadWithinBounds } from "./sessionFileBounds";
+import type { AppBootstrap, CliInput } from "../../core/types";
+import { createSessionReloadBounds, validateSessionReloadWithinBounds } from "./reloadBounds";
 
 /** Resolve expected paths the same way production bounds do, including Windows long names. */
 function realPath(path: string) {

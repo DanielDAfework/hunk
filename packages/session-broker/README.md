@@ -198,9 +198,9 @@ Responses return raw session records or command results.
 
 Hunk uses this package for the generic broker lifecycle, then layers product-specific behavior on top:
 
-- Hunk-specific daemon routes stay in `src/session-broker/brokerServer.ts`
+- Hunk-specific daemon routes stay in `src/session/broker/brokerServer.ts`
 - Hunk-specific CLI commands stay in `src/session/`
-- Hunk-specific review projections stay in `src/hunk-session/`
+- Hunk-specific review projections stay in `src/session/broker/`
 
 That split is intentional: this package owns generic broker behavior, while Hunk owns what the session data means.
 
