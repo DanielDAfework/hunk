@@ -3,6 +3,8 @@ import {
   emitExtensionEvent,
   emitExtensionEventBounded,
   emitExtensionEventToExtensions,
+  readMetadataHunkCount,
+  toReadOnlyFileViews,
 } from "./events";
 import { createExtensionNotificationHub } from "./notifications";
 import {
@@ -286,6 +288,82 @@ describe("changeset payloads handed to event handlers", () => {
     emitExtensionEvent(result, "changeset_loaded", { changeset } as never);
 
     expect(seen).toEqual(["working tree"]);
+  });
+});
+
+describe("read-only file views", () => {
+  /** One file whose nested state a test can try to corrupt. */
+  function createTestFile() {
+    return {
+      id: "file-1",
+      path: "a.ts",
+      patch: "",
+      stats: { additions: 1, deletions: 0 },
+      metadata: { type: "change", hunks: [{ header: "@@ -1 +1 @@" }] },
+      agent: { path: "a.ts", annotations: [{ summary: "why" }] },
+    };
+  }
+
+  test("reads reach the shared metadata, writes into it are refused", () => {
+    const file = createTestFile();
+    const [view] = toReadOnlyFileViews([file as never]);
+
+    // Reads pass through, including the host's own metadata readers.
+    expect(readMetadataHunkCount(view!.metadata)).toBe(1);
+
+    const metadata = view!.metadata as { type: string; hunks: { header: string }[] };
+    expect(() => {
+      metadata.type = "deleted";
+    }).toThrow(TypeError);
+    expect(() => {
+      metadata.hunks.push({ header: "@@ forged @@" });
+    }).toThrow(TypeError);
+    expect(() => {
+      metadata.hunks[0]!.header = "@@ forged @@";
+    }).toThrow(TypeError);
+
+    // The live model is exactly as it was.
+    expect(file.metadata.type).toBe("change");
+    expect(file.metadata.hunks).toHaveLength(1);
+    expect(file.metadata.hunks[0]!.header).toBe("@@ -1 +1 @@");
+  });
+
+  test("stats and agent annotations are guarded the same way", () => {
+    const file = createTestFile();
+    const [view] = toReadOnlyFileViews([file as never]);
+
+    expect(view!.stats.additions).toBe(1);
+    expect(() => {
+      (view!.stats as { additions: number }).additions = 99;
+    }).toThrow(TypeError);
+    expect(() => {
+      view!.agent!.annotations[0]!.summary = "forged";
+    }).toThrow(TypeError);
+    expect(file.stats.additions).toBe(1);
+    expect(file.agent.annotations[0]!.summary).toBe("why");
+  });
+
+  test("converting the same file again hands out the identical guarded objects", () => {
+    const file = createTestFile();
+    const [first] = toReadOnlyFileViews([file as never]);
+    const [second] = toReadOnlyFileViews([file as never]);
+
+    // Cached per source object, so consumers comparing across conversions —
+    // sidebar props against a command's selection snapshot — see one identity.
+    expect(second!.metadata).toBe(first!.metadata);
+    expect(second!.agent).toBe(first!.agent);
+  });
+
+  test("exotic objects inside metadata read through unwrapped", () => {
+    // A proxy would break internal-slot methods (`Map.prototype.get` on a
+    // proxied Map throws), so non-JSON-shaped values pass through as-is.
+    const cache = new Map([["k", "v"]]);
+    const file = { ...createTestFile(), metadata: { cache } };
+    const [view] = toReadOnlyFileViews([file as never]);
+
+    const seen = (view!.metadata as { cache: Map<string, string> }).cache;
+    expect(seen).toBe(cache);
+    expect(seen.get("k")).toBe("v");
   });
 });
 

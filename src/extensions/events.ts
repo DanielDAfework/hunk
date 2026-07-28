@@ -37,9 +37,9 @@ function describeError(error: unknown) {
  * each file. A mutating handler now throws *inside itself*, where the isolation
  * contract already turns it into a warning naming the extension. Copies are
  * frozen rather than the originals, so nothing internal — which legitimately
- * rebuilds and reassigns these objects — is affected. `metadata` stays the
- * shared opaque value the renderer owns; it is not part of the authoring
- * contract and deep-freezing it would cost a walk of the whole diff model.
+ * rebuilds and reassigns these objects — is affected. The shared nested state
+ * (`metadata`, `stats`, `agent`) is guarded by `toReadOnlyDeepView` instead of
+ * a deep freeze, which would cost a walk of the whole diff model per emit.
  */
 export function toReadOnlyChangesetView(changeset: ExtensionChangeset): ExtensionChangeset {
   const files = Array.isArray(changeset.files) ? changeset.files : [];
@@ -79,14 +79,81 @@ export function readMetadataHunkCount(metadata: unknown): number {
   return Array.isArray(hunks) ? hunks.length : 0;
 }
 
+/** Proxies already built for shared objects, so repeated views stay identical. */
+const readOnlyDeepViews = new WeakMap<object, unknown>();
+
+/** Report whether a value is JSON-shaped data a read-only proxy can stand in for. */
+function isProxyableData(value: unknown): value is object {
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
+
+  if (Array.isArray(value)) {
+    return true;
+  }
+
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
+ * Lazily wrap one shared object so extensions can read it but never write it.
+ *
+ * The file views deliberately share `metadata`, `stats`, and `agent` with the
+ * live review model instead of copying them — `metadata` alone is the whole
+ * parsed diff, and eagerly deep-freezing it would walk the model on every
+ * conversion. The proxy defers the cost to the moment an extension actually
+ * reaches in: reads pass through and hand back wrapped objects (so the guard
+ * is deep), while writes, deletes, and redefinitions are refused — a
+ * strict-mode assignment throws inside the extension, exactly like writing to
+ * the frozen view itself. Proxies are cached per source object, so converting
+ * again hands out the identical view.
+ *
+ * Only plain objects and arrays are wrapped: the diff model is JSON-shaped,
+ * and proxying an exotic object (a Map, a class instance) would break its
+ * internal-slot methods, so anything else reads through unwrapped. A property
+ * that is already non-configurable and non-writable is returned as-is — the
+ * proxy `get` invariant requires its identity, and it cannot be reassigned
+ * anyway.
+ */
+export function toReadOnlyDeepView<T>(value: T): T {
+  if (!isProxyableData(value)) {
+    return value;
+  }
+
+  const cached = readOnlyDeepViews.get(value);
+  if (cached !== undefined) {
+    return cached as T;
+  }
+
+  const proxy = new Proxy(value, {
+    get(target, property) {
+      const descriptor = Object.getOwnPropertyDescriptor(target, property);
+      const result = Reflect.get(target, property, target);
+      if (descriptor !== undefined && !descriptor.configurable && !descriptor.writable) {
+        return result;
+      }
+
+      return toReadOnlyDeepView(result);
+    },
+    set: () => false,
+    defineProperty: () => false,
+    deleteProperty: () => false,
+    setPrototypeOf: () => false,
+  });
+  readOnlyDeepViews.set(value, proxy);
+  return proxy as T;
+}
+
 /**
  * Build the read-only file-list view extension UI code receives.
  *
  * The same isolation story as `toReadOnlyChangesetView` — frozen shallow
- * copies, shared opaque `metadata` — factored out so surfaces that hand
+ * copies, with the nested state every copy shares (`metadata`, `stats`,
+ * `agent`) behind `toReadOnlyDeepView` — factored out so surfaces that hand
  * extensions a file list without a changeset envelope (a custom sidebar's
- * props) freeze it identically. `changeType` is filled from the diff metadata
- * when the file does not carry it already.
+ * props, a command's selection) guard it identically. `changeType` is filled
+ * from the diff metadata when the file does not carry it already.
  */
 export function toReadOnlyFileViews(files: readonly ExtensionDiffFile[]): ExtensionDiffFile[] {
   const frozenFiles = files.map((file) => {
@@ -95,7 +162,13 @@ export function toReadOnlyFileViews(files: readonly ExtensionDiffFile[]): Extens
     }
 
     const changeType = file.changeType ?? readMetadataChangeType(file.metadata);
-    return Object.freeze(changeType ? { ...file, changeType } : { ...file });
+    return Object.freeze({
+      ...file,
+      ...(changeType ? { changeType } : {}),
+      metadata: toReadOnlyDeepView(file.metadata),
+      stats: toReadOnlyDeepView(file.stats),
+      agent: toReadOnlyDeepView(file.agent),
+    });
   }) as ExtensionDiffFile[];
 
   return Object.freeze(frozenFiles) as ExtensionDiffFile[];

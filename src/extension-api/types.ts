@@ -131,7 +131,10 @@ export interface ExtensionDiffFile {
    * Opaque on purpose: its shape is not part of the extension contract, and it
    * is what the renderer draws from. Carry it through untouched — spreading a
    * file (`{ ...file, path }`) preserves it. A file returned without usable
-   * metadata is rejected, and the previous changeset is kept.
+   * metadata is rejected, and the previous changeset is kept. On the read-only
+   * views Hunk hands outward (event payloads, sidebar props, a command's
+   * selection) it is guarded like the rest of the view: reads pass through,
+   * writes into it are refused.
    */
   metadata: unknown;
   /**
