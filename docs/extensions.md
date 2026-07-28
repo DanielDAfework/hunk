@@ -738,6 +738,16 @@ select. The values are captured when the command fires: a handler that awaits
 still sees the selection it was run from, not wherever the user navigated to
 meanwhile.
 
+`ctx.navigation` moves the review stream: `selectFile(fileId)` and
+`selectHunk(fileId, hunkIndex)`, the same guarded navigation a sidebar's
+`actions` carry, routed through the same review controller — the stream
+scrolls, selection updates, and `selection_changed` fires exactly as if the
+user had clicked a sidebar row. Unlike `selection` it is live, not a snapshot:
+a call acts on the review as it is at that moment, so a handler that awaits a
+dialog and then navigates still works. A file id the stream cannot currently
+show is refused with a warning rather than corrupting the selection, and a
+hunk index is clamped into the file's real range.
+
 A handler may be async; a failure (sync or rejected) becomes a warning naming
 your extension.
 
@@ -770,24 +780,24 @@ hunk.registerCommand(
 );
 ```
 
-`select` is the natural fit for acting on part of the selection — here, one hunk
-of the selected file:
+`select` is the natural fit for acting on part of the selection — here, asking
+which hunk of the selected file to jump to, then navigating there:
 
 ```ts
 hunk.registerCommand({ id: "pick-hunk", title: "Pick a hunk", key: "ctrl+k" }, async (ctx) => {
-  const hunks = ctx.selection.file?.hunks ?? [];
-  if (hunks.length === 0) {
+  const file = ctx.selection.file;
+  const hunks = file?.hunks ?? [];
+  if (!file || hunks.length === 0) {
     ctx.notify("Nothing to pick from", "warning");
     return;
   }
 
-  const picked = await ctx.dialogs.select({
-    title: "Which hunk?",
-    options: hunks.map((hunk) => hunk.header || `hunk ${hunk.index + 1}`),
-  });
+  const labels = hunks.map((hunk) => hunk.header || `hunk ${hunk.index + 1}`);
+  const picked = await ctx.dialogs.select({ title: "Which hunk?", options: labels });
 
+  // `navigation` is live, so the jump is valid even after awaiting the dialog.
   if (picked !== null) {
-    ctx.notify(`You picked ${picked}`);
+    ctx.navigation.selectHunk(file.id, labels.indexOf(picked));
   }
 });
 ```
@@ -943,7 +953,8 @@ const patterns = (hunk.config.patterns as string[] | undefined) ?? ["*.lock"];
 
 Every handler and transform receives a context object with `cwd` and `notify`.
 Event and bus handlers additionally receive `sidebars` and `events.emit`; command
-handlers receive `sidebars`. `notify` shows a single unobtrusive line at the bottom of the app that clears
+handlers receive `sidebars`, `selection`, `navigation`, and `dialogs`. `notify`
+shows a single unobtrusive line at the bottom of the app that clears
 itself after a few seconds; queued messages appear in turn. `type` is `"info"`
 (default), `"warning"`, or `"error"`, which selects the color. Notifications
 raised before the UI has mounted are buffered and flushed once it does, so a

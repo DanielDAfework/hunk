@@ -60,6 +60,7 @@ export type {
   ExtensionNotifyType,
   ExtensionLayoutMode,
   ExtensionResolvedLayout,
+  ExtensionReviewNavigation,
   ExtensionReviewNote,
   ExtensionSidebarActions,
   ExtensionSidebarKeybindings,

@@ -79,6 +79,7 @@ import {
 import { buildAppMenus } from "./lib/appMenus";
 import { buildExtensionAppCommands, extensionCommandKeyDefaults } from "./lib/extensionCommands";
 import { createExtensionDialogQueue } from "./lib/extensionDialogs";
+import { createGuardedReviewNavigation } from "./lib/extensionNavigation";
 import { buildExtensionReviewSelection } from "./lib/extensionSelection";
 import { createExtensionSidebarKeybindings, resolveCommandKeys } from "./lib/keymap";
 import {
@@ -362,6 +363,15 @@ export function App({
     extensionViewsCacheRef.current = { source, views };
     return views;
   }, []);
+  // Navigation callbacks for extension command handlers. The focus and jump
+  // helpers they delegate to are defined further down the component, so the
+  // callbacks are assigned there each render and only ever read at command
+  // invocation, keeping the dispatch table free of their identities.
+  const extensionCommandNavigationRef = useRef({
+    onSelectFile: (_fileId: string) => {},
+    onSelectHunk: (_fileId: string, _hunkIndex: number) => {},
+  });
+
   /** Build the selection snapshot a command handler receives, at invocation. */
   const getExtensionSelection = useCallback(() => {
     const { selectedFileId: fileId, selectedHunkIndex: hunkIndex } =
@@ -635,6 +645,18 @@ export function App({
         // whole life of the handler's promise — a handler may ask several
         // questions in sequence with work between them.
         dialogs: extensionDialogQueue.createDialogs(registered.extensionId),
+        // Live, unlike `selection`: reads the visible files and delegates to
+        // the same focus/jump callbacks a sidebar row click runs, so a handler
+        // that awaits a dialog before navigating still acts on the current
+        // review — validated, clamped, and warned exactly like sidebar actions.
+        navigation: createGuardedReviewNavigation({
+          extensionId: registered.extensionId,
+          getFiles: () => extensionSelectionInputsRef.current.filteredFiles,
+          notify: (message, type) => extensions?.context.notify(message, type),
+          onSelectFile: (fileId) => extensionCommandNavigationRef.current.onSelectFile(fileId),
+          onSelectHunk: (fileId, hunkIndex) =>
+            extensionCommandNavigationRef.current.onSelectHunk(fileId, hunkIndex),
+        }),
       };
 
       try {
@@ -1378,6 +1400,22 @@ export function App({
   const focusFilter = useCallback(() => {
     setFocusArea("filter");
   }, []);
+
+  // Command-handler navigation lands here each render: the same focus and jump
+  // semantics the sidebar's onSelect handlers use, so a command's navigation is
+  // indistinguishable from a sidebar row click. Read through a ref because the
+  // command dispatch table is built above these helpers and must stay
+  // identity-stable while the review moves.
+  extensionCommandNavigationRef.current = {
+    onSelectFile: (fileId) => {
+      focusFiles();
+      jumpToFile(fileId, 0, { alignFileHeaderTop: true });
+    },
+    onSelectHunk: (fileId, hunkIndex) => {
+      focusFiles();
+      review.selectHunk(fileId, hunkIndex);
+    },
+  };
 
   /** Toggle keyboard focus between the file list and the file filter. */
   const toggleFocusArea = useCallback(() => {

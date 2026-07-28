@@ -640,21 +640,31 @@ export interface ExtensionSidebarTheme {
 }
 
 /**
- * Navigation a custom sidebar can trigger, exactly as the built-in one does.
+ * Navigation any extension surface can trigger, exactly as the built-in
+ * sidebar does.
  *
- * Every action routes through the same review controller the built-in sidebar
+ * Every call routes through the same review controller the built-in sidebar
  * and keyboard shortcuts use, so the main review stream scrolls, selection
  * updates, and the `selection_changed` lifecycle event fires identically —
- * other extensions cannot tell a custom sidebar drove the navigation. Actions
- * stay valid for as long as the component is mounted; a failure inside one is
- * reported as a warning naming the extension instead of thrown back into the
- * component.
+ * other extensions cannot tell what drove the navigation. Targets are
+ * validated against the currently visible (filtered) files: an unknown or
+ * hidden file id is refused with a warning naming the extension, and a hunk
+ * index is clamped into the file's real hunk range. A failure inside a call is
+ * reported the same way instead of thrown back into the caller.
  */
-export interface ExtensionSidebarActions {
+export interface ExtensionReviewNavigation {
   /** Jump the review stream to one file, like clicking its sidebar row. */
   selectFile(fileId: string): void;
   /** Jump the review stream to one hunk of one file. */
   selectHunk(fileId: string, hunkIndex: number): void;
+}
+
+/**
+ * What a custom sidebar component can trigger: review navigation plus a toast.
+ *
+ * Actions stay valid for as long as the component is mounted.
+ */
+export interface ExtensionSidebarActions extends ExtensionReviewNavigation {
   /** Show one toast, attributed to the owning extension. */
   notify(message: string, type?: ExtensionNotifyType): void;
 }
@@ -905,6 +915,15 @@ export interface ExtensionCommandContext extends ExtensionContext {
    * still sees the selection the user ran the command from.
    */
   readonly selection: ExtensionReviewSelection;
+  /**
+   * Navigate the review stream, exactly as a sidebar's actions do.
+   *
+   * Live rather than snapshot, the opposite of `selection`: a call acts on the
+   * review as it is at that moment, validated against the currently visible
+   * files — so a handler that awaits a dialog and then navigates still works,
+   * and one racing a reload gets a warning instead of a stale jump.
+   */
+  readonly navigation: ExtensionReviewNavigation;
   /**
    * Ask the user a question and await the answer.
    *

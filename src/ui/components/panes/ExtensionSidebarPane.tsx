@@ -10,6 +10,7 @@ import type {
 import { BuiltInSidebarView } from "../../../extensions/default/ui/sidebar";
 import type { ExtensionNotifySink, RegisteredSidebarView } from "../../../extensions/types";
 import type { DiffFile } from "../../../core/types";
+import { createGuardedReviewNavigation } from "../../lib/extensionNavigation";
 import type { AppTheme } from "../../themes";
 
 /** Read an error's message without assuming extension components throw `Error` instances. */
@@ -155,65 +156,24 @@ export function ExtensionSidebarPane({
   const { extensionId } = registered;
   const publicTheme = useMemo(() => Object.freeze(toSidebarTheme(theme)), [theme]);
 
-  const actions = useMemo<ExtensionSidebarActions>(() => {
-    /** Resolve a navigation target, or report one the review stream cannot show. */
-    const resolveVisibleFile = (method: string, fileId: string) => {
-      const file = files.find((candidate) => candidate.id === fileId);
-      if (!file) {
-        notify(
-          `Extension ${extensionId} ${method} targeted unknown file id "${fileId}"`,
-          "warning",
-        );
-      }
-
-      return file;
-    };
-
-    /** Turn one action failure into a warning naming the extension. */
-    const guard = (method: string, run: () => void) => {
-      try {
-        run();
-      } catch (error) {
-        notify(`Extension ${extensionId} failed ${method} • ${describeError(error)}`, "warning");
-      }
-    };
-
-    return Object.freeze({
-      selectFile(fileId: string) {
-        guard("selectFile", () => {
-          if (resolveVisibleFile("selectFile", fileId)) {
-            onSelectFile(fileId);
-          }
-        });
-      },
-      selectHunk(fileId: string, hunkIndex: number) {
-        guard("selectHunk", () => {
-          const file = resolveVisibleFile("selectHunk", fileId);
-          if (!file) {
-            return;
-          }
-
-          // Selection state, reveal scrolling, and `selection_changed` all
-          // carry this index, so an out-of-range or non-numeric value must not
-          // reach the controller: refuse garbage, clamp the rest into the
-          // file's real hunk range.
-          if (typeof hunkIndex !== "number" || !Number.isFinite(hunkIndex)) {
-            notify(
-              `Extension ${extensionId} selectHunk received an invalid hunk index for "${fileId}"`,
-              "warning",
-            );
-            return;
-          }
-
-          const maxHunkIndex = Math.max(0, file.metadata.hunks.length - 1);
-          onSelectHunk(fileId, Math.min(Math.max(0, Math.floor(hunkIndex)), maxHunkIndex));
-        });
-      },
-      notify(message: string, type: ExtensionNotifyType = "info") {
-        notify(`${extensionId}: ${message}`, type);
-      },
-    });
-  }, [extensionId, files, notify, onSelectFile, onSelectHunk]);
+  const actions = useMemo<ExtensionSidebarActions>(
+    () =>
+      Object.freeze({
+        // The same guarded navigation a command handler's `navigation` uses,
+        // so a sidebar row click and a command jump enforce one contract.
+        ...createGuardedReviewNavigation({
+          extensionId,
+          getFiles: () => files,
+          notify,
+          onSelectFile,
+          onSelectHunk,
+        }),
+        notify(message: string, type: ExtensionNotifyType = "info") {
+          notify(`${extensionId}: ${message}`, type);
+        },
+      }),
+    [extensionId, files, notify, onSelectFile, onSelectHunk],
+  );
 
   // The published contract types the component's return opaquely (`unknown`)
   // because the contract module carries no React types; inside the host it is
