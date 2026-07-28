@@ -138,57 +138,14 @@ prompt_save_view_preferences = true
 transparent_background = false
 ```
 
-`theme = "auto"` and `--theme auto` query the terminal background at startup, choose `github-light-default` for light backgrounds and `github-dark-default` for dark backgrounds, and fall back to `github-dark-default` if the terminal does not answer.
-Older theme ids such as `graphite` and `paper` remain accepted as compatibility aliases.
+Choose a built-in theme, `auto`, or a custom theme with `theme`. See
+[docs/themes.md](docs/themes.md) for automatic selection, custom theme tables,
+syntax scopes, and legacy syntax-table migration.
+
 `exclude_untracked` affects Git/Sapling working-tree `hunk diff` sessions only.
 `tab_width` controls source-code tab stops and can be overridden with `-x4` or `--tab-width 4`.
 `prompt_save_view_preferences = false` disables the quit prompt for saving changed view preferences.
 `transparent_background` can also be written as `transparentBackground`.
-
-Custom themes can inherit from any built-in theme and override only the colors you care about:
-
-```toml
-theme = "custom"
-
-[custom_theme]
-base = "catppuccin-mocha"
-label = "My Theme"
-accent = "#7fd1ff"
-panel = "#10161d"
-noteBorder = "#c49bff"
-
-[custom_theme.syntax_scopes]
-"comment" = "#6e85a7"
-"punctuation.definition.comment" = "#6e85a7"
-"keyword.operator" = "#7fd1ff"
-"entity.name.function" = "#8ed4ff"
-```
-
-Define as many themes as you like by giving each one its own `[themes.<id>]` table, using the same keys. The table id is the name you select with `theme = "<id>"` or `--theme <id>`:
-
-```toml
-theme = "ocean"
-
-[themes.ocean]
-base = "nord"
-label = "Ocean"
-accent = "#7fd1ff"
-
-[themes.ocean.syntax_scopes]
-"keyword.operator" = "#7fd1ff"
-
-[themes.paper-review]
-base = "github-light-default"
-accent = "#0969da"
-```
-
-Theme ids must be lowercase words separated by `-` or `_`, and cannot reuse a built-in theme id. Ids that break those rules are skipped with a startup notice instead of failing the session. `[custom_theme]` is the theme with id `custom`, so it takes precedence over a `[themes.custom]` table. Themes appear in the selector after the built-in themes, in the order you declare them, and a repo `.hunk/config.toml` overrides your user config table by table for the same id.
-
-`syntax_scopes` uses [Shiki/TextMate scope selectors](https://shiki.style/guide/themes#token-colors) directly, so matching and precedence follow Shiki's theme rules without a Hunk-specific translation layer. Quote selectors containing dots. Declaration order is preserved; later rules win when matching selectors have equal specificity, while a more-specific base-theme selector beats a broader override. Add the grammar-specific selector when that happens. All custom theme colors must use `#rrggbb` hex values.
-
-The former `[custom_theme.syntax]` role table is deprecated but temporarily translated into approximate scopes for compatibility. Both tables can coexist while migrating, and an exact `syntax_scopes` entry overrides a translated entry with the same selector. Because semantic roles have no one-to-one TextMate mapping, migrate when practical: for example, replace `comment = "#ffffff"` with both `"comment" = "#ffffff"` and `"punctuation.definition.comment" = "#ffffff"` under `[custom_theme.syntax_scopes]`, adding language-specific selectors when a grammar uses more specific scopes. The compatibility table will be removed in the next major release.
-
-Press `t` in the app, or choose `View -> Themes…`, to open the theme selector.
 
 ### Keybindings
 
