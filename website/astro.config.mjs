@@ -1,3 +1,4 @@
+import { unified } from "@astrojs/markdown-remark";
 import { defineConfig } from "astro/config";
 import sitemap from "@astrojs/sitemap";
 import starlight from "@astrojs/starlight";
@@ -111,7 +112,7 @@ export default defineConfig({
   ],
   markdown: {
     // CLI prose is full of `--flags`; smart typography would corrupt them into en/em dashes.
-    smartypants: false,
+    processor: unified({ smartypants: false }),
     shikiConfig: {
       themes: {
         light: "github-light-default",
