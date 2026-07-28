@@ -5,6 +5,7 @@ import type {
   ExtensionCommand,
   ExtensionCommandHandler,
   ExtensionContext,
+  ExtensionCustomEventHandler,
   ExtensionEventHandler,
   ExtensionEventName,
   ExtensionNotifyType,
@@ -28,13 +29,17 @@ export type {
   ExtensionCommandHandler,
   ExtensionConfirmOptions,
   ExtensionContext,
+  ExtensionCustomEventHandler,
   ExtensionDialogs,
   ExtensionDiffFile,
+  ExtensionEventBus,
+  ExtensionEventContext,
   ExtensionEventHandler,
   ExtensionEventName,
   ExtensionEventPayloads,
   ExtensionFactory,
   ExtensionInputOptions,
+  ExtensionReviewNote,
   ExtensionNotifyType,
   ExtensionSelectOptions,
   ExtensionSidebarActions,
@@ -116,6 +121,13 @@ export interface RegisteredEventHandler<Event extends ExtensionEventName = Exten
   handler: ExtensionEventHandler<Event>;
 }
 
+/** One extension listener on a named inter-extension bus channel. */
+export interface RegisteredCustomEventHandler {
+  extensionId: string;
+  event: string;
+  handler: ExtensionCustomEventHandler;
+}
+
 export interface ExtensionLogEntry {
   extensionId: string;
   message: string;
@@ -135,6 +147,9 @@ export interface ExtensionRegistry {
   sidebarViews: RegisteredSidebarView[];
   commands: RegisteredCommand[];
   eventHandlers: ExtensionEventHandlerMap;
+  customEventHandlers: RegisteredCustomEventHandler[];
+  /** Bound after loading so hunk.events.emit can dispatch at runtime. */
+  emitCustomEvent?: (event: string, payload: unknown) => void;
   logs: ExtensionLogEntry[];
 }
 
@@ -156,6 +171,10 @@ export interface ExtensionLoadResult {
    * so notifications from any extension land in the same sink.
    */
   context: ExtensionContext;
+  /** UI installs this per-extension context factory once sidebar controls exist. */
+  eventContextProvider?: (
+    extensionId: string,
+  ) => import("../extension-api/types").ExtensionEventContext;
   /**
    * The sink behind `context.notify`, kept on the result so the UI can attach
    * its toast surface and so a later load pass (after a trust grant) can reuse
@@ -200,9 +219,17 @@ export function createEmptyExtensionRegistry(): ExtensionRegistry {
       startup: [],
       changeset_loaded: [],
       selection_changed: [],
+      file_viewed: [],
+      filter_changed: [],
+      theme_changed: [],
+      layout_changed: [],
+      watch_reload_pending: [],
+      note_created: [],
+      note_edited: [],
       session_reload: [],
       shutdown: [],
     },
+    customEventHandlers: [],
     logs: [],
   };
 }

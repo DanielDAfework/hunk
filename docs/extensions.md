@@ -766,16 +766,26 @@ your extension and the problem.
 
 ### `hunk.on(event, handler)`
 
-Subscribe to a lifecycle event. Handlers may be async; Hunk never blocks the UI
-waiting for one.
+Subscribe to a lifecycle or UI event. Handlers may be async; Hunk never blocks
+the UI waiting for one. Alongside `cwd` and `notify`, every handler receives
+`ctx.sidebars`, the same open/close/toggle controls command handlers receive.
+That means a `changeset_loaded` handler can reveal its extension's sidebar when
+it finds something worth showing — no keypress required.
 
-| Event               | Payload                 | When                                                 |
-| ------------------- | ----------------------- | ---------------------------------------------------- |
-| `startup`           | `{ cwd }`               | once, after the app mounts with its first changeset  |
-| `changeset_loaded`  | `{ changeset }`         | first load and every reload                          |
-| `selection_changed` | `{ fileId, hunkIndex }` | when the review selection settles (debounced ~150ms) |
-| `session_reload`    | `{ changeset, reason }` | on every session reload                              |
-| `shutdown`          | `{}`                    | on exit, best-effort within a short timeout          |
+| Event                  | Payload                 | When                                                 |
+| ---------------------- | ----------------------- | ---------------------------------------------------- |
+| `startup`              | `{ cwd }`               | once, after the app mounts with its first changeset  |
+| `changeset_loaded`     | `{ changeset }`         | first load and every reload                          |
+| `selection_changed`    | `{ fileId, hunkIndex }` | when the review selection settles (debounced ~150ms) |
+| `file_viewed`          | `{ file, hunkIndex }`   | when selection settles on a different file           |
+| `filter_changed`       | `{ filter }`            | whenever the file-filter query changes               |
+| `theme_changed`        | `{ themeId }`           | when the user commits a new theme                    |
+| `layout_changed`       | `{ mode, layout }`      | mode or responsive split/stack layout changes        |
+| `watch_reload_pending` | `{}`                    | watcher observed a change before its reload check    |
+| `note_created`         | `{ note }`              | a user saves an inline review note                   |
+| `note_edited`          | `{ note }`              | an in-progress inline note's body changes            |
+| `session_reload`       | `{ changeset, reason }` | on every session reload                              |
+| `shutdown`             | `{}`                    | on exit, best-effort within a short timeout          |
 
 `selection_changed` is trailing-debounced on purpose: holding `[`/`]` retargets
 the selection many times a second, and handlers only care where the user landed.
@@ -787,6 +797,32 @@ refresh key, or the reload after granting extension trust).
 
 `shutdown` handlers get a short window (250ms) to finish before Hunk exits
 anyway, so treat it as best-effort flushing rather than guaranteed cleanup.
+
+### `hunk.events`
+
+`hunk.events` is a small bus shared by every loaded extension. Use it to
+coordinate extensions without coupling them through a command or global state.
+Names are open-ended, so namespace them with your extension id. Listeners get
+the same `ctx.sidebars` controls as lifecycle handlers; delivery is fire-and-forget
+and one listener's failure is reported without stopping the others.
+
+```ts
+import type { HunkExtensionAPI } from "hunkdiff/extension";
+
+export default function (hunk: HunkExtensionAPI) {
+  hunk.events.on<{ fileCount: number }>("summary:ready", (payload, ctx) => {
+    if (payload.fileCount > 100) ctx.sidebars.open("summary");
+  });
+
+  hunk.on("changeset_loaded", ({ changeset }, ctx) => {
+    hunk.events.emit("summary:ready", { fileCount: changeset.files.length });
+    ctx.sidebars.open("summary");
+  });
+}
+```
+
+Bus payloads are shallow-frozen copies when they are objects. Keep nested data
+immutable if multiple extensions will read it.
 
 ### `hunk.config`
 
@@ -816,7 +852,8 @@ const patterns = (hunk.config.patterns as string[] | undefined) ?? ["*.lock"];
 ### `ctx.notify(message, type?)`
 
 Every handler and transform receives a context object with `cwd` and `notify`.
-`notify` shows a single unobtrusive line at the bottom of the app that clears
+Event and bus handlers additionally receive `sidebars` and `events.emit`; command
+handlers receive `sidebars`. `notify` shows a single unobtrusive line at the bottom of the app that clears
 itself after a few seconds; queued messages appear in turn. `type` is `"info"`
 (default), `"warning"`, or `"error"`, which selects the color. Notifications
 raised before the UI has mounted are buffered and flushed once it does, so a

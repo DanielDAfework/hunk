@@ -7,6 +7,8 @@ import {
   type ExtensionLoadIssue,
   type ExtensionCommand,
   type ExtensionCommandHandler,
+  type ExtensionCustomEventHandler,
+  type ExtensionEventBus,
   type ExtensionMetadata,
   type ExtensionRegistry,
   type ExtensionSidebarView,
@@ -216,6 +218,7 @@ interface RegistrySnapshot {
   sidebarViews: number;
   commands: number;
   eventHandlers: Record<string, number>;
+  customEventHandlers: number;
 }
 
 /** Capture how much each registration list already holds. */
@@ -233,6 +236,7 @@ function snapshotRegistry(registry: ExtensionRegistry): RegistrySnapshot {
     sidebarViews: registry.sidebarViews.length,
     commands: registry.commands.length,
     eventHandlers,
+    customEventHandlers: registry.customEventHandlers.length,
   };
 }
 
@@ -249,6 +253,7 @@ function rollbackRegistry(registry: ExtensionRegistry, snapshot: RegistrySnapsho
   registry.changesetTransforms.length = snapshot.changesetTransforms;
   registry.sidebarViews.length = snapshot.sidebarViews;
   registry.commands.length = snapshot.commands;
+  registry.customEventHandlers.length = snapshot.customEventHandlers;
   for (const [event, handlers] of Object.entries(registry.eventHandlers)) {
     handlers.length = snapshot.eventHandlers[event] ?? 0;
   }
@@ -276,9 +281,30 @@ export function createExtensionApi(
     }
   };
 
+  const events: ExtensionEventBus = {
+    on<Payload = unknown>(event: string, handler: ExtensionCustomEventHandler<Payload>) {
+      assertOpen("events.on");
+      assertNonEmptyString(event, "events.on requires a non-empty event name.");
+      if (typeof handler !== "function") {
+        throw new Error(`events.on("${event}") requires a handler function.`);
+      }
+
+      registry.customEventHandlers.push({
+        extensionId: metadata.id,
+        event,
+        handler: handler as ExtensionCustomEventHandler,
+      });
+    },
+    emit(event: string, payload: unknown) {
+      assertNonEmptyString(event, "events.emit requires a non-empty event name.");
+      registry.emitCustomEvent?.(event, payload);
+    },
+  };
+
   const api: HunkExtensionAPI = {
     apiVersion: HUNK_EXTENSION_API_VERSION,
     config,
+    events,
     registerTheme(theme: ExtensionThemeConfig) {
       assertOpen("registerTheme");
       assertNonEmptyString(theme?.id, "registerTheme requires a theme with a non-empty id.");

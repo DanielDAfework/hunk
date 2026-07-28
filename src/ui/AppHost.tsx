@@ -126,6 +126,12 @@ export function AppHost({
       let reloadedExtensions = false;
 
       if (options?.reloadExtensions || cwd !== extensionsCwdRef.current) {
+        // A reloaded extension set owns a fresh ephemeral bus. Detach the old
+        // registry first so delayed callbacks from a retired extension cannot
+        // keep publishing into listeners that no longer belong to this session.
+        if (extensionsRef.current) {
+          extensionsRef.current.registry.emitCustomEvent = undefined;
+        }
         // Reuse the session's notification hub so the mounted toast surface keeps
         // receiving `ctx.notify` from the extensions this pass loads.
         extensionsRef.current = await loadStartupExtensions({

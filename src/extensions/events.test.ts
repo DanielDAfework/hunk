@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
+  bindExtensionEventBus,
+  emitExtensionCustomEvent,
   emitExtensionEvent,
   emitExtensionEventBounded,
   emitExtensionEventToExtensions,
@@ -142,8 +144,67 @@ describe("extension event dispatch", () => {
     expect(Date.now() - started).toBeLessThan(1_000);
   });
 
+  test("gives lifecycle handlers live sidebar controls for their owning extension", () => {
+    const opened: string[] = [];
+    const { result } = createTestLoadResult([
+      {
+        extensionId: "summary",
+        event: "changeset_loaded",
+        handler: (_payload, ctx) => ctx.sidebars.open("summary"),
+      },
+    ]);
+    result.eventContextProvider = (extensionId) => ({
+      cwd: "/repo",
+      notify: () => {},
+      sidebars: {
+        open: (viewId) => opened.push(`${extensionId}:${viewId}`),
+        close: () => {},
+        toggle: () => {},
+        isOpen: () => false,
+      },
+      events: { emit: () => {} },
+    });
+
+    emitExtensionEvent(result, "changeset_loaded", {
+      changeset: { id: "c", sourceLabel: "repo", title: "t", files: [] },
+    });
+
+    expect(opened).toEqual(["summary:summary"]);
+  });
+
   test("is a no-op when the session has no extensions", () => {
     expect(() => emitExtensionEvent(undefined, "startup", { cwd: "/repo" })).not.toThrow();
+  });
+});
+
+describe("extension event bus", () => {
+  test("delivers a namespaced event to every listener and isolates failures", async () => {
+    const seen: string[] = [];
+    const { result, notices } = createTestLoadResult();
+    result.registry.customEventHandlers.push(
+      {
+        extensionId: "broken",
+        event: "summary:ready",
+        handler: () => {
+          throw new Error("boom");
+        },
+      },
+      {
+        extensionId: "sidebar",
+        event: "summary:ready",
+        handler: (payload) => {
+          seen.push((payload as { count: number }).count.toString());
+        },
+      },
+    );
+    bindExtensionEventBus(result);
+
+    result.registry.emitCustomEvent?.("summary:ready", { count: 3 });
+    emitExtensionCustomEvent(result, "other:event", { count: 4 });
+    await Promise.resolve();
+
+    expect(seen).toEqual(["3"]);
+    expect(notices).toEqual(["Extension broken failed handling event summary:ready • boom"]);
   });
 });
 

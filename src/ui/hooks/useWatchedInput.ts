@@ -23,17 +23,21 @@ export function useWatchedInput({
   enabled,
   input,
   reloadContext,
+  onReloadPending,
   refresh,
   runtime = defaultRuntime,
 }: {
   enabled: boolean;
   input: CliInput;
+  onReloadPending?: () => void;
   reloadContext: ReloadContext;
   refresh: () => void | Promise<void>;
   runtime?: WatchedInputRuntime;
 }) {
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
+  const pendingRef = useRef(onReloadPending);
+  pendingRef.current = onReloadPending;
 
   useEffect(() => {
     if (!enabled) return;
@@ -61,6 +65,7 @@ export function useWatchedInput({
       createEventSource: eventSourceFactory,
       getSignature: () => getSignature(input, reloadContext),
       initialSignature,
+      onReloadPending: () => pendingRef.current?.(),
       pollOnly: plan.coverage === "poll-only",
       refresh: () => refreshRef.current(),
       reportError: (error) => console.error("Failed to auto-reload the current diff.", error),

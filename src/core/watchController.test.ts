@@ -118,6 +118,26 @@ describe("createWatchController", () => {
     expect(clock.scheduledDelays).not.toContain(250);
   });
 
+  test("reports one pending reload for a burst of watcher hints", () => {
+    const clock = new FakeWatchClock();
+    const source = fakeSource();
+    let pending = 0;
+    createWatchController({
+      initialSignature: "same",
+      clock,
+      createEventSource: source.create,
+      getSignature: () => "same",
+      refresh: () => {},
+      onReloadPending: () => pending++,
+    });
+
+    source.event();
+    source.event();
+    source.event();
+
+    expect(pending).toBe(1);
+  });
+
   test("uses signatures to distinguish changed and unchanged hints", async () => {
     const clock = new FakeWatchClock();
     const source = fakeSource();

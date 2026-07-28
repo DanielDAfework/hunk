@@ -5,7 +5,11 @@ import type {
   ExtensionEventPayloads,
   ExtensionLoadResult,
 } from "./types";
-import type { ExtensionVcsFileChangeType } from "../extension-api/types";
+import type {
+  ExtensionEventContext,
+  ExtensionSidebarControls,
+  ExtensionVcsFileChangeType,
+} from "../extension-api/types";
 
 /**
  * How long `shutdown` handlers may run before Hunk exits anyway.
@@ -225,14 +229,56 @@ function toHandlerPayload<Event extends ExtensionEventName>(
   payload: ExtensionEventPayloads[Event],
 ): ExtensionEventPayloads[Event] {
   const changeset = (payload as { changeset?: unknown }).changeset;
-  if (changeset === null || typeof changeset !== "object") {
-    return Object.freeze({ ...payload }) as ExtensionEventPayloads[Event];
-  }
-
+  const file = (payload as { file?: unknown }).file;
+  const note = (payload as { note?: unknown }).note;
   return Object.freeze({
     ...payload,
-    changeset: toReadOnlyChangesetView(changeset as ExtensionChangeset),
+    ...(changeset !== null && typeof changeset === "object"
+      ? { changeset: toReadOnlyChangesetView(changeset as ExtensionChangeset) }
+      : {}),
+    ...(file !== null && typeof file === "object"
+      ? { file: toReadOnlyFileViews([file as ExtensionDiffFile])[0] }
+      : {}),
+    ...(note !== null && typeof note === "object" ? { note: Object.freeze({ ...note }) } : {}),
   }) as ExtensionEventPayloads[Event];
+}
+
+/** Sidebar controls used only before the mounted app has installed live controls. */
+function unavailableSidebarControls(
+  result: ExtensionLoadResult,
+  extensionId: string,
+): ExtensionSidebarControls {
+  const unavailable = (method: string, viewId: string) => {
+    result.context.notify(
+      `Extension ${extensionId} cannot ${method} sidebar view "${viewId}" before the app is ready`,
+      "warning",
+    );
+  };
+
+  return {
+    open: (viewId) => unavailable("open", viewId),
+    close: (viewId) => unavailable("close", viewId),
+    toggle: (viewId) => unavailable("toggle", viewId),
+    isOpen: () => false,
+  };
+}
+
+/** Build the runtime event context for one owning extension. */
+function createEventContext(
+  result: ExtensionLoadResult,
+  extensionId: string,
+): ExtensionEventContext {
+  return (
+    result.eventContextProvider?.(extensionId) ?? {
+      ...result.context,
+      sidebars: unavailableSidebarControls(result, extensionId),
+      events: {
+        emit(event, payload) {
+          emitExtensionCustomEvent(result, event, payload);
+        },
+      },
+    }
+  );
 }
 
 /**
@@ -271,7 +317,7 @@ function runExtensionEventHandlers<Event extends ExtensionEventName>(
     };
 
     try {
-      const returned = handler(payload, result.context);
+      const returned = handler(payload, createEventContext(result, extensionId));
       if (returned && typeof (returned as PromiseLike<void>).then === "function") {
         settled.push(Promise.resolve(returned).catch(report));
       }
@@ -281,6 +327,59 @@ function runExtensionEventHandlers<Event extends ExtensionEventName>(
   }
 
   return settled;
+}
+
+/**
+ * Emit a named event on the shared extension bus without blocking its caller.
+ *
+ * Bus payloads are shallow-frozen copies: listeners share an immutable envelope
+ * just as lifecycle listeners do, while opaque nested values remain the sender's
+ * responsibility. Event names are intentionally open-ended so extensions can
+ * coordinate without Hunk reserving a central registry.
+ */
+export function emitExtensionCustomEvent(
+  result: ExtensionLoadResult | undefined,
+  event: string,
+  rawPayload: unknown,
+) {
+  if (!result) {
+    return;
+  }
+
+  const payload =
+    rawPayload !== null && typeof rawPayload === "object"
+      ? Object.freeze({ ...(rawPayload as Record<string, unknown>) })
+      : rawPayload;
+  for (const { extensionId, event: registeredEvent, handler } of result.registry
+    .customEventHandlers) {
+    if (registeredEvent !== event) {
+      continue;
+    }
+
+    const report = (error: unknown) => {
+      result.context.notify(
+        `Extension ${extensionId} failed handling event ${event} • ${describeError(error)}`,
+        "warning",
+      );
+    };
+    try {
+      const returned = handler(payload, createEventContext(result, extensionId));
+      if (returned && typeof (returned as PromiseLike<void>).then === "function") {
+        void Promise.resolve(returned).catch(report);
+      }
+    } catch (error) {
+      report(error);
+    }
+  }
+}
+
+/** Bind a loaded registry so hunk.events.emit starts delivering runtime events. */
+export function bindExtensionEventBus(result: ExtensionLoadResult | undefined) {
+  if (result) {
+    result.registry.emitCustomEvent = (event, payload) => {
+      emitExtensionCustomEvent(result, event, payload);
+    };
+  }
 }
 
 /**

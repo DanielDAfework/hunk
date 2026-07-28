@@ -847,6 +847,31 @@ export interface ExtensionCommandContext extends ExtensionContext {
 
 export type ExtensionCommandHandler = (ctx: ExtensionCommandContext) => void | Promise<void>;
 
+/** One listener registered on Hunk's extension-to-extension event bus. */
+export type ExtensionCustomEventHandler<Payload = unknown> = (
+  payload: Payload,
+  ctx: ExtensionEventContext,
+) => void | Promise<void>;
+
+/**
+ * A small in-process event bus shared by every loaded extension.
+ *
+ * Use a namespaced event name (`"my-extension:status-ready"`) so unrelated
+ * extensions cannot accidentally claim the same channel. Delivery is
+ * fire-and-forget and isolated like lifecycle events: Hunk never awaits a
+ * listener, and one failure becomes a warning without stopping another.
+ */
+export interface ExtensionEventBus {
+  on<Payload = unknown>(event: string, handler: ExtensionCustomEventHandler<Payload>): void;
+  emit<Payload = unknown>(event: string, payload: Payload): void;
+}
+
+/** Context lifecycle and bus listeners receive, including live sidebar controls. */
+export interface ExtensionEventContext extends ExtensionContext {
+  sidebars: ExtensionSidebarControls;
+  events: Pick<ExtensionEventBus, "emit">;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Lifecycle events                                                            */
 /* -------------------------------------------------------------------------- */
@@ -861,10 +886,40 @@ export type ExtensionCommandHandler = (ctx: ExtensionCommandContext) => void | P
 export type SessionReloadReason = "watch" | "daemon" | "manual";
 
 /** Payload delivered with each lifecycle event, keyed by event name. */
+export type ExtensionLayoutMode = "auto" | "split" | "stack";
+export type ExtensionResolvedLayout = Exclude<ExtensionLayoutMode, "auto">;
+
+/** A user-authored note as reported by note lifecycle events. */
+export interface ExtensionReviewNote {
+  id: string;
+  fileId: string;
+  filePath: string;
+  hunkIndex: number;
+  side: "old" | "new";
+  line: number;
+  body: string;
+  /** True while the note is still being composed rather than saved. */
+  draft: boolean;
+}
+
 export interface ExtensionEventPayloads {
   startup: { cwd: string };
   changeset_loaded: { changeset: ExtensionChangeset };
   selection_changed: { fileId: string | null; hunkIndex: number | null };
+  /** The review stream settled on a different file. */
+  file_viewed: { file: ExtensionDiffFile; hunkIndex: number | null };
+  /** The file-filter query changed, including when it was cleared. */
+  filter_changed: { filter: string };
+  /** The user committed a different active theme. Selector previews do not emit this event. */
+  theme_changed: { themeId: string };
+  /** The configured layout mode or responsive resolved layout changed. */
+  layout_changed: { mode: ExtensionLayoutMode; layout: ExtensionResolvedLayout };
+  /** A watch source observed a change and is waiting to check/reload it. */
+  watch_reload_pending: Record<string, never>;
+  /** A user saved a new inline review note. */
+  note_created: { note: ExtensionReviewNote };
+  /** The body of an in-progress inline review note changed. */
+  note_edited: { note: ExtensionReviewNote };
   session_reload: { changeset: ExtensionChangeset; reason: SessionReloadReason };
   shutdown: Record<string, never>;
 }
@@ -873,7 +928,7 @@ export type ExtensionEventName = keyof ExtensionEventPayloads;
 
 export type ExtensionEventHandler<Event extends ExtensionEventName = ExtensionEventName> = (
   payload: ExtensionEventPayloads[Event],
-  ctx: ExtensionContext,
+  ctx: ExtensionEventContext,
 ) => void | Promise<void>;
 
 /* -------------------------------------------------------------------------- */
@@ -915,8 +970,10 @@ export interface HunkExtensionAPI {
   registerCommand(command: ExtensionCommand, handler: ExtensionCommandHandler): void;
   /** Rewrite every loaded changeset before review. */
   transformChangeset(fn: ChangesetTransform): void;
-  /** Subscribe to one Hunk lifecycle event. */
+  /** Subscribe to one Hunk lifecycle or UI event. Handlers receive sidebar controls. */
   on<Event extends ExtensionEventName>(event: Event, handler: ExtensionEventHandler<Event>): void;
+  /** Publish or subscribe to a namespaced event shared with other loaded extensions. */
+  readonly events: ExtensionEventBus;
   /**
    * This extension's own `[extension.<id>]` config table.
    *

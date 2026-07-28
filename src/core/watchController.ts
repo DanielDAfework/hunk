@@ -29,6 +29,8 @@ export interface WatchControllerOptions {
   initialSignature: string;
   getSignature: () => string | Promise<string>;
   refresh: () => void | Promise<void>;
+  /** A source event arrived and a debounced signature check is now pending. */
+  onReloadPending?: () => void;
   clock?: WatchControllerClock;
   createEventSource?: (callbacks: WatchEventSourceCallbacks) => WatchEventSource;
   pollOnly?: boolean;
@@ -259,6 +261,10 @@ export function createWatchController(options: WatchControllerOptions): WatchCon
       return;
     }
     const now = clock.now();
+    // Report one pending reload per debounce window, not once per noisy file event.
+    if (state.phase !== "debouncing") {
+      options.onReloadPending?.();
+    }
     quietDeadline = now + quietDelayMs;
     maximumDeadline ??= now + maximumDelayMs;
     state.phase = "debouncing";

@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { findVcsRepoRootCandidate, isVcsId } from "../core/vcs";
 import { EXTENSION_ID_RULE, HUNK_VENDOR_EXTENSION_ID, isValidExtensionId } from "./extensionIds";
+import { bindExtensionEventBus } from "./events";
 import { registerHostRuntimeModules } from "./hostRuntimeModules";
 import { createExtensionNotificationHub, type ExtensionNotificationHub } from "./notifications";
 import { describeError, readExtensionFactory, runExtensionFactory } from "./runExtension";
@@ -202,7 +203,9 @@ export async function loadExtensions(options: LoadExtensionsOptions): Promise<Ex
   // completed, in load order, so the loaded list is a copy of it rather than a
   // second tally that could drift.
   const loaded = [...registry.extensions];
-  return pendingTrustRepoRoot
+  const result = pendingTrustRepoRoot
     ? { registry, issues, loaded, context, notifications, pendingTrustRepoRoot }
     : { registry, issues, loaded, context, notifications };
+  bindExtensionEventBus(result);
+  return result;
 }

@@ -32,10 +32,16 @@ import type {
 import { canReloadInput } from "../core/watch";
 import { sanitizeTerminalLine } from "../lib/terminalText";
 import { resolveExtensionCommands } from "../extensions/apply";
-import { emitExtensionEvent, toReadOnlyFileViews } from "../extensions/events";
+import {
+  emitExtensionCustomEvent,
+  emitExtensionEvent,
+  toReadOnlyFileViews,
+} from "../extensions/events";
 import { writeExtensionTrust } from "../extensions/trust";
 import type {
   ExtensionCommandContext,
+  ExtensionEventContext,
+  ExtensionReviewNote,
   ExtensionSidebarControls,
   RegisteredCommand,
 } from "../extensions/types";
@@ -592,6 +598,21 @@ export function App({
     setExtensionDialogSelectedIndex((current) => (current + delta + optionCount) % optionCount);
   };
 
+  // Lifecycle and bus listeners receive the same sidebar controls as commands,
+  // so an extension can react to loaded content by revealing its own pane.
+  if (extensions) {
+    extensions.eventContextProvider = (extensionId): ExtensionEventContext => ({
+      cwd: extensions.context.cwd,
+      notify: (message, type) => extensions.context.notify(message, type),
+      sidebars: createSidebarControls(extensionId),
+      events: {
+        emit(event, payload) {
+          emitExtensionCustomEvent(extensions, event, payload);
+        },
+      },
+    });
+  }
+
   /** Invoke one extension command with its context, containing any failure. */
   const runExtensionCommand = useCallback(
     (registered: RegisteredCommand) => {
@@ -708,16 +729,29 @@ export function App({
     );
   }, [keymap, showSessionNotice]);
 
+  // The initial selected file is a view too, so extensions can populate a
+  // file-scoped pane without waiting for the user to navigate first.
+  const lastViewedFileIdRef = useRef<string | null>(null);
   useEffect(() => {
     const timer = setTimeout(() => {
-      emitExtensionEvent(extensions, "selection_changed", {
-        fileId: selectedFileId,
-        hunkIndex: selectedFileId === null ? null : selectedHunkIndex,
-      });
+      const hunkIndex = selectedFileId === null ? null : selectedHunkIndex;
+      emitExtensionEvent(extensions, "selection_changed", { fileId: selectedFileId, hunkIndex });
+      if (selectedFile && selectedFileId !== lastViewedFileIdRef.current) {
+        lastViewedFileIdRef.current = selectedFileId;
+        emitExtensionEvent(extensions, "file_viewed", { file: selectedFile, hunkIndex });
+      }
     }, SELECTION_CHANGED_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [extensions, selectedFileId, selectedHunkIndex]);
+  }, [extensions, selectedFile, selectedFileId, selectedHunkIndex]);
+
+  const reportedFilterRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (reportedFilterRef.current !== undefined && reportedFilterRef.current !== review.filter) {
+      emitExtensionEvent(extensions, "filter_changed", { filter: review.filter });
+    }
+    reportedFilterRef.current = review.filter;
+  }, [extensions, review.filter]);
 
   const bodyPadding = pagerMode ? 0 : BODY_PADDING;
   const bodyWidth = Math.max(0, terminal.width - bodyPadding);
@@ -726,6 +760,17 @@ export function App({
   const sidebarAreaVisible =
     sidebarVisible && (responsiveLayout.showSidebar || (forceSidebarOpen && canForceShowSidebar));
   const resolvedLayout = responsiveLayout.layout;
+  const reportedLayoutRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const signature = `${layoutMode}:${resolvedLayout}`;
+    if (reportedLayoutRef.current !== undefined && reportedLayoutRef.current !== signature) {
+      emitExtensionEvent(extensions, "layout_changed", {
+        mode: layoutMode,
+        layout: resolvedLayout,
+      });
+    }
+    reportedLayoutRef.current = signature;
+  }, [extensions, layoutMode, resolvedLayout]);
   const sidebarLayout = useMemo(
     () =>
       sidebarAreaVisible
@@ -931,6 +976,14 @@ export function App({
     setCodeHorizontalOffset(0);
     setWrapLines((current) => !current);
   };
+
+  const reportedThemeIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (reportedThemeIdRef.current !== undefined && reportedThemeIdRef.current !== themeId) {
+      emitExtensionEvent(extensions, "theme_changed", { themeId });
+    }
+    reportedThemeIdRef.current = themeId;
+  }, [extensions, themeId]);
 
   /** Switch the active theme. */
   const selectTheme = useCallback(
@@ -1206,6 +1259,7 @@ export function App({
   useWatchedInput({
     enabled: watchEnabled,
     input: bootstrap.input,
+    onReloadPending: () => emitExtensionEvent(extensions, "watch_reload_pending", {}),
     refresh: refreshWatchedInput,
     reloadContext: bootstrap.reloadContext,
     runtime: watchRuntime,
@@ -1346,11 +1400,58 @@ export function App({
     setFocusArea((current) => (current === "note" ? "files" : current));
   }, []);
 
+  /** Convert a draft or saved UI note into the stable public event view. */
+  const toExtensionReviewNote = useCallback(
+    (
+      note: {
+        id: string;
+        fileId: string;
+        filePath: string;
+        hunkIndex: number;
+        side: "old" | "new";
+        line: number;
+        body?: string;
+        summary?: string;
+      },
+      draft: boolean,
+    ): ExtensionReviewNote => ({
+      id: note.id,
+      fileId: note.fileId,
+      filePath: note.filePath,
+      hunkIndex: note.hunkIndex,
+      side: note.side,
+      line: note.line,
+      body: note.body ?? note.summary ?? "",
+      draft,
+    }),
+    [],
+  );
+
   /** Save the active draft note and return focus to review navigation. */
   const saveDraftNote = useCallback(() => {
-    review.saveDraftNote();
+    const draft = review.draftNote;
+    const saved = review.saveDraftNote();
+    if (saved && draft) {
+      emitExtensionEvent(extensions, "note_created", {
+        note: toExtensionReviewNote({ ...saved, fileId: draft.fileId }, false),
+      });
+    }
     setFocusArea("files");
-  }, [review.saveDraftNote]);
+  }, [extensions, review.draftNote, review.saveDraftNote, toExtensionReviewNote]);
+
+  /** Update a draft note and publish its current in-progress contents. */
+  const updateDraftNote = useCallback(
+    (body: string) => {
+      const draft = review.draftNote;
+      review.updateDraftNote(body);
+      if (draft) {
+        emitExtensionEvent(extensions, "note_edited", {
+          note: toExtensionReviewNote({ ...draft, body }, true),
+        });
+      }
+    },
+    [extensions, review.draftNote, review.updateDraftNote, toExtensionReviewNote],
+  );
 
   /** Cancel the active draft note and return focus to review navigation. */
   const cancelDraftNote = useCallback(() => {
@@ -1682,7 +1783,7 @@ export function App({
           onRemoveUserNote={review.removeUserNote}
           onSaveDraftNote={saveDraftNote}
           onStartUserNoteAtHunk={startUserNote}
-          onUpdateDraftNote={review.updateDraftNote}
+          onUpdateDraftNote={updateDraftNote}
           onBlurDraftNote={blurDraftNote}
           onCancelDraftNote={cancelDraftNote}
           onFocusDraftNote={focusDraftNote}

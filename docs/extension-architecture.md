@@ -47,7 +47,7 @@ load issue and costs only that extension. The rules themselves are stated in
 ## One registry, one apply path
 
 Registrations (themes, file languages, VCS adapters, changeset transforms,
-sidebar views, commands, lifecycle events) collect into one
+sidebar views, commands, lifecycle/UI events, and inter-extension bus listeners) collect into one
 `ExtensionRegistry` (`src/extensions/types.ts`) and are resolved/applied
 through `src/extensions/apply.ts` on both startup and reload. A factory that
 throws is rolled back to its pre-run registration counts
