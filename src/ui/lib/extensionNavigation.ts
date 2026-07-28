@@ -31,6 +31,18 @@ export interface CreateGuardedReviewNavigationOptions {
    * files visible *now*, not the ones visible when its key fired.
    */
   getFiles: () => readonly NavigableFile[];
+  /**
+   * Whether the review surface this navigation was minted for still exists.
+   *
+   * A session reload may remount the whole app (`resetApp`), and a command
+   * handler still in flight across that remount holds navigation closing over
+   * the unmounted instance — its file list frozen at the old review, its
+   * callbacks driving a controller whose state updates no longer render.
+   * Checked per call, so such a handler gets an accurate refusal instead of a
+   * stale validation or a silent no-op. Omitted means always live, which is
+   * right for a sidebar's actions: the pane unmounts with the instance.
+   */
+  isLive?: () => boolean;
   notify: ExtensionNotifySink;
   onSelectFile: (fileId: string) => void;
   onSelectHunk: (fileId: string, hunkIndex: number) => void;
@@ -49,6 +61,7 @@ export interface CreateGuardedReviewNavigationOptions {
 export function createGuardedReviewNavigation({
   extensionId,
   getFiles,
+  isLive,
   notify,
   onSelectFile,
   onSelectHunk,
@@ -65,6 +78,14 @@ export function createGuardedReviewNavigation({
 
   /** Turn one action failure into a warning naming the extension. */
   const guard = (method: string, run: () => void) => {
+    if (isLive && !isLive()) {
+      notify(
+        `Extension ${extensionId} ${method} ignored — the review session was reloaded`,
+        "warning",
+      );
+      return;
+    }
+
     try {
       run();
     } catch (error) {

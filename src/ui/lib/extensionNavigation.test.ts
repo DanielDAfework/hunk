@@ -98,6 +98,38 @@ describe("createGuardedReviewNavigation", () => {
     expect(warnings).toEqual(["Extension triage failed selectFile • controller unavailable"]);
   });
 
+  test("refuses every call once the review surface it was minted for is gone", () => {
+    // A hard session reload (`resetApp`) remounts the app under an in-flight
+    // handler; its navigation must say so rather than silently no-op against
+    // the dead instance or judge targets by the old review's file list.
+    let alive = true;
+    const warnings: string[] = [];
+    const selectedFiles: string[] = [];
+    const navigation = createGuardedReviewNavigation({
+      extensionId: "triage",
+      getFiles: () => [createTestNavigableFile("a", 1)],
+      isLive: () => alive,
+      notify: (message, type) => {
+        if (type === "warning") {
+          warnings.push(message);
+        }
+      },
+      onSelectFile: (fileId) => selectedFiles.push(fileId),
+      onSelectHunk: () => {},
+    });
+
+    navigation.selectFile("a");
+    alive = false;
+    navigation.selectFile("a");
+    navigation.selectHunk("a", 0);
+
+    expect(selectedFiles).toEqual(["a"]);
+    expect(warnings).toEqual([
+      "Extension triage selectFile ignored — the review session was reloaded",
+      "Extension triage selectHunk ignored — the review session was reloaded",
+    ]);
+  });
+
   test("validates against the files visible at call time, not at creation", () => {
     // A command handler may await a dialog while a reload or filter changes
     // the review; navigation must judge the target against the current list.

@@ -371,6 +371,18 @@ export function App({
     onSelectFile: (_fileId: string) => {},
     onSelectHunk: (_fileId: string, _hunkIndex: number) => {},
   });
+  // A hard session reload (`resetApp`) remounts App under an in-flight async
+  // command handler, whose `ctx.navigation` closes over *this* instance's
+  // refs. Flipping this on unmount lets those closures refuse with an accurate
+  // warning instead of validating against the dead instance's file list or
+  // driving a controller whose state updates no longer render.
+  const appAliveForNavigationRef = useRef(true);
+  useEffect(
+    () => () => {
+      appAliveForNavigationRef.current = false;
+    },
+    [],
+  );
 
   /** Build the selection snapshot a command handler receives, at invocation. */
   const getExtensionSelection = useCallback(() => {
@@ -652,6 +664,9 @@ export function App({
         navigation: createGuardedReviewNavigation({
           extensionId: registered.extensionId,
           getFiles: () => extensionSelectionInputsRef.current.filteredFiles,
+          // Extensions outlive App remounts, so the notify sink stays valid
+          // even after this instance dies and `isLive` starts refusing calls.
+          isLive: () => appAliveForNavigationRef.current,
           notify: (message, type) => extensions?.context.notify(message, type),
           onSelectFile: (fileId) => extensionCommandNavigationRef.current.onSelectFile(fileId),
           onSelectHunk: (fileId, hunkIndex) =>
