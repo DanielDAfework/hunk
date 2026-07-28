@@ -35,6 +35,11 @@ test("documentation stays in the canonical light theme", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 });
 
+test("documentation includes Vercel Analytics", async ({ page }) => {
+  await page.goto("/docs/");
+  await expect(page.locator('script[src="/_vercel/insights/script.js"]')).toHaveCount(1);
+});
+
 test("left sidebar credits Modem at its bottom", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/docs/start/quick-start/");

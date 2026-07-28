@@ -13,6 +13,10 @@ export default defineConfig({
         "Review code changes and collaborate with coding agents in a desktop-inspired terminal diff viewer.",
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/modem-dev/hunk" }],
       head: [
+        {
+          tag: "script",
+          attrs: { defer: true, src: "/_vercel/insights/script.js" },
+        },
         { tag: "link", attrs: { rel: "icon", href: "/docs/favicon.svg", type: "image/svg+xml" } },
         { tag: "meta", attrs: { property: "og:type", content: "website" } },
         { tag: "meta", attrs: { property: "og:site_name", content: "Hunk documentation" } },
