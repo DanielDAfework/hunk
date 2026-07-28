@@ -219,6 +219,7 @@ interface RegistrySnapshot {
   commands: number;
   eventHandlers: Record<string, number>;
   customEventHandlers: number;
+  pendingCustomEvents: number;
 }
 
 /** Capture how much each registration list already holds. */
@@ -237,6 +238,7 @@ function snapshotRegistry(registry: ExtensionRegistry): RegistrySnapshot {
     commands: registry.commands.length,
     eventHandlers,
     customEventHandlers: registry.customEventHandlers.length,
+    pendingCustomEvents: registry.pendingCustomEvents.length,
   };
 }
 
@@ -254,6 +256,7 @@ function rollbackRegistry(registry: ExtensionRegistry, snapshot: RegistrySnapsho
   registry.sidebarViews.length = snapshot.sidebarViews;
   registry.commands.length = snapshot.commands;
   registry.customEventHandlers.length = snapshot.customEventHandlers;
+  registry.pendingCustomEvents.length = snapshot.pendingCustomEvents;
   for (const [event, handlers] of Object.entries(registry.eventHandlers)) {
     handlers.length = snapshot.eventHandlers[event] ?? 0;
   }
@@ -297,7 +300,13 @@ export function createExtensionApi(
     },
     emit(event: string, payload: unknown) {
       assertNonEmptyString(event, "events.emit requires a non-empty event name.");
-      registry.emitCustomEvent?.(event, payload);
+      if (registry.emitCustomEvent) {
+        registry.emitCustomEvent(event, payload);
+      } else if (registry.eventBusPhase === "loading") {
+        // Factories load sequentially, before the runtime dispatcher has its
+        // notification context. Preserve their events until it is available.
+        registry.pendingCustomEvents.push({ extensionId: metadata.id, event, payload });
+      }
     },
   };
 

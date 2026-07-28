@@ -859,7 +859,9 @@ export type ExtensionCustomEventHandler<Payload = unknown> = (
  * Use a namespaced event name (`"my-extension:status-ready"`) so unrelated
  * extensions cannot accidentally claim the same channel. Delivery is
  * fire-and-forget and isolated like lifecycle events: Hunk never awaits a
- * listener, and one failure becomes a warning without stopping another.
+ * listener, and one failure becomes a warning without stopping another. Events
+ * emitted while extension factories load are queued until every extension has
+ * had a chance to subscribe.
  */
 export interface ExtensionEventBus {
   on<Payload = unknown>(event: string, handler: ExtensionCustomEventHandler<Payload>): void;

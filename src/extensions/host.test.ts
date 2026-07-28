@@ -101,6 +101,32 @@ export default function (hunk: HunkExtensionAPI) {
     ).toBe("transformed");
   });
 
+  test("replays a factory event after every extension has subscribed", async () => {
+    const dir = createTempDir("hunk-host-factory-event-");
+    const listener = createTestExtension(
+      dir,
+      "listener.ts",
+      `export default function (hunk) {
+  hunk.events.on("summary:ready", (payload) => hunk.log("received:" + payload.count));
+}
+`,
+    );
+    const emitter = createTestExtension(
+      dir,
+      "emitter.ts",
+      `export default function (hunk) {
+  hunk.events.emit("summary:ready", { count: 3 });
+}
+`,
+    );
+
+    const result = await loadExtensions({ candidates: [listener, emitter], cwd: dir });
+
+    expect(result.issues).toEqual([]);
+    expect(result.registry.logs).toEqual([{ extensionId: "listener", message: "received:3" }]);
+    expect(result.registry.pendingCustomEvents).toEqual([]);
+  });
+
   test("loads a folder extension whose index imports a sibling module", async () => {
     const dir = createTempDir("hunk-host-folder-");
     // The helper is written first so the index's relative import resolves.

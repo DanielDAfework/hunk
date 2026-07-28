@@ -772,20 +772,20 @@ the UI waiting for one. Alongside `cwd` and `notify`, every handler receives
 That means a `changeset_loaded` handler can reveal its extension's sidebar when
 it finds something worth showing — no keypress required.
 
-| Event                  | Payload                 | When                                                 |
-| ---------------------- | ----------------------- | ---------------------------------------------------- |
-| `startup`              | `{ cwd }`               | once, after the app mounts with its first changeset  |
-| `changeset_loaded`     | `{ changeset }`         | first load and every reload                          |
-| `selection_changed`    | `{ fileId, hunkIndex }` | when the review selection settles (debounced ~150ms) |
-| `file_viewed`          | `{ file, hunkIndex }`   | when selection settles on a different file           |
-| `filter_changed`       | `{ filter }`            | whenever the file-filter query changes               |
-| `theme_changed`        | `{ themeId }`           | when the user commits a new theme                    |
-| `layout_changed`       | `{ mode, layout }`      | mode or responsive split/stack layout changes        |
-| `watch_reload_pending` | `{}`                    | watcher observed a change before its reload check    |
-| `note_created`         | `{ note }`              | a user saves an inline review note                   |
-| `note_edited`          | `{ note }`              | an in-progress inline note's body changes            |
-| `session_reload`       | `{ changeset, reason }` | on every session reload                              |
-| `shutdown`             | `{}`                    | on exit, best-effort within a short timeout          |
+| Event                  | Payload                 | When                                                     |
+| ---------------------- | ----------------------- | -------------------------------------------------------- |
+| `startup`              | `{ cwd }`               | once, after the app mounts with its first changeset      |
+| `changeset_loaded`     | `{ changeset }`         | first load and every reload                              |
+| `selection_changed`    | `{ fileId, hunkIndex }` | when the review selection settles (debounced ~150ms)     |
+| `file_viewed`          | `{ file, hunkIndex }`   | when selection settles on a file or a reload replaces it |
+| `filter_changed`       | `{ filter }`            | whenever the file-filter query changes                   |
+| `theme_changed`        | `{ themeId }`           | when the user commits a new theme                        |
+| `layout_changed`       | `{ mode, layout }`      | mode or responsive split/stack layout changes            |
+| `watch_reload_pending` | `{}`                    | watcher observed a change before its reload check        |
+| `note_created`         | `{ note }`              | a user saves an inline review note                       |
+| `note_edited`          | `{ note }`              | an in-progress inline note's body changes                |
+| `session_reload`       | `{ changeset, reason }` | on every session reload                                  |
+| `shutdown`             | `{}`                    | on exit, best-effort within a short timeout              |
 
 `selection_changed` is trailing-debounced on purpose: holding `[`/`]` retargets
 the selection many times a second, and handlers only care where the user landed.
@@ -804,7 +804,9 @@ anyway, so treat it as best-effort flushing rather than guaranteed cleanup.
 coordinate extensions without coupling them through a command or global state.
 Names are open-ended, so namespace them with your extension id. Listeners get
 the same `ctx.sidebars` controls as lifecycle handlers; delivery is fire-and-forget
-and one listener's failure is reported without stopping the others.
+and one listener's failure is reported without stopping the others. Events an
+extension emits while factories are loading are queued until every extension
+has had a chance to subscribe.
 
 ```ts
 import type { HunkExtensionAPI } from "hunkdiff/extension";

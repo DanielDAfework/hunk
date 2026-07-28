@@ -128,6 +128,13 @@ export interface RegisteredCustomEventHandler {
   handler: ExtensionCustomEventHandler;
 }
 
+/** One bus event emitted while extension factories are still loading. */
+export interface PendingCustomEvent {
+  extensionId: string;
+  event: string;
+  payload: unknown;
+}
+
 export interface ExtensionLogEntry {
   extensionId: string;
   message: string;
@@ -148,6 +155,10 @@ export interface ExtensionRegistry {
   commands: RegisteredCommand[];
   eventHandlers: ExtensionEventHandlerMap;
   customEventHandlers: RegisteredCustomEventHandler[];
+  /** Events raised by a factory, delivered after every factory has loaded. */
+  pendingCustomEvents: PendingCustomEvent[];
+  /** The bus accepts queued factory events only while this registry is loading. */
+  eventBusPhase: "loading" | "ready" | "closed";
   /** Bound after loading so hunk.events.emit can dispatch at runtime. */
   emitCustomEvent?: (event: string, payload: unknown) => void;
   logs: ExtensionLogEntry[];
@@ -230,6 +241,8 @@ export function createEmptyExtensionRegistry(): ExtensionRegistry {
       shutdown: [],
     },
     customEventHandlers: [],
+    pendingCustomEvents: [],
+    eventBusPhase: "loading",
     logs: [],
   };
 }

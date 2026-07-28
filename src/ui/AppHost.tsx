@@ -131,6 +131,8 @@ export function AppHost({
         // keep publishing into listeners that no longer belong to this session.
         if (extensionsRef.current) {
           extensionsRef.current.registry.emitCustomEvent = undefined;
+          extensionsRef.current.registry.eventBusPhase = "closed";
+          extensionsRef.current.registry.pendingCustomEvents.length = 0;
         }
         // Reuse the session's notification hub so the mounted toast surface keeps
         // receiving `ctx.notify` from the extensions this pass loads.

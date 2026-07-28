@@ -730,14 +730,16 @@ export function App({
   }, [keymap, showSessionNotice]);
 
   // The initial selected file is a view too, so extensions can populate a
-  // file-scoped pane without waiting for the user to navigate first.
-  const lastViewedFileIdRef = useRef<string | null>(null);
+  // file-scoped pane without waiting for the user to navigate first. Track the
+  // file object, not only its id: a soft reload replaces its contents while
+  // preserving stable navigation ids.
+  const lastViewedFileRef = useRef<typeof selectedFile>(null);
   useEffect(() => {
     const timer = setTimeout(() => {
       const hunkIndex = selectedFileId === null ? null : selectedHunkIndex;
       emitExtensionEvent(extensions, "selection_changed", { fileId: selectedFileId, hunkIndex });
-      if (selectedFile && selectedFileId !== lastViewedFileIdRef.current) {
-        lastViewedFileIdRef.current = selectedFileId;
+      if (selectedFile && selectedFile !== lastViewedFileRef.current) {
+        lastViewedFileRef.current = selectedFile;
         emitExtensionEvent(extensions, "file_viewed", { file: selectedFile, hunkIndex });
       }
     }, SELECTION_CHANGED_DEBOUNCE_MS);

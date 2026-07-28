@@ -180,7 +180,7 @@ describe("hunk.events", () => {
     ]);
   });
 
-  test("rolls bus registrations back with a failing factory", () => {
+  test("rolls bus registrations and queued factory events back with a failing factory", () => {
     const registry = createEmptyExtensionRegistry();
     const issues: ExtensionLoadIssue[] = [];
 
@@ -190,11 +190,13 @@ describe("hunk.events", () => {
       issues,
       factory: (hunk) => {
         hunk.events.on("broken:ready", () => {});
+        hunk.events.emit("broken:ready", {});
         throw new Error("boom");
       },
     });
 
     expect(registry.customEventHandlers).toEqual([]);
+    expect(registry.pendingCustomEvents).toEqual([]);
   });
 });
 

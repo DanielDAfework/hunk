@@ -322,6 +322,55 @@ describe("reload keeps launch extension authority", () => {
   });
 });
 
+describe("file_viewed events", () => {
+  test("fires again when a soft reload replaces the selected file with the same id", async () => {
+    const repo = createTestRepo("hunk-apphost-file-viewed-");
+    const logPath = join(repo, "file-viewed.log");
+    const extPath = join(repo, "file-viewed.ts");
+    writeFileSync(
+      extPath,
+      `import { appendFileSync } from "node:fs";
+export default function (hunk) {
+  hunk.on("file_viewed", ({ file }) => appendFileSync(${JSON.stringify(logPath)}, file.id + "\\n"));
+}
+`,
+    );
+    useTempConfigHome();
+
+    const bootstrap = await loadAppBootstrap(
+      { kind: "vcs", staged: false, options: { mode: "stack", extensionPaths: [extPath] } },
+      { cwd: repo },
+    );
+    bootstrap.extensions = await loadStartupExtensions({
+      extensions: { enabled: true, paths: [], repoPaths: [], extensionConfigs: {} },
+      cwd: repo,
+      cliExtensionPaths: [extPath],
+    });
+
+    await withAppHost(bootstrap, async (setup) => {
+      await flushUntil(
+        setup,
+        () => readProbeLog(logPath).length === 1,
+        "the initial selected file to be reported",
+      );
+
+      // `r` requests a soft reload (`resetApp: false`), retaining selection and
+      // its stable id while replacing the underlying review file object.
+      await act(async () => {
+        await setup.mockInput.typeText("r");
+      });
+      await flushUntil(
+        setup,
+        () => readProbeLog(logPath).length === 2,
+        "the reloaded selected file to be reported",
+      );
+
+      const viewedIds = readProbeLog(logPath);
+      expect(viewedIds[1]).toBe(viewedIds[0]);
+    });
+  });
+});
+
 /**
  * Answer a repo-extension trust prompt with `t` and return what the extension logged.
  *

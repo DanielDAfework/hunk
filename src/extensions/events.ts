@@ -375,10 +375,20 @@ export function emitExtensionCustomEvent(
 
 /** Bind a loaded registry so hunk.events.emit starts delivering runtime events. */
 export function bindExtensionEventBus(result: ExtensionLoadResult | undefined) {
-  if (result) {
-    result.registry.emitCustomEvent = (event, payload) => {
-      emitExtensionCustomEvent(result, event, payload);
-    };
+  if (!result) {
+    return;
+  }
+
+  const { registry } = result;
+  registry.emitCustomEvent = (event, payload) => {
+    emitExtensionCustomEvent(result, event, payload);
+  };
+  registry.eventBusPhase = "ready";
+
+  // Factories load before a result has the context needed to invoke handlers.
+  // Replay their events now that every extension has had a chance to subscribe.
+  for (const { event, payload } of registry.pendingCustomEvents.splice(0)) {
+    emitExtensionCustomEvent(result, event, payload);
   }
 }
 
