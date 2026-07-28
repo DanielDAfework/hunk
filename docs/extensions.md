@@ -656,8 +656,9 @@ hunk.registerCommand(
 ```
 
 `selection.file` is a frozen read-only view, identical to the entries in a
-sidebar's `files` prop, and is `null` when nothing is selected or when the
-current filter hides the selected file. `selection.hunkIndex` is that file's
+sidebar's `files` prop. Hunk keeps the selection inside the visible files, so
+it is `null` only when nothing is visible at all — a filter that matches no
+files. `selection.hunkIndex` is that file's
 selected hunk, and `null` whenever `file` is — or when the file has no hunks to
 select. The values are captured when the command fires: a handler that awaits
 still sees the selection it was run from, not wherever the user navigated to

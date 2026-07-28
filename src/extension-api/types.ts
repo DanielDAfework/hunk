@@ -749,9 +749,11 @@ export interface ExtensionReviewSelection {
    * The selected file among the currently visible (filtered) files, or `null`.
    *
    * The same frozen read-only view a sidebar component receives in its `files`
-   * prop, so holding or mutating it cannot reach the review model. `null` when
-   * nothing is selected, or when the selection points at a file the current
-   * file filter hides.
+   * prop, so holding or mutating it cannot reach the review model. Hunk keeps
+   * the selection inside the visible list — filtering away the selected file
+   * immediately reselects the first visible one — so in practice this is
+   * `null` only when nothing is visible at all, such as a filter matching no
+   * files.
    */
   file: ExtensionDiffFile | null;
   /**

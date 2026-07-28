@@ -323,16 +323,37 @@ export function App({
   // The one conversion of the visible review files into the frozen views every
   // extension surface sees: sidebar props and command-handler selection both
   // read from this list, so they can never describe the review differently.
-  const extensionFileViews = useMemo(() => toReadOnlyFileViews(filteredFiles), [filteredFiles]);
-  const extensionSelection = useMemo(
-    () =>
-      buildExtensionReviewSelection({
-        files: extensionFileViews,
-        selectedFileId,
-        selectedHunkIndex,
-      }),
-    [extensionFileViews, selectedFileId, selectedHunkIndex],
-  );
+  // Computed on demand and cached per visible-files identity rather than
+  // eagerly memoized: `visibleFiles` gets a fresh identity on every selection
+  // change, so an eager memo would reconvert the whole list on each navigation
+  // keypress even in sessions where no pane is showing and no command fires.
+  const extensionViewsCacheRef = useRef<{
+    source: typeof filteredFiles;
+    views: ReturnType<typeof toReadOnlyFileViews>;
+  } | null>(null);
+  const extensionSelectionInputsRef = useRef({ filteredFiles, selectedFileId, selectedHunkIndex });
+  extensionSelectionInputsRef.current = { filteredFiles, selectedFileId, selectedHunkIndex };
+  const getExtensionFileViews = useCallback(() => {
+    const source = extensionSelectionInputsRef.current.filteredFiles;
+    const cache = extensionViewsCacheRef.current;
+    if (cache && cache.source === source) {
+      return cache.views;
+    }
+
+    const views = toReadOnlyFileViews(source);
+    extensionViewsCacheRef.current = { source, views };
+    return views;
+  }, []);
+  /** Build the selection snapshot a command handler receives, at invocation. */
+  const getExtensionSelection = useCallback(() => {
+    const { selectedFileId: fileId, selectedHunkIndex: hunkIndex } =
+      extensionSelectionInputsRef.current;
+    return buildExtensionReviewSelection({
+      files: getExtensionFileViews(),
+      selectedFileId: fileId,
+      selectedHunkIndex: hunkIndex,
+    });
+  }, [getExtensionFileViews]);
   const moveToAnnotatedFile = review.moveToAnnotatedFile;
   const moveToAnnotatedHunk = review.moveToAnnotatedHunk;
   const moveToFile = review.moveToFile;
@@ -476,17 +497,6 @@ export function App({
    */
   const revealSidebarAreaRef = useRef<() => void>(() => {});
 
-  /**
-   * The selection commands are handed, read when a command fires.
-   *
-   * Kept in a ref rather than in `runExtensionCommand`'s dependencies: the
-   * dispatch table, the keymap, and the Extensions menu are all derived from
-   * that callback, and rebuilding them on every `[`/`]` press to carry a value
-   * only read at invocation would be wasted work.
-   */
-  const extensionSelectionRef = useRef(extensionSelection);
-  extensionSelectionRef.current = extensionSelection;
-
   /** Invoke one extension command with its context, containing any failure. */
   const runExtensionCommand = useCallback(
     (registered: RegisteredCommand) => {
@@ -501,9 +511,10 @@ export function App({
         cwd: extensions?.context.cwd ?? process.cwd(),
         notify: (message, type) => extensions?.context.notify(message, type),
         sidebars: createSidebarControls(registered.extensionId),
-        // Snapshot semantics: the handler sees where the review was when its
-        // key fired, even if it awaits and the user navigates on.
-        selection: extensionSelectionRef.current,
+        // Snapshot semantics: built when the key fires, so the handler sees
+        // where the review was at that moment, even if it awaits and the user
+        // navigates on.
+        selection: getExtensionSelection(),
       };
 
       try {
@@ -515,7 +526,10 @@ export function App({
         report(error);
       }
     },
-    [createSidebarControls, extensions],
+    // `getExtensionSelection` is identity-stable (it reads refs), so the
+    // dispatch table, keymap, and Extensions menu derived from this callback
+    // do not rebuild on every `[`/`]` press.
+    [createSidebarControls, extensions, getExtensionSelection],
   );
 
   const registeredExtensionCommands = useMemo(
@@ -1417,34 +1431,39 @@ export function App({
   const diffPaneScreenTop = pagerMode || !showMenuBar ? 0 : 1;
 
   /** Render one open sidebar view at its planned width. */
-  const renderSidebarPane = (pane: SidebarPanePlan) => (
-    <ExtensionSidebarPane
-      registered={pane.view.registered}
-      files={filteredFiles}
-      fileViews={extensionFileViews}
-      selectedFileId={extensionSelection.file?.id ?? null}
-      selectedHunkIndex={extensionSelection.hunkIndex}
-      showTopChrome={showMenuBar}
-      theme={activeTheme}
-      width={pane.width}
-      notify={(message, type) => extensions?.context.notify(message, type)}
-      onSelectFile={(fileId) => {
-        focusFiles();
-        jumpToFile(fileId, 0, { alignFileHeaderTop: true });
-      }}
-      onSelectHunk={(fileId, hunkIndex) => {
-        focusFiles();
-        review.selectHunk(fileId, hunkIndex);
-      }}
-      // Extension panes close on a render failure; the bundled files pane is
-      // Hunk's own and keeps its in-place fallback semantics.
-      onRenderFailure={
-        pane.view.key === bundledSidebarViewKey()
-          ? undefined
-          : () => handleSidebarViewFailure(pane.view.key)
-      }
-    />
-  );
+  const renderSidebarPane = (pane: SidebarPanePlan) => {
+    // Resolved here so hidden sidebars never pay for the conversion; the
+    // per-source cache hands every pane (and command snapshots) one list.
+    const paneSelection = getExtensionSelection();
+    return (
+      <ExtensionSidebarPane
+        registered={pane.view.registered}
+        files={filteredFiles}
+        fileViews={getExtensionFileViews()}
+        selectedFileId={paneSelection.file?.id ?? null}
+        selectedHunkIndex={paneSelection.hunkIndex}
+        showTopChrome={showMenuBar}
+        theme={activeTheme}
+        width={pane.width}
+        notify={(message, type) => extensions?.context.notify(message, type)}
+        onSelectFile={(fileId) => {
+          focusFiles();
+          jumpToFile(fileId, 0, { alignFileHeaderTop: true });
+        }}
+        onSelectHunk={(fileId, hunkIndex) => {
+          focusFiles();
+          review.selectHunk(fileId, hunkIndex);
+        }}
+        // Extension panes close on a render failure; the bundled files pane is
+        // Hunk's own and keeps its in-place fallback semantics.
+        onRenderFailure={
+          pane.view.key === bundledSidebarViewKey()
+            ? undefined
+            : () => handleSidebarViewFailure(pane.view.key)
+        }
+      />
+    );
+  };
 
   return (
     <box
