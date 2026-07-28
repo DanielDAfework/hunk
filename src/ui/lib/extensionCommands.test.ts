@@ -88,7 +88,7 @@ describe("buildExtensionAppCommands", () => {
   test("binds one command to every chord it declares", () => {
     const ran: string[] = [];
     const { commands, conflicts } = buildExtensionAppCommands({
-      registered: [registeredCommand("meta", "toggle", ["y", "ctrl+g"])],
+      registered: [registeredCommand("meta", "toggle", ["y", "ctrl+o"])],
       builtins: builtinCommandMatchProbes(),
       runCommand: (registered) => ran.push(`${registered.extensionId}.${registered.command.id}`),
     });
@@ -96,9 +96,9 @@ describe("buildExtensionAppCommands", () => {
     expect(conflicts).toEqual([]);
     // One command, one dispatch entry, matching either chord.
     expect(commands).toHaveLength(1);
-    expect(commands[0]?.keyLabels).toEqual(["y", "Ctrl+G"]);
+    expect(commands[0]?.keyLabels).toEqual(["y", "Ctrl+O"]);
     expect(dispatchAppCommand(commands, "review", chordEvent("y"))?.id).toBe("meta.toggle");
-    expect(dispatchAppCommand(commands, "review", chordEvent("ctrl+g"))?.id).toBe("meta.toggle");
+    expect(dispatchAppCommand(commands, "review", chordEvent("ctrl+o"))?.id).toBe("meta.toggle");
     expect(ran).toEqual(["meta.toggle", "meta.toggle"]);
   });
 

@@ -10,11 +10,14 @@ import { diffSectionId } from "../../lib/ids";
 import { fitText } from "../../lib/text";
 import type { AppTheme } from "../../themes";
 import { DiffFileHeaderRow } from "./DiffFileHeaderRow";
+import { FileView } from "./FileView";
+import type { ResolvedFileViewLayout } from "../../fileViews/useFileViews";
 
 interface DiffSectionProps {
   codeHorizontalOffset: number;
   expandedGapKeys: ReadonlySet<string>;
   file: DiffFile;
+  fileView?: ResolvedFileViewLayout;
   headerLabelWidth: number;
   headerStatsWidth: number;
   layout: Exclude<LayoutMode, "auto">;
@@ -50,6 +53,7 @@ function DiffSectionComponent({
   codeHorizontalOffset,
   expandedGapKeys,
   file,
+  fileView,
   headerLabelWidth,
   headerStatsWidth,
   layout,
@@ -115,34 +119,54 @@ function DiffSectionComponent({
         />
       ) : null}
 
-      <PierreDiffView
-        expandedGapKeys={expandedGapKeys}
-        file={file}
-        layout={layout}
-        showLineNumbers={showLineNumbers}
-        showHunkHeaders={showHunkHeaders}
-        sourceStatus={sourceStatus}
-        tabWidth={tabWidth}
-        wrapLines={wrapLines}
-        codeHorizontalOffset={codeHorizontalOffset}
-        copySelectedRowRanges={copySelectedRowRanges}
-        copySelectedSide={copySelectedSide}
-        theme={theme}
-        width={viewWidth}
-        visibleAgentNotes={visibleAgentNotes}
-        hoverActive={hoverActive}
-        hoverClearSignal={hoverClearSignal}
-        onHover={onHover}
-        onActiveAddNoteAffordanceChange={onActiveAddNoteAffordanceChange}
-        onStartUserNoteAtHunk={onStartUserNoteAtHunk}
-        onToggleGap={onToggleGap}
-        selectedHunkIndex={selectedHunkIndex}
-        sectionGeometry={sectionGeometry}
-        shouldLoadHighlight={shouldLoadHighlight}
-        // The parent review stream owns scrolling across files.
-        scrollable={false}
-        visibleBodyBounds={visibleBodyBounds}
-      />
+      {fileView ? (
+        <FileView
+          layout={fileView.layout}
+          geometry={
+            sectionGeometry ?? {
+              bodyHeight: 0,
+              hunkAnchorRows: new Map(),
+              hunkBounds: new Map(),
+              lineNumberDigits: 1,
+              plannedRows: [],
+              rowBounds: [],
+              rowBoundsByKey: new Map(),
+              rowBoundsByStableKey: new Map(),
+            }
+          }
+          theme={theme}
+          visibleBodyBounds={visibleBodyBounds}
+        />
+      ) : (
+        <PierreDiffView
+          expandedGapKeys={expandedGapKeys}
+          file={file}
+          layout={layout}
+          showLineNumbers={showLineNumbers}
+          showHunkHeaders={showHunkHeaders}
+          sourceStatus={sourceStatus}
+          tabWidth={tabWidth}
+          wrapLines={wrapLines}
+          codeHorizontalOffset={codeHorizontalOffset}
+          copySelectedRowRanges={copySelectedRowRanges}
+          copySelectedSide={copySelectedSide}
+          theme={theme}
+          width={viewWidth}
+          visibleAgentNotes={visibleAgentNotes}
+          hoverActive={hoverActive}
+          hoverClearSignal={hoverClearSignal}
+          onHover={onHover}
+          onActiveAddNoteAffordanceChange={onActiveAddNoteAffordanceChange}
+          onStartUserNoteAtHunk={onStartUserNoteAtHunk}
+          onToggleGap={onToggleGap}
+          selectedHunkIndex={selectedHunkIndex}
+          sectionGeometry={sectionGeometry}
+          shouldLoadHighlight={shouldLoadHighlight}
+          // The parent review stream owns scrolling across files.
+          scrollable={false}
+          visibleBodyBounds={visibleBodyBounds}
+        />
+      )}
     </box>
   );
 }
@@ -156,6 +180,7 @@ export const DiffSection = memo(DiffSectionComponent, (previous, next) => {
     previous.codeHorizontalOffset === next.codeHorizontalOffset &&
     previous.expandedGapKeys === next.expandedGapKeys &&
     previous.file === next.file &&
+    previous.fileView === next.fileView &&
     previous.headerLabelWidth === next.headerLabelWidth &&
     previous.headerStatsWidth === next.headerStatsWidth &&
     previous.layout === next.layout &&

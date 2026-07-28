@@ -21,7 +21,7 @@
  * Extensions can branch on `hunk.apiVersion` so a newer Hunk can keep loading
  * older extensions without guessing at their expectations.
  */
-export const HUNK_EXTENSION_API_VERSION = 1;
+export const HUNK_EXTENSION_API_VERSION = 2;
 export type HunkExtensionApiVersion = typeof HUNK_EXTENSION_API_VERSION;
 
 export type ExtensionNotifyType = "info" | "warning" | "error";
@@ -209,6 +209,121 @@ export type ChangesetTransform = (
   changeset: ExtensionChangeset,
   ctx: ExtensionContext,
 ) => ExtensionChangeset | Promise<ExtensionChangeset>;
+
+/* -------------------------------------------------------------------------- */
+/* File views                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/** A side of a reviewed source document. */
+export type ExtensionFileSide = "old" | "new";
+
+/**
+ * An exact source document made available by the host.
+ *
+ * A missing side (a newly-created file has no old document, for example), an
+ * unavailable source provider, a read failure, and a resource-limit refusal
+ * all resolve to `null`. Extensions must treat `null` as a normal fallback
+ * condition rather than an error worth surfacing to the user.
+ */
+export interface ExtensionExactFileDocument {
+  availability: "exact";
+  text: string;
+}
+
+/** Host-backed, lazy full-document reads for a file-view layout. */
+export interface ExtensionFileDocuments {
+  /**
+   * Read one full source document once. The host deduplicates reads per file
+   * and side for the lifetime of this layout request; `signal` cancels only
+   * this caller's wait, never the shared source read.
+   *
+   * Patch text is already available as `input.file.patch`; it is deliberately
+   * not presented as a document because a patch is not an exact source file.
+   */
+  read(side: ExtensionFileSide, signal?: AbortSignal): Promise<ExtensionExactFileDocument | null>;
+}
+
+/** One changed source-line range, inclusive on both ends. */
+export interface ExtensionFileChangeRange {
+  hunkIndex: number;
+  side: ExtensionFileSide;
+  range: [number, number];
+  kind: "added" | "removed" | "context";
+}
+
+/** A semantic style the host maps to its active terminal theme at render time. */
+export type ExtensionFileViewStyle =
+  | "plain"
+  | "muted"
+  | "heading"
+  | "quote"
+  | "code"
+  | "table"
+  | "added"
+  | "removed";
+
+/** One symbolic colored run in a host-rendered file-view row. */
+export interface ExtensionFileViewSpan {
+  text: string;
+  style?: ExtensionFileViewStyle;
+}
+
+/** A line in a host-owned, terminal-safe file-view layout. */
+export interface ExtensionFileViewRow {
+  /** A stable identifier within this layout result. */
+  id: string;
+  spans: readonly ExtensionFileViewSpan[];
+}
+
+/** One hunk's inclusive row extent in a file-view layout. */
+export interface ExtensionFileViewHunkBounds {
+  index: number;
+  startRow: number;
+  endRow: number;
+}
+
+/** Map a source line to a rendered row for note placement and click selection. */
+export interface ExtensionFileViewSourceAnchor {
+  side: ExtensionFileSide;
+  line: number;
+  row: number;
+}
+
+/** The deterministic, symbolic layout returned by a file-view extension. */
+export interface ExtensionFileViewLayout {
+  rows: readonly ExtensionFileViewRow[];
+  /** Every parsed diff hunk must have one inclusive row extent. */
+  hunks: readonly ExtensionFileViewHunkBounds[];
+  /** Optional source-to-row mappings; notes fall back to hunk placement without them. */
+  sourceAnchors?: readonly ExtensionFileViewSourceAnchor[];
+}
+
+/** Immutable input a file-view renderer receives for one file. */
+export interface ExtensionFileViewInput {
+  file: ExtensionDiffFile;
+  documents: ExtensionFileDocuments;
+  changes: readonly ExtensionFileChangeRange[];
+}
+
+/** Bounded host context for one file-view layout request. */
+export interface ExtensionFileViewLayoutContext {
+  /** Available terminal columns. Layout must be deterministic for this width. */
+  width: number;
+  /** Aborts when a resize, reload, selection change, or extension reload supersedes this work. */
+  signal: AbortSignal;
+}
+
+/** A host-rendered alternative presentation for an individual file in the review stream. */
+export interface ExtensionFileView {
+  id: string;
+  title: string;
+  matches(file: ExtensionDiffFile): boolean;
+  /** Return `null` whenever the view cannot safely present this file; Hunk renders raw diff. */
+  layout(
+    input: ExtensionFileViewInput,
+    context: ExtensionFileViewLayoutContext,
+  ): ExtensionFileViewLayout | null | Promise<ExtensionFileViewLayout | null>;
+}
 
 /* -------------------------------------------------------------------------- */
 /* Theme config tables                                                         */
@@ -769,14 +884,15 @@ export interface ExtensionCommand {
    * cannot shadow one of Hunk's, whichever id an extension is installed under.
    */
   id: string;
-  /**
-   * Human-readable name, shown as the command's item in the Extensions menu.
-   *
-   * Every registered command is listed there with the key it currently answers
-   * to, so a command is reachable by mouse even when it ships without a chord
-   * or the one it wanted was already taken.
-   */
+  /** Human-readable name for command menus and keyboard help. */
   title: string;
+  /**
+   * Whether to list this command in the Extensions menu. Defaults to true.
+   *
+   * Use false for a keyboard-only convenience action when another host-owned
+   * control already exposes the same operation.
+   */
+  showInMenu?: boolean;
   /**
    * Default key chord, e.g. `"ctrl+m"`, `"F2"`, `"G"`, `"y"`, or an array of
    * chords to bind the command to every one of them.
@@ -808,6 +924,16 @@ export interface ExtensionSidebarControls {
   close(viewId: string): void;
   toggle(viewId: string): void;
   isOpen(viewId: string): boolean;
+}
+
+/** Select or inspect the active file presentation from an extension command. */
+export interface ExtensionFileViewControls {
+  /** Select this extension's matching view (or `"raw"`) for the current file. */
+  select(viewId: string): void;
+  /** Switch this extension's view on/off, returning to raw when it was active. */
+  toggle(viewId: string): void;
+  /** Report whether this extension's view is active for the current file. */
+  isActive(viewId: string): boolean;
 }
 
 /**
@@ -898,6 +1024,8 @@ export interface ExtensionDialogs {
 /** What a command handler receives when its key fires. */
 export interface ExtensionCommandContext extends ExtensionContext {
   sidebars: ExtensionSidebarControls;
+  /** Host-owned selection controls for alternate file presentations. */
+  fileViews: ExtensionFileViewControls;
   /**
    * Where the review was pointing when this command fired.
    *
@@ -1031,7 +1159,15 @@ export interface HunkExtensionAPI {
    */
   registerSidebarView(view: ExtensionSidebarView): void;
   /**
-   * Register one named command, optionally bound to a key.
+   * Register a host-rendered alternative presentation for matching files.
+   *
+   * The host owns row measurement, scrolling, windowing, selection, and note
+   * placement. A file view returns only symbolic text rows and hunk/source
+   * geometry; it never mounts arbitrary React content in the review stream.
+   */
+  registerFileView(view: ExtensionFileView): void;
+  /**
+   * Register one named command, optionally bound to a key,
    *
    * The handler runs when the key fires outside modal UI (dialogs, menus,
    * focused inputs own their keys first). Handlers receive the standard

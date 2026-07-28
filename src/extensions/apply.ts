@@ -9,6 +9,7 @@ import type {
   ExtensionLoadResult,
   ExtensionRegistry,
   RegisteredCommand,
+  RegisteredFileView,
   RegisteredSidebarView,
 } from "./types";
 
@@ -148,6 +149,40 @@ export function resolveExtensionSidebarViews(
   return { views, issues };
 }
 
+/** Derive the key one file view is addressed by everywhere in the app. */
+export function fileViewKey(registered: RegisteredFileView) {
+  return `${registered.extensionId}:${registered.view.id}`;
+}
+
+/** The file views one session offers, plus registrations skipped as duplicates. */
+export interface ResolvedExtensionFileViews {
+  views: RegisteredFileView[];
+  issues: ExtensionApplyIssue[];
+}
+
+/** Resolve file-view identities while retaining registration order as the priority rule. */
+export function resolveExtensionFileViews(registry: ExtensionRegistry): ResolvedExtensionFileViews {
+  const views: RegisteredFileView[] = [];
+  const issues: ExtensionApplyIssue[] = [];
+  const claimed = new Set<string>();
+
+  for (const registered of registry.fileViews) {
+    const key = fileViewKey(registered);
+    if (claimed.has(key)) {
+      issues.push({
+        extensionId: registered.extensionId,
+        message: `Skipped duplicate file view "${key}" from extension ${registered.extensionId}`,
+      });
+      continue;
+    }
+
+    claimed.add(key);
+    views.push(registered);
+  }
+
+  return { views, issues };
+}
+
 /** The commands one session offers, plus the registrations skipped as duplicates. */
 export interface ResolvedExtensionCommands {
   commands: RegisteredCommand[];
@@ -212,10 +247,17 @@ export function applyExtensionRegistrations(
   // duplicate registrations surface through the same notice path as every
   // other refusal.
   const sidebars = resolveExtensionSidebarViews(result.registry);
+  const fileViews = resolveExtensionFileViews(result.registry);
   const commands = resolveExtensionCommands(result.registry);
   return {
     vcsAdapters: vcs.adapters,
-    issues: [...languageIssues, ...vcs.issues, ...sidebars.issues, ...commands.issues],
+    issues: [
+      ...languageIssues,
+      ...vcs.issues,
+      ...sidebars.issues,
+      ...fileViews.issues,
+      ...commands.issues,
+    ],
   };
 }
 

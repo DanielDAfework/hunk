@@ -31,7 +31,7 @@ import type {
 } from "../core/types";
 import { canReloadInput } from "../core/watch";
 import { sanitizeTerminalLine } from "../lib/terminalText";
-import { resolveExtensionCommands } from "../extensions/apply";
+import { resolveExtensionCommands, resolveExtensionFileViews } from "../extensions/apply";
 import {
   emitExtensionCustomEvent,
   emitExtensionEvent,
@@ -41,6 +41,7 @@ import { writeExtensionTrust } from "../extensions/trust";
 import type {
   ExtensionCommandContext,
   ExtensionEventContext,
+  ExtensionFileViewControls,
   ExtensionReviewNote,
   ExtensionSidebarControls,
   RegisteredCommand,
@@ -80,6 +81,9 @@ import { buildAppMenus } from "./lib/appMenus";
 import { buildExtensionAppCommands, extensionCommandKeyDefaults } from "./lib/extensionCommands";
 import { createExtensionDialogQueue } from "./lib/extensionDialogs";
 import { buildExtensionReviewSelection } from "./lib/extensionSelection";
+import { getBundledFileViewExtension } from "../extensions/default/ui/fileViews";
+import { useFileViewLayouts, registeredFileViewKey } from "./fileViews/useFileViews";
+import { reconcileFileViewSelections, selectFileView } from "./fileViews/state";
 import { createExtensionSidebarKeybindings, resolveCommandKeys } from "./lib/keymap";
 import {
   buildSessionSidebarViews,
@@ -338,6 +342,31 @@ export function App({
   const selectedFile = review.selectedFile;
   const selectedHunkIndex = review.selectedHunkIndex;
   const selectedFileId = selectedFile?.id ?? null;
+  // File presentations are per-file, survive filtering, and are reconciled against a reload's
+  // stable ids. Raw is implicit, so an empty state is the guaranteed default/fallback.
+  const bundledFileViewExtension = getBundledFileViewExtension();
+  const sessionFileViews = useMemo(
+    () => [
+      ...bundledFileViewExtension.views,
+      ...(extensions ? resolveExtensionFileViews(extensions.registry).views : []),
+    ],
+    [bundledFileViewExtension, extensions],
+  );
+  const [fileViewSelections, setFileViewSelections] = useState<Record<string, string>>({});
+  const fileViewSelectionsRef = useRef(fileViewSelections);
+  fileViewSelectionsRef.current = fileViewSelections;
+  const sessionFileViewsRef = useRef(sessionFileViews);
+  sessionFileViewsRef.current = sessionFileViews;
+  useEffect(() => {
+    const viewKeys = new Set(sessionFileViews.map(registeredFileViewKey));
+    setFileViewSelections((current) =>
+      reconcileFileViewSelections(
+        current,
+        reviewFiles.map((file) => file.id),
+        viewKeys,
+      ),
+    );
+  }, [reviewFiles, sessionFileViews]);
   // The one conversion of the visible review files into the frozen views every
   // extension surface sees: sidebar props and command-handler selection both
   // read from this list, so they can never describe the review differently.
@@ -509,6 +538,85 @@ export function App({
     [extensions, setSidebarOpen],
   );
 
+  /** Build host-owned file-presentation controls for one extension command. */
+  const createFileViewControls = useCallback(
+    (extensionId: string): ExtensionFileViewControls => {
+      const resolve = (viewId: string) => {
+        if (viewId === "raw") return null;
+        const key = viewId.includes(":") ? viewId : `${extensionId}:${viewId}`;
+        return (
+          sessionFileViewsRef.current.find((view) => registeredFileViewKey(view) === key) ?? null
+        );
+      };
+      const selectedId = () => extensionSelectionInputsRef.current.selectedFileId;
+      const select = (viewId: string) => {
+        const fileId = selectedId();
+        if (!fileId) {
+          extensions?.context.notify(
+            `Extension ${extensionId} cannot select a file view without a selected file`,
+            "warning",
+          );
+          return;
+        }
+        const registered = resolve(viewId);
+        if (viewId !== "raw" && !registered) {
+          extensions?.context.notify(
+            `Extension ${extensionId} targeted unknown file view "${viewId}"`,
+            "warning",
+          );
+          return;
+        }
+        if (registered) {
+          const selected = getExtensionSelection().file;
+          try {
+            if (!selected || !registered.view.matches(selected)) {
+              extensions?.context.notify(
+                `File view "${viewId}" does not match the selected file • using raw diff`,
+                "warning",
+              );
+              return;
+            }
+          } catch {
+            extensions?.context.notify(
+              `Extension ${registered.extensionId} file view "${registered.view.id}" failed matching the selected file`,
+              "warning",
+            );
+            return;
+          }
+        }
+        setFileViewSelections((current) =>
+          selectFileView(current, fileId, registered ? registeredFileViewKey(registered) : null),
+        );
+      };
+      return {
+        select,
+        toggle(viewId: string) {
+          const registered = resolve(viewId);
+          const fileId = selectedId();
+          if (
+            fileId &&
+            registered &&
+            fileViewSelectionsRef.current[fileId] === registeredFileViewKey(registered)
+          ) {
+            select("raw");
+          } else {
+            select(viewId);
+          }
+        },
+        isActive(viewId: string) {
+          const registered = resolve(viewId);
+          const fileId = selectedId();
+          return Boolean(
+            fileId &&
+            registered &&
+            fileViewSelectionsRef.current[fileId] === registeredFileViewKey(registered),
+          );
+        },
+      };
+    },
+    [extensions, getExtensionSelection],
+  );
+
   /**
    * Reveal the sidebar area, assigned each render once the responsive layout
    * is known (the controls above are created before it is computed).
@@ -627,6 +735,7 @@ export function App({
         cwd: extensions?.context.cwd ?? process.cwd(),
         notify: (message, type) => extensions?.context.notify(message, type),
         sidebars: createSidebarControls(registered.extensionId),
+        fileViews: createFileViewControls(registered.extensionId),
         // Snapshot semantics: built when the key fires, so the handler sees
         // where the review was at that moment, even if it awaits and the user
         // navigates on.
@@ -649,12 +758,21 @@ export function App({
     // `getExtensionSelection` is identity-stable (it reads refs), so the
     // dispatch table, keymap, and Extensions menu derived from this callback
     // do not rebuild on every `[`/`]` press.
-    [createSidebarControls, extensionDialogQueue, extensions, getExtensionSelection],
+    [
+      createFileViewControls,
+      createSidebarControls,
+      extensionDialogQueue,
+      extensions,
+      getExtensionSelection,
+    ],
   );
 
   const registeredExtensionCommands = useMemo(
-    () => (extensions ? resolveExtensionCommands(extensions.registry).commands : []),
-    [extensions],
+    () => [
+      ...bundledFileViewExtension.commands,
+      ...(extensions ? resolveExtensionCommands(extensions.registry).commands : []),
+    ],
+    [bundledFileViewExtension, extensions],
   );
   // The session keymap: every bindable command's defaults folded against the
   // user's `[keybindings]` table, once. Matchers, key labels, and extension
@@ -682,6 +800,16 @@ export function App({
       }),
     [registeredExtensionCommands, resolvedCommandKeys, runExtensionCommand],
   );
+  // Commands may opt out of the Extensions menu while remaining available to
+  // keyboard help and their configured shortcut.
+  const extensionMenuCommands = useMemo(() => {
+    const visibleCommandIds = new Set(
+      registeredExtensionCommands
+        .filter((registered) => registered.command.showInMenu !== false)
+        .map((registered) => `${registered.extensionId}.${registered.command.id}`),
+    );
+    return extensionAppCommands.commands.filter((command) => visibleCommandIds.has(command.id));
+  }, [extensionAppCommands.commands, registeredExtensionCommands]);
   // Sidebar views receive the dispatcher’s effective keys, including command
   // conflicts, rather than independently resolving their default bindings.
   const sidebarKeybindings = useMemo(() => {
@@ -826,6 +954,13 @@ export function App({
     anchorSide: "new",
     layout: resolvedLayout,
     width: diffContentWidth,
+  });
+  const fileViewLayouts = useFileViewLayouts({
+    files: filteredFiles,
+    selections: fileViewSelections,
+    views: sessionFileViews,
+    width: diffContentWidth,
+    onIssue: showSessionNotice,
   });
 
   useHunkSessionBridge({
@@ -1505,6 +1640,40 @@ export function App({
     ...extensionAppCommands.commands,
   ];
 
+  const selectedFileViewEntries = useMemo(() => {
+    if (!selectedFile) return [];
+    const publicFile = getExtensionFileViews().find((file) => file.id === selectedFile.id);
+    if (!publicFile) return [];
+    const active = fileViewSelections[selectedFile.id];
+    const entries = [
+      {
+        kind: "item" as const,
+        label: "File presentation: Raw diff",
+        commandId: "hunk.view.filePresentation.raw",
+        checked: active === undefined,
+        action: () =>
+          setFileViewSelections((current) => selectFileView(current, selectedFile.id, null)),
+      },
+    ];
+    for (const registered of sessionFileViews) {
+      try {
+        if (!registered.view.matches(publicFile)) continue;
+      } catch {
+        continue;
+      }
+      const key = registeredFileViewKey(registered);
+      entries.push({
+        kind: "item" as const,
+        label: `File presentation: ${registered.view.title}`,
+        commandId: `hunk.view.filePresentation.${key}`,
+        checked: active === key,
+        action: () =>
+          setFileViewSelections((current) => selectFileView(current, selectedFile.id, key)),
+      });
+    }
+    return entries;
+  }, [fileViewSelections, getExtensionFileViews, selectedFile, sessionFileViews]);
+
   // Menus name commands rather than repeating them: every item's key hint and
   // action come from the table above, so a remapped shortcut shows its new key
   // and a menu item can never drift from the command it claims to run. Built
@@ -1512,7 +1681,8 @@ export function App({
   // hints and the checkbox state have to stay live.
   const menus = buildAppMenus({
     commands: appCommands,
-    extensionCommands: extensionAppCommands.commands,
+    extensionCommands: extensionMenuCommands,
+    fileViewEntries: selectedFileViewEntries,
     copyDecorations,
     layoutMode,
     renderSidebar,
@@ -1763,6 +1933,7 @@ export function App({
           copyDecorations={copyDecorations}
           diffContentWidth={diffContentWidth}
           expandedGapsByFileId={review.expandedGapsByFileId}
+          fileViews={fileViewLayouts}
           files={filteredFiles}
           pagerMode={pagerMode}
           screenLeft={diffPaneScreenLeft}

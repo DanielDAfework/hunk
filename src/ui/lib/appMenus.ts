@@ -32,6 +32,8 @@ export interface BuildAppMenusOptions {
   commands: readonly AppCommand[];
   /** The extension-contributed subset, in registration order, for the Extensions menu. */
   extensionCommands?: readonly AppCommand[];
+  /** Host-owned per-file presentation choices appended to View. */
+  fileViewEntries?: readonly MenuEntry[];
   copyDecorations: boolean;
   layoutMode: LayoutMode;
   renderSidebar: boolean;
@@ -118,6 +120,7 @@ function toExtensionMenuEntries(
 export function buildAppMenus({
   commands,
   extensionCommands = [],
+  fileViewEntries = [],
   copyDecorations,
   layoutMode,
   renderSidebar,
@@ -184,11 +187,15 @@ export function buildAppMenus({
     help: [{ commandId: "hunk.app.toggleHelp", label: "Controls help", checked: showHelp }],
   };
 
+  if (fileViewEntries.length > 0) {
+    specs.view.push(SEPARATOR);
+  }
+
   const extensions = toExtensionMenuEntries(commands, extensionCommands);
 
   return {
     file: toMenuEntries(commands, specs.file),
-    view: toMenuEntries(commands, specs.view),
+    view: [...toMenuEntries(commands, specs.view), ...fileViewEntries],
     navigate: toMenuEntries(commands, specs.navigate),
     agent: toMenuEntries(commands, specs.agent),
     // No extension commands means no menu at all, rather than an empty dropdown.

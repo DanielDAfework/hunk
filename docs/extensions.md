@@ -646,6 +646,70 @@ Snapshots must be immutable — replace the set instead of mutating it, so
 `useSyncExternalStore` can compare references. Storing state in a hook inside
 the component instead would lose it every time the pane closes and unmounts.
 
+### `hunk.registerFileView(view)` (experimental)
+
+A file view is an alternate **host-rendered** presentation of one file in the
+same top-to-bottom review stream. It is not a React component: Hunk owns row
+measurement, scrolling/windowing, hunk navigation, and fallback to Pierre's raw
+diff. Raw is always the default; users select a matching view from **View** for
+the selected file. Hunk's bundled Markdown view also toggles with `Ctrl+G`.
+
+```ts
+import type { HunkExtensionAPI } from "hunkdiff/extension";
+
+export default function (hunk: HunkExtensionAPI) {
+  hunk.registerFileView({
+    id: "plain-markdown",
+    title: "Plain Markdown",
+    matches: (file) => file.path.endsWith(".md"),
+    async layout(input, { width, signal }) {
+      const document = await input.documents.read("new", signal);
+      if (!document || document.text.length > 100_000) return null;
+
+      const rows = document.text.split("\n").map((text, index) => ({
+        id: `line:${index + 1}`,
+        spans: [{ text: text || " ", style: "plain" as const }],
+      }));
+      if (rows.length === 0) return null;
+
+      return {
+        rows,
+        hunks: (input.file.hunks ?? []).map((hunk) => ({
+          index: hunk.index,
+          startRow: Math.max(0, (hunk.newRange?.[0] ?? 1) - 1),
+          endRow: Math.min(rows.length - 1, (hunk.newRange?.[1] ?? 1) - 1),
+        })),
+        sourceAnchors: rows.map((_, index) => ({
+          side: "new" as const,
+          line: index + 1,
+          row: index,
+        })),
+      };
+    },
+  });
+}
+```
+
+`input.file` is the same frozen public `ExtensionDiffFile` sidebars receive.
+`input.changes` exposes typed added, removed, and context ranges without
+Pierre metadata. `documents.read("old" | "new")` is lazy and cached by Hunk;
+it resolves an exact document or `null` when that side is absent, unavailable,
+too large, or fails to load. Never treat `null` as an exception: return `null`
+from `layout` to keep raw diff active.
+
+Layouts use symbolic spans (`plain`, `muted`, `heading`, `quote`, `code`,
+`table`, `added`, `removed`) that Hunk colors only while rendering, so
+measurement is theme-independent. Every parsed hunk needs one in-bounds,
+inclusive row range. Source anchors are optional; without them Hunk uses the
+hunk range for placement. Invalid, oversized, cancelled, or throwing layouts
+are isolated with one warning and fall back to raw diff.
+
+A command handler can control the selected file's view through
+`ctx.fileViews.select("view-id")`, `toggle("view-id")`, and
+`isActive("view-id")`; pass `"raw"` to `select` to restore raw rendering.
+Bare ids address the calling extension; use `"other-extension:view-id"` to
+address another registered view.
+
 ### `hunk.registerCommand(command, handler)`
 
 Register a named command, optionally bound to a key. Commands are not a
@@ -691,12 +755,13 @@ and friends. See [docs/keybindings.md](keybindings.md) for the rules; the
 practical consequence is that a chord you declare may not be the chord your
 command ends up on.
 
-Every registered command is also listed in the menu bar's **Extensions** menu,
-under its `title`, showing whichever key it currently answers to. The menu
-appears only when something registered a command, entries are grouped by
-extension in load order, and running one from the menu is the same dispatch the
-key would have done — so a command with no `key`, or one whose chord was
-refused, is still reachable with the mouse.
+Commands are listed in the menu bar's **Extensions** menu under their `title`,
+showing whichever key they currently answer to. Set `showInMenu: false` for a
+keyboard-only convenience action when another host-owned control already exposes
+the operation. The menu appears only when at least one command is shown, entries
+are grouped by extension in load order, and running one from the menu is the
+same dispatch the key would have done — so a visible command with no `key`, or
+one whose chord was refused, is still reachable with the mouse.
 
 The handler fires when the key is pressed outside modal UI — dialogs, menus,
 and focused text inputs own their keys first, and pager mode does not dispatch
@@ -955,6 +1020,13 @@ Record a diagnostic line. Logs are collected per extension rather than written
 to the terminal, because the TUI owns the screen.
 
 ## A complete example
+
+For a larger user-installable extension, see
+[`examples/extensions/review-triage/`](../examples/extensions/review-triage/): a
+session-local hunk triage board that combines a sidebar, Extensions-menu
+commands, host-rendered dialogs, lifecycle listeners, and the extension event
+bus. Its API evaluation and follow-up opportunities are recorded in
+[Extension API field notes](extension-api-evaluation.md).
 
 Collapse lockfiles and generated output out of every review, and say how many
 files were hidden.

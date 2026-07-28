@@ -59,6 +59,8 @@ import { DiffSection } from "./DiffSection";
 import { DiffFileHeaderRow } from "./DiffFileHeaderRow";
 import { VerticalScrollbar, type VerticalScrollbarHandle } from "../scrollbar/VerticalScrollbar";
 import type { VisibleBodyBounds } from "../../diff/rowWindowing";
+import type { ResolvedFileViewLayout } from "../../fileViews/useFileViews";
+import { measureFileViewGeometry } from "../../fileViews/geometry";
 import { prefetchHighlightedDiff } from "../../diff/useHighlightedDiff";
 import {
   buildFileRenderWindow,
@@ -174,6 +176,7 @@ function buildHighlightPrefetchFileIds({
 
 const EMPTY_EXPANDED_GAP_KEYS: ReadonlySet<string> = new Set();
 const EMPTY_EXPANDED_GAPS_BY_FILE_ID: Record<string, ReadonlySet<string>> = {};
+const EMPTY_FILE_VIEWS: ReadonlyMap<string, ResolvedFileViewLayout> = new Map();
 const EMPTY_SOURCE_STATUS_BY_FILE_ID: Record<string, FileSourceStatus> = {};
 const NOOP_TOGGLE_GAP = () => {};
 
@@ -182,6 +185,7 @@ export function DiffPane({
   codeHorizontalOffset = 0,
   diffContentWidth,
   expandedGapsByFileId = EMPTY_EXPANDED_GAPS_BY_FILE_ID,
+  fileViews = EMPTY_FILE_VIEWS,
   files,
   headerLabelWidth,
   headerStatsWidth,
@@ -230,6 +234,8 @@ export function DiffPane({
   codeHorizontalOffset?: number;
   diffContentWidth: number;
   expandedGapsByFileId?: Record<string, ReadonlySet<string>>;
+  /** Validated alternate layouts, keyed by file id; raw Pierre remains the fallback. */
+  fileViews?: ReadonlyMap<string, ResolvedFileViewLayout>;
   files: DiffFile[];
   headerLabelWidth: number;
   headerStatsWidth: number;
@@ -675,8 +681,14 @@ export function DiffPane({
 
   const baseSectionGeometry = useMemo(
     () =>
-      files.map((file) =>
-        measureDiffSectionGeometry(
+      files.map((file) => {
+        // Inline notes have one shared raw-diff planning path today. Retain raw rendering for
+        // annotated files rather than letting an alternate layout silently lose notes.
+        const fileView = allAgentNotesByFile.has(file.id) ? undefined : fileViews.get(file.id);
+        if (fileView) {
+          return measureFileViewGeometry(file, fileView.layout, diffContentWidth);
+        }
+        return measureDiffSectionGeometry(
           file,
           layout,
           showHunkHeaders,
@@ -689,11 +701,13 @@ export function DiffPane({
           sourceStatusByFileId[file.id],
           reserveAddNoteColumn,
           tabWidth,
-        ),
-      ),
+        );
+      }),
     [
+      allAgentNotesByFile,
       diffContentWidth,
       expandedGapsByFileId,
+      fileViews,
       files,
       layout,
       reserveAddNoteColumn,
@@ -740,6 +754,7 @@ export function DiffPane({
       baseSectionGeometry,
       diffContentWidth,
       expandedGapsByFileId,
+      fileViews,
       files,
       layout,
       reserveAddNoteColumn,
@@ -1867,6 +1882,9 @@ export function DiffPane({
                       codeHorizontalOffset={codeHorizontalOffset}
                       expandedGapKeys={expandedGapsByFileId[file.id] ?? EMPTY_EXPANDED_GAP_KEYS}
                       file={file}
+                      fileView={
+                        allAgentNotesByFile.has(file.id) ? undefined : fileViews.get(file.id)
+                      }
                       headerLabelWidth={headerLabelWidth}
                       headerStatsWidth={headerStatsWidth}
                       layout={layout}

@@ -159,6 +159,50 @@ describe("registerSidebarView", () => {
   });
 });
 
+describe("registerFileView", () => {
+  test("collects a host-rendered layout callback under the owning extension", () => {
+    const registry = createEmptyExtensionRegistry();
+    const issues: ExtensionLoadIssue[] = [];
+    const layout = () => null;
+
+    runExtensionFactory({
+      metadata: bundledMetadata("presentation"),
+      registry,
+      issues,
+      factory: (hunk) => {
+        hunk.registerFileView({
+          id: "plain",
+          title: "Plain",
+          matches: () => true,
+          layout,
+        });
+      },
+    });
+
+    expect(issues).toEqual([]);
+    expect(registry.fileViews).toHaveLength(1);
+    expect(registry.fileViews[0]?.extensionId).toBe("presentation");
+    expect(registry.fileViews[0]?.view.layout).toBe(layout);
+  });
+
+  test("rejects a file view without a layout function", () => {
+    const registry = createEmptyExtensionRegistry();
+    const issues: ExtensionLoadIssue[] = [];
+
+    runExtensionFactory({
+      metadata: bundledMetadata("broken-presentation"),
+      registry,
+      issues,
+      factory: (hunk) => {
+        hunk.registerFileView({ id: "plain", title: "Plain", matches: () => true } as never);
+      },
+    });
+
+    expect(registry.fileViews).toEqual([]);
+    expect(issues[0]?.message).toContain("layout() function");
+  });
+});
+
 describe("hunk.events", () => {
   test("registers a bus listener under its owning extension", () => {
     const registry = createEmptyExtensionRegistry();
@@ -287,6 +331,26 @@ describe("registerCommand", () => {
 
     expect(emptyRegistry.commands).toEqual([]);
     expect(emptyIssues[0]?.message).toContain("non-empty chord string or array");
+  });
+
+  test("rejects a non-boolean showInMenu value", () => {
+    const registry = createEmptyExtensionRegistry();
+    const issues: ExtensionLoadIssue[] = [];
+
+    runExtensionFactory({
+      metadata: bundledMetadata("bad-menu-visibility"),
+      registry,
+      issues,
+      factory: (hunk) => {
+        hunk.registerCommand(
+          { id: "toggle", title: "Toggle", showInMenu: "no" as never },
+          () => {},
+        );
+      },
+    });
+
+    expect(registry.commands).toEqual([]);
+    expect(issues[0]?.message).toContain("showInMenu must be a boolean");
   });
 
   test("rejects a command without a handler function", () => {

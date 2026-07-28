@@ -12,6 +12,7 @@ import {
   type ExtensionMetadata,
   type ExtensionRegistry,
   type ExtensionSidebarView,
+  type ExtensionFileView,
   type ExtensionThemeConfig,
   type ExtensionVcsAdapter,
   type HunkExtensionAPI,
@@ -216,6 +217,7 @@ interface RegistrySnapshot {
   vcsAdapters: number;
   changesetTransforms: number;
   sidebarViews: number;
+  fileViews: number;
   commands: number;
   eventHandlers: Record<string, number>;
   customEventHandlers: number;
@@ -235,6 +237,7 @@ function snapshotRegistry(registry: ExtensionRegistry): RegistrySnapshot {
     vcsAdapters: registry.vcsAdapters.length,
     changesetTransforms: registry.changesetTransforms.length,
     sidebarViews: registry.sidebarViews.length,
+    fileViews: registry.fileViews.length,
     commands: registry.commands.length,
     eventHandlers,
     customEventHandlers: registry.customEventHandlers.length,
@@ -254,6 +257,7 @@ function rollbackRegistry(registry: ExtensionRegistry, snapshot: RegistrySnapsho
   registry.vcsAdapters.length = snapshot.vcsAdapters;
   registry.changesetTransforms.length = snapshot.changesetTransforms;
   registry.sidebarViews.length = snapshot.sidebarViews;
+  registry.fileViews.length = snapshot.fileViews;
   registry.commands.length = snapshot.commands;
   registry.customEventHandlers.length = snapshot.customEventHandlers;
   registry.pendingCustomEvents.length = snapshot.pendingCustomEvents;
@@ -362,6 +366,19 @@ export function createExtensionApi(
 
       registry.sidebarViews.push({ extensionId: metadata.id, view });
     },
+    registerFileView(view: ExtensionFileView) {
+      assertOpen("registerFileView");
+      assertNonEmptyString(view?.id, "registerFileView requires a view with a non-empty id.");
+      assertNonEmptyString(view?.title, "registerFileView requires a view with a non-empty title.");
+      if (typeof view.matches !== "function") {
+        throw new Error("registerFileView requires a matches() function.");
+      }
+      if (typeof view.layout !== "function") {
+        throw new Error("registerFileView requires a layout() function.");
+      }
+
+      registry.fileViews.push({ extensionId: metadata.id, view });
+    },
     registerCommand(command: ExtensionCommand, handler: ExtensionCommandHandler) {
       assertOpen("registerCommand");
       assertNonEmptyString(command?.id, "registerCommand requires a command with a non-empty id.");
@@ -371,6 +388,9 @@ export function createExtensionApi(
       );
       if (typeof handler !== "function") {
         throw new Error("registerCommand requires a handler function.");
+      }
+      if (command.showInMenu !== undefined && typeof command.showInMenu !== "boolean") {
+        throw new Error("registerCommand showInMenu must be a boolean when provided.");
       }
 
       // Parse every chord at registration so a typo fails the author loudly
