@@ -13,7 +13,8 @@ src/core/            normalized review model, loading, patch handling, VCS contr
 src/core/vcs/        VCS-specific helpers and adapter-facing support code
 src/extensions/      extension host, registry, trust, lifecycle, and bundled extensions
 src/session/         shared session protocol, schemas, types, agent surface, app bridge, and broker transport
-src/session/agent/   agent-facing session CLI, command manifest, errors, and capability checks
+src/session/client/  shared session-daemon HTTP and compatibility client support
+src/session/agent/   agent-facing session CLI, command manifest, errors, and formatting
 src/session/app/     mounted-review registration, bridge, and reload authorization
 src/session/broker/  local daemon transport, launcher, Hunk broker state, wire parsing, projections
 src/ui/              interactive review application, rendering, interaction, and chrome

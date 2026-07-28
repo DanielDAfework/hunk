@@ -13,7 +13,7 @@ import {
   setSessionCommandTestHooks,
   type HunkDaemonCliClient,
 } from "./commands";
-import { HUNK_DAEMON_UPGRADE_RESTART_NOTICE } from "./capabilities";
+import { HUNK_DAEMON_UPGRADE_RESTART_NOTICE } from "../client/capabilities";
 import { HUNK_SESSION_API_VERSION, HUNK_SESSION_DAEMON_VERSION } from "../protocol";
 
 function createTestListedSession(sessionId: string) {

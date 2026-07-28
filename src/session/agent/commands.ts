@@ -31,7 +31,7 @@ import {
   stringifyJson,
   type HunkSessionCliClient,
 } from "./cliClient";
-import { reportHunkDaemonUpgradeRestart } from "./capabilities";
+import { reportHunkDaemonUpgradeRestart } from "../client/capabilities";
 import { HUNK_SESSION_API_VERSION, type SessionDaemonAction } from "../protocol";
 
 const REQUIRED_ACTION_BY_COMMAND: Record<SessionCommandInput["action"], SessionDaemonAction> = {

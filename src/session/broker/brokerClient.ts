@@ -22,7 +22,7 @@ import {
 import {
   readHunkSessionDaemonCapabilities,
   reportHunkDaemonUpgradeRestart,
-} from "../agent/capabilities";
+} from "../client/capabilities";
 
 const DAEMON_STARTUP_TIMEOUT_MS = 3_000;
 const RECONNECT_DELAY_MS = 3_000;

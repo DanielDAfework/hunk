@@ -1,7 +1,10 @@
 import { resolveSessionBrokerConfig } from "../broker/brokerConfig";
 import type { SessionTerminalLocation, SessionTerminalMetadata } from "@hunk/session-broker-core";
-import { readHunkSessionDaemonCapabilities } from "./capabilities";
-import { HUNK_SESSION_DAEMON_HTTP_TIMEOUT_MS, requestSessionDaemonHttp } from "./daemonHttp";
+import { readHunkSessionDaemonCapabilities } from "../client/capabilities";
+import {
+  HUNK_SESSION_DAEMON_HTTP_TIMEOUT_MS,
+  requestSessionDaemonHttp,
+} from "../client/daemonHttp";
 import {
   HUNK_SESSION_API_PATH,
   type SessionDaemonCapabilities,
