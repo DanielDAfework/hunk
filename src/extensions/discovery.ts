@@ -6,7 +6,7 @@ import { findVcsRepoRootCandidate } from "../core/vcs";
 import { deriveExtensionId, type ExtensionCandidate, type ExtensionOrigin } from "./types";
 
 /** Entry-file suffixes Hunk will import directly, in preference order. */
-const EXTENSION_ENTRY_SUFFIXES = [".ts", ".js", ".mjs"] as const;
+const EXTENSION_ENTRY_SUFFIXES = [".ts", ".tsx", ".js", ".jsx", ".mjs"] as const;
 const EXTENSION_INDEX_BASENAMES = EXTENSION_ENTRY_SUFFIXES.map((suffix) => `index${suffix}`);
 /** `package.json` field a folder extension declares its entry files under. */
 const EXTENSION_MANIFEST_FIELD = "hunk";
@@ -146,8 +146,8 @@ function deriveManifestEntryIds(paths: readonly string[]) {
 /**
  * Resolve the entry files of one folder extension.
  *
- * A `package.json` manifest wins over the `index.{ts,js,mjs}` fallback, and may
- * declare several entries. A manifest that declares no usable entry is treated
+ * A `package.json` manifest wins over the `index.*` entry-suffix fallback, and
+ * may declare several entries. A manifest that declares no usable entry is treated
  * as no manifest at all, so such a folder still loads its index if it has one.
  *
  * A single-entry manifest keeps the folder's name as the extension id — the
@@ -181,10 +181,10 @@ function resolveFolderExtensionEntries(dir: string): DiscoveredExtensionEntry[] 
 /**
  * Scan one extensions directory for entry files.
  *
- * Matches `<dir>/*.{ts,js,mjs}` plus exactly one level of folder extensions —
- * either a `package.json` manifest or `<dir>/<name>/index.{ts,js,mjs}` — so
- * folder extensions can keep helper modules beside their entry file without
- * being scanned as entries themselves.
+ * Matches `<dir>/*.{ts,tsx,js,jsx,mjs}` plus exactly one level of folder
+ * extensions — either a `package.json` manifest or an `index.*` file with one
+ * of those suffixes — so folder extensions can keep helper modules beside
+ * their entry file without being scanned as entries themselves.
  */
 function scanExtensionsDir(dir: string): DiscoveredExtensionEntry[] {
   const entries: DiscoveredExtensionEntry[] = [];
@@ -230,7 +230,7 @@ function expandHomePath(path: string) {
  * Expand one explicit path into entry files.
  *
  * A directory that resolves as a folder extension — by `package.json` manifest
- * or by its own `index.{ts,js,mjs}` — expands to just those entries: its helper
+ * or by its own `index.*` entry file — expands to just those entries: its helper
  * modules sit beside the entry file and must not be loaded as separate
  * extensions. Only a directory that is not a folder extension is a container of
  * extensions and gets scanned. Anything else is taken as a literal entry file so

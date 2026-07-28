@@ -66,6 +66,44 @@ describe("extension discovery", () => {
     expect(candidates.every((candidate) => candidate.origin === "global")).toBe(true);
   });
 
+  test("discovers .tsx and .jsx entries everywhere .ts entries are discovered", () => {
+    // The runtime transpiler has always accepted TSX; discovery used to be the
+    // only gap, forcing a manifest just to name an `index.tsx`.
+    const globalDir = createTempDir("hunk-ext-tsx-");
+    const standaloneTsx = writeExtensionFile(globalDir, "alpha.tsx");
+    const standaloneJsx = writeExtensionFile(globalDir, "beta.jsx");
+    const folderTsxIndex = writeExtensionFile(globalDir, "gamma", "index.tsx");
+
+    const candidates = discoverExtensions({
+      cwd: globalDir,
+      globalExtensionsDir: globalDir,
+      repoRoot: undefined,
+      env: {},
+    });
+
+    expect(candidates).toEqual([
+      { id: "alpha", path: standaloneTsx, origin: "global" },
+      { id: "beta", path: standaloneJsx, origin: "global" },
+      { id: "gamma", path: folderTsxIndex, origin: "global" },
+    ]);
+  });
+
+  test("prefers index.ts over index.tsx for a folder shipping both", () => {
+    const root = createTempDir("hunk-ext-tsx-index-order-");
+    const typescriptIndex = writeExtensionFile(root, "dual", "index.ts");
+    writeExtensionFile(root, "dual", "index.tsx");
+
+    const candidates = discoverExtensions({
+      cwd: root,
+      repoRoot: undefined,
+      globalExtensionsDir: undefined,
+      flagPaths: [join(root, "dual")],
+      env: {},
+    });
+
+    expect(candidates).toEqual([{ id: "dual", path: typescriptIndex, origin: "flag" }]);
+  });
+
   test("orders flag, user config, global, then repo-local sources", () => {
     const repo = createRepo("hunk-ext-repo-");
     const globalDir = join(repo, "global-extensions");

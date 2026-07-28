@@ -209,6 +209,45 @@ export default function (hunk: { registerFileLanguage: (e: string, l: string) =>
     ]);
   });
 
+  test("loads a discovered standalone .tsx entry with JSX in it", async () => {
+    // The docs' sidebar example is a bare `flat-sidebar.tsx` in the global
+    // extensions directory; discovery finding it and the host importing its
+    // JSX is the whole contract that example depends on.
+    const globalDir = createTempDir("hunk-host-tsx-");
+    const entryPath = writeTestFile(
+      globalDir,
+      "flat-sidebar.tsx",
+      `function FlatSidebar() {
+  return <text content="flat" />;
+}
+
+export default function (hunk: { registerSidebarView: (view: unknown) => void }) {
+  hunk.registerSidebarView({ id: "flat", component: FlatSidebar });
+}
+`,
+    );
+
+    const candidates = discoverExtensions({
+      cwd: globalDir,
+      repoRoot: undefined,
+      globalExtensionsDir: globalDir,
+      env: {},
+    });
+    const result = await loadExtensions({ candidates, cwd: globalDir });
+
+    expect(candidates).toEqual([{ id: "flat-sidebar", path: entryPath, origin: "global" }]);
+    expect(result.issues).toEqual([]);
+    expect(result.loaded).toEqual([
+      { id: "flat-sidebar", sourcePath: entryPath, origin: "global" },
+    ]);
+    expect(
+      result.registry.sidebarViews.map((entry) => ({
+        extensionId: entry.extensionId,
+        viewId: entry.view.id,
+      })),
+    ).toEqual([{ extensionId: "flat-sidebar", viewId: "flat" }]);
+  });
+
   test("awaits an async factory before sealing the API", async () => {
     const dir = createTempDir("hunk-host-async-");
     const candidate = createTestExtension(

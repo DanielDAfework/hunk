@@ -41,12 +41,14 @@ The two repo-local sources share a group number because they are one group:
 both are repo-controlled, so they share a trust decision and their paths are
 sorted together rather than one source being loaded ahead of the other.
 
-A directory source matches `*.ts`, `*.js`, `*.mjs` directly inside it, plus one
-level of folder extensions, so a folder extension can keep helper modules beside
-its entry file.
+A directory source matches `*.ts`, `*.tsx`, `*.js`, `*.jsx`, `*.mjs` directly
+inside it, plus one level of folder extensions, so a folder extension can keep
+helper modules beside its entry file.
 
 A folder is an extension if it declares its entry files in a `package.json`, or
-failing that if it has an `index.{ts,js,mjs}`. The manifest field is `hunk`:
+failing that if it has an `index.{ts,tsx,js,jsx,mjs}` (in that preference
+order, so a folder shipping both a source and a built entry resolves the same
+everywhere). The manifest field is `hunk`:
 
 ```text
 ~/.config/hunk/extensions/my-ext/
@@ -571,11 +573,70 @@ costs you the pane, not the user the session: the failure is reported as a
 toast naming your extension, the pane closes, and the built-in file navigation
 reopens if nothing else is showing.
 
+Props carry the pane's `width` but not its height: the pane is a flex cell, so
+give your root element `height="100%"` and let layout size it. For a list
+longer than the pane, a `scrollbox` scrolls it — but there is no public
+viewport data (pane rows, scroll offset), so row virtualization and
+keeping the selected row scrolled into view are not supportable in a
+third-party sidebar today. `useTerminalDimensions` from `@opentui/react`
+reports the whole terminal, which bounds the pane but is not its height. If
+your extension needs true pane geometry, say so in an issue — it is a known
+gap under consideration, not a settled boundary.
+
 The built-in sidebar is itself a bundled extension
-(`src/extensions/default/ui/sidebar/`): it registers through this exact call and
-its component consumes exactly the props documented above, so it doubles as the
-reference implementation — anything it renders (grouping, change-type icons,
-stat badges, selection follow), yours can too.
+(`src/extensions/default/ui/sidebar/`): it registers through this exact call
+and its component consumes exactly the props documented above, so it doubles as
+the reference implementation — anything it draws from those props (grouping,
+change-type icons, stat badges), yours can too. The one thing it does that the
+props alone cannot express is windowing and selection follow, which it builds
+from host-internal geometry helpers — that is the pane-geometry gap described
+above, kept honest by the dogfooding.
+
+#### Sidebar state from events
+
+Lifecycle handlers run outside React, but a sidebar component only rerenders
+when React sees a change. The recipe that connects them is a module-local store
+read through `useSyncExternalStore`: the event handler updates the store, and
+any mounted component subscribed to it rerenders — while the store keeps
+accumulating even when the pane is closed.
+
+```tsx
+import { useSyncExternalStore } from "react";
+import type { HunkExtensionAPI } from "hunkdiff/extension";
+
+let viewedPaths: ReadonlySet<string> = new Set();
+const listeners = new Set<() => void>();
+
+function markViewed(path: string) {
+  if (viewedPaths.has(path)) return;
+  viewedPaths = new Set(viewedPaths).add(path); // new reference, so React sees the change
+  for (const listener of listeners) listener();
+}
+
+function useViewedPaths() {
+  return useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    () => viewedPaths,
+  );
+}
+
+function ViewedCount() {
+  const viewed = useViewedPaths();
+  return <text content={`${viewed.size} files viewed`} />;
+}
+
+export default function (hunk: HunkExtensionAPI) {
+  hunk.on("file_viewed", ({ file }) => markViewed(file.path));
+  hunk.registerSidebarView({ id: "progress", component: ViewedCount });
+}
+```
+
+Snapshots must be immutable — replace the set instead of mutating it, so
+`useSyncExternalStore` can compare references. Storing state in a hook inside
+the component instead would lose it every time the pane closes and unmounts.
 
 ### `hunk.registerCommand(command, handler)`
 
@@ -800,6 +861,13 @@ the selection many times a second, and handlers only care where the user landed.
 `"daemon"` (an agent command through the session broker), or `"manual"` (the
 refresh key, or the reload after granting extension trust).
 
+`note_created` and `note_edited` cover notes authored in Hunk's own UI, in this
+session. Review notes are session-local state, so there is no backlog to replay
+on startup — but comments added through agent session commands do not emit
+these events, and a `session_reload` may remap or drop notes without one
+either. A list accumulated from these events is therefore "notes the user saved
+here this session", not a complete review record; present it as such.
+
 `shutdown` handlers get a short window (250ms) to finish before Hunk exits
 anyway, so treat it as best-effort flushing rather than guaranteed cleanup.
 
@@ -952,9 +1020,11 @@ repo-controlled either way.
 
 ## Not contributable yet
 
-Menu entries, user-remappable keybindings, custom note renderers, session
-commands, and CLI subcommands are not contributable yet. Commands and their
-default key bindings landed with `registerCommand` — the named-command registry
-the rest build on; see
+Menu entries, standalone keybindings (a chord contributed without a command —
+commands registered through `registerCommand` **are** already user-remappable
+via `[keybindings]`), custom note renderers, session commands, and CLI
+subcommands are not contributable yet. Commands and their default key bindings
+landed with `registerCommand` — the named-command registry the rest build on;
+see
 [docs/extension-system-exploration.md](extension-system-exploration.md) for the
 design and phasing.
