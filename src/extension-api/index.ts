@@ -55,6 +55,7 @@ export type {
   ExtensionSelectOptions,
   ExtensionNotifyType,
   ExtensionSidebarActions,
+  ExtensionSidebarKeybindings,
   ExtensionSidebarComponent,
   ExtensionSidebarControls,
   ExtensionSidebarPlacement,

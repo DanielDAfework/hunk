@@ -1,6 +1,7 @@
 import type { UserKeyBinding } from "../../core/types";
+import type { ExtensionSidebarKeybindings } from "../../extension-api/types";
 import { HUNK_VENDOR_EXTENSION_ID } from "../../extensions/extensionIds";
-import { parseKeyChord, type ParsedKeyChord } from "../../lib/commandKeys";
+import { matchesKeyChord, parseKeyChord, type ParsedKeyChord } from "../../lib/commandKeys";
 
 /**
  * Resolve which chords each command answers to, defaults against user config.
@@ -36,6 +37,43 @@ export interface KeymapIssue {
 export interface ResolvedKeymap {
   keys: Map<string, readonly string[]>;
   issues: KeymapIssue[];
+}
+
+const NO_KEY_CHORDS: readonly string[] = Object.freeze([]);
+
+/**
+ * Build the immutable keybindings manager injected into sidebar components.
+ *
+ * Components receive command ids rather than raw default chords, exactly as
+ * Pi custom components receive its `KeybindingsManager`. Capturing the
+ * resolved map here means a component's local key handling observes the same
+ * remaps, unbindings, and extension bindings as the app dispatcher.
+ */
+export function createExtensionSidebarKeybindings(
+  resolvedKeys: ReadonlyMap<string, readonly string[]>,
+): ExtensionSidebarKeybindings {
+  const keysByCommand = new Map(
+    Array.from(resolvedKeys, ([commandId, keys]) => [commandId, Object.freeze([...keys])]),
+  );
+  const parsedByCommand = new Map(
+    Array.from(keysByCommand, ([commandId, keys]) => [
+      commandId,
+      keys
+        .map((key) => parseKeyChord(key))
+        .filter((key): key is ParsedKeyChord => !("error" in key)),
+    ]),
+  );
+
+  const keybindings: ExtensionSidebarKeybindings = {
+    matches(key, commandId) {
+      return parsedByCommand.get(commandId)?.some((chord) => matchesKeyChord(chord, key)) ?? false;
+    },
+    getKeys(commandId) {
+      return keysByCommand.get(commandId) ?? NO_KEY_CHORDS;
+    },
+  };
+
+  return Object.freeze(keybindings);
 }
 
 export interface ResolveCommandKeysOptions {

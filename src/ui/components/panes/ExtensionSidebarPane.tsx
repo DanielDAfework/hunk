@@ -3,6 +3,7 @@ import type {
   ExtensionDiffFile,
   ExtensionNotifyType,
   ExtensionSidebarActions,
+  ExtensionSidebarKeybindings,
   ExtensionSidebarTheme,
   ExtensionSidebarViewProps,
 } from "../../../extension-api/types";
@@ -113,6 +114,7 @@ export function ExtensionSidebarPane({
   showTopChrome,
   theme,
   width,
+  keybindings,
   notify,
   onSelectFile,
   onSelectHunk,
@@ -137,6 +139,7 @@ export function ExtensionSidebarPane({
   showTopChrome: boolean;
   theme: AppTheme;
   width: number;
+  keybindings: ExtensionSidebarKeybindings;
   notify: ExtensionNotifySink;
   onSelectFile: (fileId: string) => void;
   onSelectHunk: (fileId: string, hunkIndex: number) => void;
@@ -223,6 +226,7 @@ export function ExtensionSidebarPane({
     selectedHunkIndex,
     width,
     theme: publicTheme,
+    keybindings,
     actions,
   };
 

@@ -74,7 +74,7 @@ import { buildAppMenus } from "./lib/appMenus";
 import { buildExtensionAppCommands, extensionCommandKeyDefaults } from "./lib/extensionCommands";
 import { createExtensionDialogQueue } from "./lib/extensionDialogs";
 import { buildExtensionReviewSelection } from "./lib/extensionSelection";
-import { resolveCommandKeys } from "./lib/keymap";
+import { createExtensionSidebarKeybindings, resolveCommandKeys } from "./lib/keymap";
 import {
   buildSessionSidebarViews,
   bundledSidebarViewKey,
@@ -661,6 +661,15 @@ export function App({
       }),
     [registeredExtensionCommands, resolvedCommandKeys, runExtensionCommand],
   );
+  // Sidebar views receive the dispatcher’s effective keys, including command
+  // conflicts, rather than independently resolving their default bindings.
+  const sidebarKeybindings = useMemo(() => {
+    const effectiveKeys = new Map(resolvedCommandKeys);
+    for (const command of extensionAppCommands.commands) {
+      effectiveKeys.set(command.id, command.keys);
+    }
+    return createExtensionSidebarKeybindings(effectiveKeys);
+  }, [extensionAppCommands.commands, resolvedCommandKeys]);
   const reportedCommandConflictsRef = useRef(new Set<string>());
   useEffect(() => {
     for (const conflict of extensionAppCommands.conflicts) {
@@ -1548,6 +1557,7 @@ export function App({
         showTopChrome={showMenuBar}
         theme={activeTheme}
         width={pane.width}
+        keybindings={sidebarKeybindings}
         notify={(message, type) => extensions?.context.notify(message, type)}
         onSelectFile={(fileId) => {
           focusFiles();

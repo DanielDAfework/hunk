@@ -458,6 +458,7 @@ describe("UI components", () => {
         selectedHunkIndex={0}
         theme={theme}
         width={30}
+        keybindings={{ matches: () => false, getKeys: () => [] }}
         actions={{ selectFile: () => {}, selectHunk: () => {}, notify: () => {} }}
       />,
       36,

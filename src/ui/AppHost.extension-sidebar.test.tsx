@@ -208,6 +208,44 @@ describe("extension sidebar views", () => {
     });
   });
 
+  test("injects the user's resolved command bindings into a sidebar view", async () => {
+    const repo = createTestRepo("hunk-ext-sidebar-keybindings-");
+    const extPath = join(createTempDir("hunk-ext-sidebar-keybindings-ext-"), "ext.ts");
+    writeFileSync(
+      extPath,
+      `import { createElement } from "react";\n` +
+        `export default function (hunk) {\n` +
+        `  hunk.registerSidebarView({\n` +
+        `    id: "keys",\n` +
+        `    defaultOpen: true,\n` +
+        `    component: (props) => createElement("box", { style: { flexDirection: "column" } },\n` +
+        `      createElement("text", {\n` +
+        `        content: "EXTKEYS " + props.keybindings.getKeys("hunk.review.nextFile").join(",") +\n` +
+        `          " matched=" + props.keybindings.matches({ name: "n", ctrl: true }, "hunk.review.nextFile"),\n` +
+        `      }),\n` +
+        `      createElement("text", {\n` +
+        `        content: "BLOCKED " + (props.keybindings.getKeys("ext.blocked").join(",") || "none"),\n` +
+        `      }),\n` +
+        `    ),\n` +
+        `  });\n` +
+        `  hunk.registerCommand({ id: "blocked", title: "Blocked", key: "s" }, () => {});\n` +
+        `}\n`,
+    );
+
+    const bootstrap = await launchWithExtension(repo, extPath);
+    bootstrap.keybindings = { "hunk.review.nextFile": "ctrl+n" };
+    await withAppHost(bootstrap, async (setup) => {
+      await flushUntil(
+        setup,
+        () => {
+          const frame = setup.captureCharFrame();
+          return frame.includes("EXTKEYS ctrl+n matched=true") && frame.includes("BLOCKED none");
+        },
+        "the sidebar to receive the remapped command manager",
+      );
+    });
+  });
+
   test("a command handler sees the current review selection", async () => {
     const repo = createTestRepo("hunk-ext-selection-");
     // Outside the repo, so the fixture and its log never join the review as

@@ -526,6 +526,7 @@ The component receives fresh props as the app changes:
 | `selectedHunkIndex` | the selected hunk within that file, or `null`                                                                                                         |
 | `width`             | terminal columns the sidebar pane occupies                                                                                                            |
 | `theme`             | hex color tokens from the active theme, updated on theme switch                                                                                       |
+| `keybindings`       | the current command bindings, resolved from defaults and the user's `[keybindings]` table                                                             |
 | `actions`           | navigation the sidebar may trigger                                                                                                                    |
 
 `actions.selectFile(fileId)` and `actions.selectHunk(fileId, hunkIndex)` route
@@ -536,28 +537,32 @@ row. `actions.notify(message, type?)` shows a toast attributed to your
 extension. An action given a file id that is not currently visible is refused
 with a warning rather than corrupting the selection.
 
-A component that wants keys of its own should match them with the same grammar
-Hunk uses, rather than reading modifier flags by hand:
+A component that owns a key event should ask the injected `keybindings`
+manager about a **command id**, rather than hard-coding the command's default
+chord. Like Pi's injected `KeybindingsManager`, this keeps local component
+behavior synchronized with the user's remaps and unbindings:
 
 ```ts
-import { matchesKey } from "hunkdiff/extension";
-import type { ExtensionKeyEvent } from "hunkdiff/extension";
+import type { ExtensionKeyEvent, ExtensionSidebarViewProps } from "hunkdiff/extension";
 
-export function handleSidebarKey(key: ExtensionKeyEvent) {
-  if (matchesKey("ctrl+n", key)) {
-    return "next";
+export function handleSidebarKey(props: ExtensionSidebarViewProps, key: ExtensionKeyEvent) {
+  const nextFile = props.files[1];
+  if (nextFile && props.keybindings.matches(key, "hunk.review.nextFile")) {
+    // The user may have remapped this from `.` to another chord.
+    props.actions.selectFile(nextFile.id);
   }
-
-  return matchesKey("G", key) ? "last" : "none";
 }
 ```
 
-`matchesKey(chord, key)` parses and matches in one call and returns `false` for
-an unparsable chord, so a typo is a binding that never fires rather than one
-that swallows unrelated keys. `parseKeyChord` and `matchesKeyChord` are exported
-too, for a component that would rather parse its chords once up front. Any
-object with `name`, `sequence`, `ctrl`, `meta`, `option`, and `shift` fields
-works — OpenTUI's `KeyEvent` included, so pass the event straight through.
+`keybindings.getKeys(commandId)` returns the current chord list for a label or
+hint; unknown and unbound commands return an empty list. `matches(key,
+commandId)` returns `false` for those commands too. The manager includes both
+Hunk commands and extension commands under their documented ids, and its key
+event argument is structural — OpenTUI's `KeyEvent` works directly.
+
+`matchesKey`, `parseKeyChord`, and `matchesKeyChord` remain exported for
+extension-local keys that intentionally are not commands. Prefer a named
+command whenever a shortcut should be user-remappable.
 
 Hunk keeps owning pane arrangement — widths, resize dividers, responsive
 show/hide, and dropping panes that no longer fit a narrow terminal — and your

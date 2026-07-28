@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { formatKeyChord, resolveCommandKeys, type CommandKeyDefaults } from "./keymap";
+import {
+  createExtensionSidebarKeybindings,
+  formatKeyChord,
+  resolveCommandKeys,
+  type CommandKeyDefaults,
+} from "./keymap";
 
 const DEFAULTS: CommandKeyDefaults[] = [
   { id: "hunk.app.quit", defaultKeys: ["q"] },
@@ -127,6 +132,28 @@ describe("resolveCommandKeys", () => {
     const { keys, issues } = resolve({ "meta.toggle": "ctrl+alt+t" });
     expect(issues).toEqual([]);
     expect(keys.get("meta.toggle")).toEqual(["ctrl+alt+t"]);
+  });
+});
+
+describe("extension sidebar keybindings", () => {
+  test("matches resolved commands and exposes their effective chords", () => {
+    const { keys } = resolve({ "hunk.review.nextHunk": "ctrl+n", "hunk.app.quit": false });
+    const keybindings = createExtensionSidebarKeybindings(keys);
+
+    expect(keybindings.getKeys("hunk.review.nextHunk")).toEqual(["ctrl+n"]);
+    expect(keybindings.matches({ name: "n", ctrl: true }, "hunk.review.nextHunk")).toBe(true);
+    // The manager follows user remaps, so the shipped bracket chord is gone.
+    expect(keybindings.matches({ sequence: "]" }, "hunk.review.nextHunk")).toBe(false);
+    expect(keybindings.getKeys("hunk.app.quit")).toEqual([]);
+    expect(keybindings.matches({ name: "q" }, "hunk.app.quit")).toBe(false);
+  });
+
+  test("treats unknown command ids as unbound", () => {
+    const { keys } = resolveCommandKeys({ defaults: DEFAULTS });
+    const keybindings = createExtensionSidebarKeybindings(keys);
+
+    expect(keybindings.getKeys("missing.command")).toEqual([]);
+    expect(keybindings.matches({ name: "q" }, "missing.command")).toBe(false);
   });
 });
 

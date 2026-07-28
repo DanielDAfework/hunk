@@ -4,6 +4,7 @@ import { act, useState, type ReactNode } from "react";
 import { createTestDiffFile } from "../../../../test/helpers/diff-helpers";
 import type {
   ExtensionSidebarActions,
+  ExtensionSidebarKeybindings,
   ExtensionSidebarViewProps,
 } from "../../../extension-api/types";
 import { toReadOnlyFileViews } from "../../../extensions/events";
@@ -18,6 +19,11 @@ function registeredView(component: (props: ExtensionSidebarViewProps) => ReactNo
     view: { id: "probe-view", component },
   } as RegisteredSidebarView;
 }
+
+const TEST_KEYBINDINGS: ExtensionSidebarKeybindings = {
+  matches: () => false,
+  getKeys: () => [],
+};
 
 function createTestFiles() {
   return [
@@ -76,6 +82,7 @@ describe("ExtensionSidebarPane actions", () => {
         showTopChrome={true}
         theme={theme}
         width={30}
+        keybindings={TEST_KEYBINDINGS}
         notify={(message) => notifications.push(message)}
         onSelectFile={() => {}}
         onSelectHunk={(fileId, hunkIndex) => hunkSelections.push([fileId, hunkIndex])}
@@ -138,6 +145,7 @@ describe("ExtensionSidebarPane failure recovery", () => {
           showTopChrome={true}
           theme={theme}
           width={30}
+          keybindings={TEST_KEYBINDINGS}
           notify={(message) => notifications.push(message)}
           onSelectFile={() => {}}
           onSelectHunk={() => {}}

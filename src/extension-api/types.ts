@@ -618,6 +618,32 @@ export interface ExtensionSidebarActions {
   notify(message: string, type?: ExtensionNotifyType): void;
 }
 
+/**
+ * The resolved command bindings available to a custom sidebar.
+ *
+ * This mirrors Pi's injected keybindings manager: sidebar components name a
+ * command instead of repeating its default chord, so their local key handling
+ * follows the user's `[keybindings]` configuration. The command ids are the
+ * same ids documented by Hunk (`"hunk.review.nextFile"`) and extensions
+ * (`"<extensionId>.<commandId>"`).
+ */
+export interface ExtensionSidebarKeybindings {
+  /** Report whether one terminal key event matches the command's current binding. */
+  matches(
+    key: {
+      name?: string;
+      sequence?: string;
+      ctrl?: boolean;
+      meta?: boolean;
+      option?: boolean;
+      shift?: boolean;
+    },
+    commandId: string,
+  ): boolean;
+  /** Return the command's current chords, or an empty list when it is unbound or unknown. */
+  getKeys(commandId: string): readonly string[];
+}
+
 /** Everything a custom sidebar component receives, refreshed as the app changes. */
 export interface ExtensionSidebarViewProps {
   /**
@@ -632,6 +658,8 @@ export interface ExtensionSidebarViewProps {
   /** Terminal columns the sidebar pane occupies; height comes from flex layout. */
   width: number;
   theme: ExtensionSidebarTheme;
+  /** Resolved command bindings; use these instead of hard-coding sidebar chords. */
+  keybindings: ExtensionSidebarKeybindings;
   actions: ExtensionSidebarActions;
 }
 
