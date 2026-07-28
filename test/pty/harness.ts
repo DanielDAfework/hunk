@@ -809,6 +809,32 @@ export function createPtyHarness() {
     return (text.match(pattern) ?? []).length;
   }
 
+  /**
+   * Wait until the app is actually listening for keys.
+   *
+   * The keypress handler is bound after the first paint, so a key sent the
+   * moment the review appears on screen can land before anything is subscribed
+   * and be dropped — which reads as a broken shortcut rather than as the
+   * startup race it is. Toggling the help overlay is a cheap key with an
+   * unmistakable effect, so proving one landed makes the next key — the one a
+   * test actually cares about — meaningful.
+   */
+  async function ensureKeyboardIsLive(session: Session) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await session.press("?");
+      try {
+        await waitForSnapshot(session, (text) => text.includes("Controls help"), 2_000);
+        await session.press("escape");
+        await waitForSnapshot(session, (text) => !text.includes("Controls help"), 5_000);
+        return;
+      } catch {
+        // Dropped before the app was listening; the next press is the retry.
+      }
+    }
+
+    throw new Error("The app never reacted to a keypress.");
+  }
+
   return {
     cleanup,
     countMatches,
@@ -832,6 +858,7 @@ export function createPtyHarness() {
     createTwoFileRepoFixture,
     createWatchFilePair,
     createWideCharacterFilePair,
+    ensureKeyboardIsLive,
     launchHunk,
     launchHunkWithFileBackedStdin,
     launchShellCommand,

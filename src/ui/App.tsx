@@ -1035,6 +1035,11 @@ export function App({
         wrapLines,
       });
 
+      // The reload swaps the changeset (and possibly the extension registry)
+      // out from under any open extension dialog, so the question it asked no
+      // longer describes what is on screen: resolve open dialogs as cancelled
+      // rather than leaving them up over a different review.
+      extensionDialogQueue.cancelAll();
       await onReloadSession(nextInput, {
         ...options,
         resetApp: false,

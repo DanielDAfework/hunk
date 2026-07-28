@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Session } from "tuistory";
 import { createPtyHarness } from "./harness";
 
 const harness = createPtyHarness();
@@ -92,32 +91,6 @@ const DIALOG_EXTENSION_SOURCE = `export default function (hunk) {
   });
 }
 `;
-
-/**
- * Wait until the app is actually listening for keys.
- *
- * The keypress handler is bound after the first paint, so a key sent the moment
- * the review appears on screen can land before anything is subscribed and be
- * dropped — which reads as a broken command rather than as the startup race it
- * is. Toggling the help overlay is a cheap key with an unmistakable effect, so
- * proving that one landed is what makes the key a test actually cares about
- * meaningful.
- */
-async function pressUntilKeyboardIsLive(session: Session) {
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    await session.press("?");
-    try {
-      await harness.waitForSnapshot(session, (text) => text.includes("Controls help"), 2_000);
-      await session.press("escape");
-      await harness.waitForSnapshot(session, (text) => !text.includes("Controls help"), 5_000);
-      return;
-    } catch {
-      // Dropped before the app was listening; the next press is the retry.
-    }
-  }
-
-  throw new Error("The app never reacted to a keypress.");
-}
 
 describe("PTY extensions", () => {
   test("trust prompt runs repo extensions after the user trusts the repository", async () => {
@@ -303,6 +276,10 @@ describe("PTY extensions", () => {
         20_000,
       );
       expect(before).not.toContain("EXTSIDEBAR");
+      // The first keypress after the initial paint can be dropped before the
+      // app subscribes its handler; prove the keyboard is live before the
+      // press this test is actually about.
+      await harness.ensureKeyboardIsLive(session);
 
       // The registered key dispatches through the shared command table and
       // opens the extension's right-hand pane beside the built-in one.
@@ -343,7 +320,7 @@ describe("PTY extensions", () => {
         20_000,
       );
       expect(before).not.toContain("Reformat the changeset?");
-      await pressUntilKeyboardIsLive(session);
+      await harness.ensureKeyboardIsLive(session);
 
       await session.press("y");
       const prompt = await harness.waitForSnapshot(

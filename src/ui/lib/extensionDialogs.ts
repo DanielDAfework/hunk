@@ -80,14 +80,21 @@ export interface ExtensionDialogQueue {
    * A confirm resolves `true`. A select or input resolves `value`; without one
    * there is nothing to hand back, so it settles as a cancel instead.
    *
-   * Answering anything but the current dialog is ignored. The same answer can
-   * reach the queue twice — a key handled by the shortcut hook and by the
-   * focused input widget both count as one Enter — and without the id the
-   * second call would silently answer whatever was queued behind it.
+   * Answering anything but the current dialog is ignored: an answer computed
+   * for a dialog the queue has already moved past — a repeated key, a late
+   * cancel racing a user's accept — can never settle the one queued behind it.
    */
   accept(id: number, value?: string): void;
   /** Cancel the dialog with this id, resolving its cancel value. */
   cancel(id: number): void;
+  /**
+   * Cancel the visible dialog and everything queued, keeping the queue open.
+   *
+   * Called on session reload: the changeset (and possibly the extension
+   * registry) is being swapped out from under the question, so open dialogs
+   * resolve their cancel values while later requests stay welcome.
+   */
+  cancelAll(): void;
   /**
    * Cancel everything and refuse further requests.
    *
@@ -213,6 +220,18 @@ export function createExtensionDialogQueue(): ExtensionDialogQueue {
     });
   }
 
+  /** Resolve every pending dialog with its cancel value. */
+  const drainPending = () => {
+    const drained = pending.splice(0);
+    for (const entry of drained) {
+      entry.settle(cancelValueFor(entry.request));
+    }
+
+    if (drained.length > 0) {
+      notify();
+    }
+  };
+
   /** Settle the current dialog and promote whatever was queued behind it. */
   const settleCurrent = (value: ExtensionDialogResult) => {
     const active = pending.shift();
@@ -261,7 +280,11 @@ export function createExtensionDialogQueue(): ExtensionDialogQueue {
               extensionId,
               title,
               placeholder: normalizeLabel(options.placeholder, ""),
-              initial: typeof options.initial === "string" ? options.initial : "",
+              // Sanitized like every other extension-authored string, but not
+              // trimmed: the text is the field's starting value, and leading or
+              // trailing spaces the extension put there are content.
+              initial:
+                typeof options.initial === "string" ? sanitizeTerminalLine(options.initial) : "",
             }),
             null,
           );
@@ -296,16 +319,13 @@ export function createExtensionDialogQueue(): ExtensionDialogQueue {
       settleCurrent(cancelValueFor(active.request));
     },
 
+    cancelAll() {
+      drainPending();
+    },
+
     shutdown() {
       closed = true;
-      const drained = pending.splice(0);
-      for (const entry of drained) {
-        entry.settle(cancelValueFor(entry.request));
-      }
-
-      if (drained.length > 0) {
-        notify();
-      }
+      drainPending();
     },
 
     subscribe(listener: () => void) {

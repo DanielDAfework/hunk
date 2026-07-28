@@ -77,7 +77,6 @@ export function ExtensionDialog({
     return (
       <ExtensionInputDialog
         inputValue={inputValue}
-        onAccept={onAccept}
         onCancel={onCancel}
         onChangeInput={onChangeInput}
         request={request}
@@ -204,7 +203,6 @@ function ExtensionSelectDialog({
 /** Render an input dialog as a focused single-line field. */
 function ExtensionInputDialog({
   inputValue,
-  onAccept,
   onCancel,
   onChangeInput,
   request,
@@ -213,7 +211,6 @@ function ExtensionInputDialog({
   theme,
 }: {
   inputValue: string;
-  onAccept: () => void;
   onCancel: () => void;
   onChangeInput: (value: string) => void;
   request: ExtensionInputDialogRequest;
@@ -241,13 +238,16 @@ function ExtensionInputDialog({
       </box>
       <box style={{ width: "100%", height: 1 }} />
       <box style={{ width: "100%", height: 1, backgroundColor: theme.panelAlt }}>
+        {/* The field only edits text: Enter and Escape are answered by
+            useAppKeyboardShortcuts, where every dialog's action keys live —
+            the app's global key handler consumes them before a focused
+            renderable's own submit machinery could see them. */}
         <input
           width={bodyWidth}
           value={inputValue}
           placeholder={request.placeholder}
           focused={true}
           onInput={onChangeInput}
-          onSubmit={onAccept}
         />
       </box>
       <box style={{ width: "100%", height: 1 }} />

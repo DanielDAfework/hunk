@@ -805,9 +805,11 @@ export interface ExtensionInputOptions {
  *
  * Escape always cancels, resolving the cancel value (`false`, or `null`).
  * Enter accepts: the confirm action, the highlighted option, or the typed text.
- * A dialog raised while the app is tearing down — session shutdown, or a reload
- * that unmounts the review — resolves its cancel value immediately, so a
- * handler awaiting one is never left hanging.
+ * A session reload — the refresh key, a watch-triggered reload, an agent
+ * command — cancels open and queued dialogs the same way: the review they
+ * asked about is being replaced. A dialog raised while the app is tearing
+ * down resolves its cancel value immediately, so a handler awaiting one is
+ * never left hanging.
  *
  * Bad arguments are a programming error rather than a user answer, so they
  * reject instead of resolving: a missing or blank `title`, or a `select` with

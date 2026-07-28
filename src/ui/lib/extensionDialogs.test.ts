@@ -63,8 +63,8 @@ describe("createExtensionDialogQueue", () => {
     queue.accept(firstId);
     expect(await first).toBe(true);
 
-    // A second Enter for the same dialog — the shortcut hook and a widget
-    // callback both reporting it — must not answer the queued one.
+    // A repeated answer for an already-settled dialog — a held-down key, a
+    // late cancel racing an accept — must not answer the queued one.
     queue.accept(firstId);
     expect(queue.current()).toMatchObject({ title: "Second?" });
 
@@ -99,6 +99,36 @@ describe("createExtensionDialogQueue", () => {
       options: ["\u001b]0;pwned\u0007opt"],
     });
     expect(queue.current()).toMatchObject({ title: "Pick", options: ["opt"] });
+  });
+
+  test("sanitizes an input dialog's starting text without trimming it", () => {
+    const queue = createExtensionDialogQueue();
+    const dialogs = queue.createDialogs("hostile");
+
+    // The field's starting value is extension-authored text like any other,
+    // but its edge spaces are content rather than formatting noise.
+    void dialogs.input({ title: "Branch", initial: " \u001b]0;pwned\u0007feature/x " });
+    expect(queue.current()).toMatchObject({ kind: "input", initial: " feature/x " });
+  });
+
+  test("cancelAll drains open dialogs while the queue keeps taking new ones", async () => {
+    const queue = createExtensionDialogQueue();
+    const dialogs = queue.createDialogs("probe");
+
+    const confirmed = dialogs.confirm({ title: "First?" });
+    const typed = dialogs.input({ title: "Second?" });
+
+    // A session reload replaces the review the questions were about.
+    queue.cancelAll();
+    expect(await confirmed).toBe(false);
+    expect(await typed).toBeNull();
+    expect(queue.current()).toBeNull();
+
+    // Unlike shutdown, the queue stays open: the reloaded session can ask.
+    const again = dialogs.confirm({ title: "After the reload?" });
+    expect(queue.current()).toMatchObject({ title: "After the reload?" });
+    queue.accept(queue.current()!.id);
+    expect(await again).toBe(true);
   });
 
   test("cancels the pending and queued dialogs on shutdown, and refuses later ones", async () => {

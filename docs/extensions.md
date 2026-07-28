@@ -731,10 +731,11 @@ typed text — and review shortcuts stay suppressed underneath. Confirm dialogs
 also answer to `y`/`n`, select dialogs to `↑`/`↓`, and every dialog's actions
 and rows are clickable.
 
-Two things resolve a dialog without the user: teardown, and bad arguments.
-A dialog pending when the review unmounts — session shutdown, or a reload that
-replaces the app — resolves its cancel value, so an awaiting handler is never
-left hanging, and a request made after that point cancels immediately. A blank
+Two things resolve a dialog without the user: the session moving on, and bad
+arguments. A session reload — the refresh key, a watch-triggered reload, an
+agent command — cancels open and queued dialogs, since the review they asked
+about is being replaced; a dialog pending at shutdown resolves its cancel value
+the same way, and a request made after that point cancels immediately. A blank
 `title`, or a `select` with no options, is a bug in the extension rather than an
 answer from the user, so the promise **rejects**; like any other handler
 failure, that surfaces as a warning naming your extension.
