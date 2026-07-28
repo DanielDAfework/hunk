@@ -17,6 +17,14 @@ export interface WatchedInputRuntime {
 }
 
 const defaultRuntime: WatchedInputRuntime = {};
+const DIRECT_FILE_WATCH_SAFETY_CHECK_MS = 2_000;
+
+/** Return whether a watch plan needs the short file-stat safety check. */
+function hasDirectFileContent(plan: WatchPlan) {
+  return plan.targets.some(
+    (target) => target.kind === "directory-entries" && target.sources.includes("content"),
+  );
+}
 
 /** Own the observer and controller lifecycle for one reloadable input. */
 export function useWatchedInput({
@@ -64,6 +72,7 @@ export function useWatchedInput({
       clock: runtime.clock,
       createEventSource: eventSourceFactory,
       getSignature: () => getSignature(input, reloadContext),
+      healthyCheckMs: hasDirectFileContent(plan) ? DIRECT_FILE_WATCH_SAFETY_CHECK_MS : undefined,
       initialSignature,
       onReloadPending: () => pendingRef.current?.(),
       pollOnly: plan.coverage === "poll-only",

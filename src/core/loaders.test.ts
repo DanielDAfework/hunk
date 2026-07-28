@@ -223,8 +223,9 @@ describe("loadAppBootstrap", () => {
         typeof path === "number" ? originalBunFile(path, options) : originalBunFile(path, options);
       if (String(path) === right) {
         file.text = async () => {
-          writeFileSync(right, "export const value = 3;\n");
-          return "export const value = 3;\n";
+          // Change the byte size as well as content: filesystems can retain an identical mtime here.
+          writeFileSync(right, "export const value = 300;\n");
+          return "export const value = 300;\n";
         };
       }
       return file;

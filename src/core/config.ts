@@ -31,6 +31,8 @@ import type {
 } from "./types";
 
 export const BUILT_IN_THEME_IDS = BUNDLED_SHIKI_THEME_IDS;
+// Widen the large literal tuple before formatting it, avoiding TypeScript's deep tuple inference.
+const BUILT_IN_THEME_IDS_FOR_MESSAGES: readonly string[] = BUILT_IN_THEME_IDS;
 const DEFAULT_THEME_ID = "github-dark-default";
 const DEFAULT_VIEW_PREFERENCES: PersistedViewPreferences = {
   mode: "auto",
@@ -417,7 +419,7 @@ function normalizeCustomThemeBase(value: unknown, keyPath: string) {
   const resolved = resolveThemeBase(value);
   if ("issue" in resolved) {
     throw new Error(
-      `Expected ${keyPath}.base to be a built-in theme id. Known themes: ${BUILT_IN_THEME_IDS.join(", ")}.`,
+      `Expected ${keyPath}.base to be a built-in theme id. Known themes: ${BUILT_IN_THEME_IDS_FOR_MESSAGES.join(", ")}.`,
     );
   }
 

@@ -18,6 +18,9 @@ const RESERVED_THEME_IDS: ReadonlySet<string> = new Set<string>([
   ...BUNDLED_SHIKI_THEME_IDS,
 ]);
 
+// Widen the large literal tuple before formatting it, avoiding TypeScript's deep tuple inference.
+const BUNDLED_THEME_IDS_FOR_MESSAGES: readonly string[] = BUNDLED_SHIKI_THEME_IDS;
+
 /** Lowercase words joined by `-` or `_`, so ids stay typeable as a `--theme` value. */
 const CUSTOM_THEME_ID_PATTERN = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
 
@@ -111,7 +114,7 @@ export function resolveThemeBase(value: unknown): { base: string } | { issue: st
   const resolved = typeof value === "string" ? resolveBundledShikiThemeId(value) : undefined;
   if (!resolved) {
     return {
-      issue: `must be a built-in theme id. Known themes: ${BUNDLED_SHIKI_THEME_IDS.join(", ")}`,
+      issue: `must be a built-in theme id. Known themes: ${BUNDLED_THEME_IDS_FOR_MESSAGES.join(", ")}`,
     };
   }
 
