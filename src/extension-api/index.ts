@@ -48,6 +48,7 @@ export type {
   ExtensionCommand,
   ExtensionCommandContext,
   ExtensionCommandHandler,
+  ExtensionReviewSelection,
   ExtensionNotifyType,
   ExtensionSidebarActions,
   ExtensionSidebarComponent,

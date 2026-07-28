@@ -328,6 +328,23 @@ describe("read-only file views", () => {
     expect(file.metadata.hunks[0]!.header).toBe("@@ -1 +1 @@");
   });
 
+  test("reflection cannot expose or alter the live model", () => {
+    const file = createTestFile();
+    const [view] = toReadOnlyFileViews([file as never]);
+    const metadata = view!.metadata as object;
+    const hunks = Object.getOwnPropertyDescriptor(metadata, "hunks")!.value as {
+      header: string;
+    }[];
+
+    expect(hunks).not.toBe(file.metadata.hunks);
+    expect(() => {
+      hunks[0]!.header = "@@ forged @@";
+    }).toThrow(TypeError);
+    expect(() => Object.preventExtensions(metadata)).toThrow(TypeError);
+    expect(file.metadata.hunks[0]!.header).toBe("@@ -1 +1 @@");
+    expect(Object.isExtensible(file.metadata)).toBe(true);
+  });
+
   test("stats and agent annotations are guarded the same way", () => {
     const file = createTestFile();
     const [view] = toReadOnlyFileViews([file as never]);

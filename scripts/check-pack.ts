@@ -23,6 +23,7 @@ import {
 } from "hunkdiff/extension";
 import type {
   ExtensionChangeset,
+  ExtensionReviewSelection,
   ExtensionVcsAdapter,
   ExtensionVcsDiffInput,
   ExtensionVcsLoadContext,
@@ -32,6 +33,9 @@ import type {
 } from "hunkdiff/extension";
 
 export default function (hunk: HunkExtensionAPI) {
+  const noSelection: ExtensionReviewSelection = { file: null, hunkIndex: null };
+  hunk.log(noSelection.file === null ? "nothing selected" : noSelection.file.path);
+
   const theme: NamedCustomThemeConfig = {
     id: "midnight-review",
     label: "Midnight Review",

@@ -758,13 +758,13 @@ export interface ExtensionReviewSelection {
    * `null` only when nothing is visible at all, such as a filter matching no
    * files.
    */
-  file: ExtensionDiffFile | null;
+  readonly file: ExtensionDiffFile | null;
   /**
    * The selected hunk's index within that file, or `null` when no hunk is
    * selected — including whenever `file` is `null`, and for a file with no
    * hunks to select (a binary or skipped file).
    */
-  hunkIndex: number | null;
+  readonly hunkIndex: number | null;
 }
 
 /** What a command handler receives when its key fires. */

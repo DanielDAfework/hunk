@@ -111,10 +111,10 @@ function isProxyableData(value: unknown): value is object {
  *
  * Only plain objects and arrays are wrapped: the diff model is JSON-shaped,
  * and proxying an exotic object (a Map, a class instance) would break its
- * internal-slot methods, so anything else reads through unwrapped. A property
- * that is already non-configurable and non-writable is returned as-is — the
- * proxy `get` invariant requires its identity, and it cannot be reassigned
- * anyway.
+ * internal-slot methods, so anything else reads through unwrapped. The proxy
+ * targets a disposable façade rather than the shared source. That keeps
+ * reflective operations — especially property descriptors and preventing
+ * extensions — from exposing or mutating the live model behind the view.
  */
 export function toReadOnlyDeepView<T>(value: T): T {
   if (!isProxyableData(value)) {
@@ -126,20 +126,55 @@ export function toReadOnlyDeepView<T>(value: T): T {
     return cached as T;
   }
 
-  const proxy = new Proxy(value, {
-    get(target, property) {
-      const descriptor = Object.getOwnPropertyDescriptor(target, property);
-      const result = Reflect.get(target, property, target);
-      if (descriptor !== undefined && !descriptor.configurable && !descriptor.writable) {
-        return result;
+  // Keep an array target for Array.isArray and array built-ins, but never put
+  // source properties on it: descriptor reflection must not expose raw values.
+  const façade = Array.isArray(value) ? [] : Object.create(Object.getPrototypeOf(value));
+  if (Array.isArray(value)) {
+    // Match the source length without copying its elements onto the façade.
+    (façade as unknown[]).length = value.length;
+  }
+
+  const proxy = new Proxy(façade, {
+    get(_target, property) {
+      return toReadOnlyDeepView(Reflect.get(value, property, value));
+    },
+    has: (_target, property) => Reflect.has(value, property),
+    ownKeys: () => Reflect.ownKeys(value),
+    getOwnPropertyDescriptor(target, property) {
+      const descriptor = Reflect.getOwnPropertyDescriptor(value, property);
+      if (descriptor === undefined) {
+        return undefined;
       }
 
-      return toReadOnlyDeepView(result);
+      // Array targets have a non-configurable `length` property, which proxy
+      // invariants require us to report as non-configurable as well.
+      if (Array.isArray(target) && property === "length") {
+        return Reflect.getOwnPropertyDescriptor(target, property);
+      }
+
+      if ("value" in descriptor) {
+        return {
+          ...descriptor,
+          configurable: true,
+          value: toReadOnlyDeepView(descriptor.value),
+        };
+      }
+
+      // Accessors are read-only from the extension's perspective too. Calling
+      // the source setter through a reflected descriptor would otherwise evade
+      // the proxy's `set` trap.
+      return {
+        configurable: true,
+        enumerable: descriptor.enumerable,
+        get: () => toReadOnlyDeepView(Reflect.get(value, property, value)),
+        set: undefined,
+      };
     },
     set: () => false,
     defineProperty: () => false,
     deleteProperty: () => false,
     setPrototypeOf: () => false,
+    preventExtensions: () => false,
   });
   readOnlyDeepViews.set(value, proxy);
   return proxy as T;
