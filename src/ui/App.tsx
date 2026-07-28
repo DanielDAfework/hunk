@@ -341,12 +341,10 @@ export function App({
 
     return Math.max(
       0,
-      filteredFiles.reduce(
-        (maxWidth, file) => Math.max(maxWidth, maxFileCodeLineWidth(file, tabWidth)),
-        0,
-      ) - codeViewportWidth,
+      filteredFiles.reduce((maxWidth, file) => Math.max(maxWidth, maxFileCodeLineWidth(file)), 0) -
+        codeViewportWidth,
     );
-  }, [codeViewportWidth, filteredFiles, tabWidth, wrapLines]);
+  }, [codeViewportWidth, filteredFiles, wrapLines]);
 
   useEffect(() => {
     setCodeHorizontalOffset((current) => clamp(current, 0, maxCodeHorizontalOffset));
