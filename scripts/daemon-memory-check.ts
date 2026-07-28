@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "node:net";
 import { SESSION_BROKER_REGISTRATION_VERSION } from "@hunk/session-broker-core";
-import { HUNK_SESSION_API_PATH } from "../src/session/agent/protocol";
+import { HUNK_SESSION_API_PATH } from "../src/session/protocol";
 
 type MemorySample = {
   label: string;

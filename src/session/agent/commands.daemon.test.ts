@@ -8,7 +8,7 @@ import {
   setSessionCommandTestHooks,
   type HunkDaemonCliClient,
 } from "./commands";
-import { HUNK_SESSION_API_VERSION, HUNK_SESSION_DAEMON_VERSION } from "./protocol";
+import { HUNK_SESSION_API_VERSION, HUNK_SESSION_DAEMON_VERSION } from "../protocol";
 
 // These tests exercise the REAL resolveDaemonAvailability path (which the hook-based suite in
 // commands.test.ts deliberately bypasses) by pointing the broker config at a known-free loopback

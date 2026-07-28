@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readHunkSessionDaemonCapabilities } from "./capabilities";
-import { HUNK_SESSION_API_VERSION, HUNK_SESSION_DAEMON_VERSION } from "./protocol";
+import { HUNK_SESSION_API_VERSION, HUNK_SESSION_DAEMON_VERSION } from "../protocol";
 
 const servers = new Set<ReturnType<typeof createServer>>();
 const originalFetch = globalThis.fetch;

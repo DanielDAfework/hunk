@@ -1,4 +1,4 @@
-import type { SessionDaemonAction } from "./protocol";
+import type { SessionDaemonAction } from "../protocol";
 
 /**
  * Declarative description of the agent-facing `hunk session` command surface.

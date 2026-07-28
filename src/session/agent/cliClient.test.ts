@@ -14,7 +14,7 @@ import {
   HUNK_SESSION_API_PATH,
   HUNK_SESSION_API_VERSION,
   HUNK_SESSION_DAEMON_VERSION,
-} from "./protocol";
+} from "../protocol";
 import {
   createHttpHunkSessionCliClient,
   formatClearCommentsOutput,

@@ -5,7 +5,7 @@ import {
   createTestSessionReviewFile,
   createTestSessionSnapshot,
 } from "../../../test/helpers/session-daemon-fixtures";
-import { HUNK_SESSION_API_VERSION, HUNK_SESSION_DAEMON_VERSION } from "../agent/protocol";
+import { HUNK_SESSION_API_VERSION, HUNK_SESSION_DAEMON_VERSION } from "../protocol";
 import { SessionBrokerClient } from "./brokerClient";
 
 const originalHost = process.env.HUNK_MCP_HOST;

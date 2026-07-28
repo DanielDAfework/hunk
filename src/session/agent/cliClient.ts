@@ -6,7 +6,7 @@ import {
   HUNK_SESSION_API_PATH,
   type SessionDaemonCapabilities,
   type SessionDaemonRequest,
-} from "./protocol";
+} from "../protocol";
 import type {
   AppliedCommentBatchResult,
   AppliedCommentResult,

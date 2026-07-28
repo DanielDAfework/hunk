@@ -35,8 +35,8 @@ import {
   type SessionDaemonAction,
   type SessionDaemonCapabilities,
   type SessionDaemonResponse,
-} from "../agent/protocol";
-import { parseSessionDaemonRequest } from "../agent/protocolSchemas";
+} from "../protocol";
+import { parseSessionDaemonRequest } from "../protocolSchemas";
 
 const DEFAULT_STALE_SESSION_TTL_MS = 45_000;
 const DEFAULT_STALE_SESSION_SWEEP_INTERVAL_MS = 15_000;
