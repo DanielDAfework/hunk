@@ -37,6 +37,13 @@ import {
  * Rendering helpers (row components, the render window) are imported from Hunk
  * directly: this is host code, and the dogfooding boundary is the data,
  * actions, and theme crossing the props — not utility code.
+ *
+ * The scrollbox usage below is itself part of the published contract: the ref
+ * reads (`scrollTop`, `viewport.height`), the scrollbar/viewport change
+ * events, and `scrollChildIntoView` over child `id` props are documented in
+ * docs/extensions.md as the supported way third-party sidebars scroll and
+ * follow the selection. Changing how this component talks to its scrollbox
+ * means updating that contract — same honesty mechanism as the props.
  */
 
 /**

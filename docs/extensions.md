@@ -582,23 +582,97 @@ toast naming your extension, the pane closes, and the built-in file navigation
 reopens if nothing else is showing.
 
 Props carry the pane's `width` but not its height: the pane is a flex cell, so
-give your root element `height="100%"` and let layout size it. For a list
-longer than the pane, a `scrollbox` scrolls it — but there is no public
-viewport data (pane rows, scroll offset), so row virtualization and
-keeping the selected row scrolled into view are not supportable in a
-third-party sidebar today. `useTerminalDimensions` from `@opentui/react`
-reports the whole terminal, which bounds the pane but is not its height. If
-your extension needs true pane geometry, say so in an issue — it is a known
-gap under consideration, not a settled boundary.
+give your root element `height="100%"` and let layout size it. Everything else
+about scrolling — pane viewport height, scroll position, keeping a row visible
+— goes through the `<scrollbox>` itself, via a plain React ref. Hunk serves
+its own `@opentui/core` to extension files, so the renderable a ref hands you
+is the very instance the host renders with.
+
+#### Scrolling: the scrollbox ref contract
+
+The one behavior a list sidebar always ends up needing is following the
+selection. Give your rows stable `id` props, hold a ref to the scrollbox, and
+scroll the selected row into view from an effect:
+
+```tsx
+import { useEffect, useRef } from "react";
+import type { ScrollBoxRenderable } from "@opentui/core";
+import type { ExtensionSidebarViewProps } from "hunkdiff/extension";
+
+function HunkList({
+  files,
+  selectedFileId,
+  selectedHunkIndex,
+  theme,
+  actions,
+}: ExtensionSidebarViewProps) {
+  const scrollRef = useRef<ScrollBoxRenderable | null>(null);
+
+  // Follow policy is deliberately yours: the host never scrolls a pane it
+  // cannot see into, so decide here when (and whether) to follow.
+  useEffect(() => {
+    if (selectedFileId !== null) {
+      scrollRef.current?.scrollChildIntoView(`row-${selectedFileId}-${selectedHunkIndex ?? 0}`);
+    }
+  }, [selectedFileId, selectedHunkIndex]);
+
+  return (
+    <scrollbox ref={scrollRef} width="100%" height="100%" scrollY={true} focused={false}>
+      {files.flatMap((file) =>
+        (file.hunks ?? []).map((hunk) => {
+          const selected = file.id === selectedFileId && hunk.index === selectedHunkIndex;
+          return (
+            <box
+              key={`${file.id}:${hunk.index}`}
+              id={`row-${file.id}-${hunk.index}`}
+              style={{ width: "100%", height: 1 }}
+              onMouseUp={() => actions.selectHunk(file.id, hunk.index)}
+            >
+              <text
+                content={` ${file.path}  ${hunk.header}`}
+                style={{ fg: selected ? theme.accent : theme.text }}
+              />
+            </box>
+          );
+        }),
+      )}
+    </scrollbox>
+  );
+}
+```
+
+The ref surface this recipe stands on is the exact one the built-in sidebar
+runs on:
+
+- **`scrollChildIntoView(id)`** scrolls the descendant with that `id` prop
+  into view.
+- **`scrollTop`** and **`viewport.height`** read the current scroll offset and
+  the pane's viewport rows — the pane-height number the props do not carry.
+  A read before the first layout pass reports `0`, so viewport-dependent code
+  belongs behind the events below rather than a bare mount effect.
+- **`verticalScrollBar.on("change", handler)`**,
+  **`viewport.on("layout-changed", handler)`**, and
+  **`viewport.on("resized", handler)`** report scrolling and pane resizes;
+  unsubscribe with the matching `.off` in your effect's cleanup.
+
+That is enough to window a long list yourself: the built-in sidebar renders
+only the rows near the viewport, plus spacer boxes sized from those same
+reads (its render-window helper is host code, but nothing it computes needs
+anything beyond this surface — `useTerminalDimensions` from `@opentui/react`
+serves as its pre-first-layout viewport estimate).
+
+One honest caveat: this contract rides on OpenTUI's renderable API, served at
+whatever version Hunk pins — a wider surface than `hunkdiff/extension` itself.
+The built-in sidebar exercising the exact same calls is the compatibility
+guarantee: a change that breaks your scroll code breaks Hunk's own sidebar
+first. Still, keep scroll handling small and behind your own helpers.
 
 The built-in sidebar is itself a bundled extension
-(`src/extensions/default/ui/sidebar/`): it registers through this exact call
-and its component consumes exactly the props documented above, so it doubles as
-the reference implementation — anything it draws from those props (grouping,
-change-type icons, stat badges), yours can too. The one thing it does that the
-props alone cannot express is windowing and selection follow, which it builds
-from host-internal geometry helpers — that is the pane-geometry gap described
-above, kept honest by the dogfooding.
+(`src/extensions/default/ui/sidebar/`): it registers through this exact call,
+its component consumes exactly the props documented above, and its windowing
+and selection follow run on exactly the ref contract above — so it doubles as
+the reference implementation for everything a third-party sidebar can build,
+from grouping and stat badges down to scroll behavior.
 
 #### Sidebar state from events
 

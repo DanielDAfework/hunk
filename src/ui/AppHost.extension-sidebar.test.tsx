@@ -478,4 +478,111 @@ describe("extension sidebar views", () => {
       );
     });
   });
+
+  test("the documented scrollbox ref contract follows the selection from a fixture sidebar", async () => {
+    // Enough changed files that the fixture pane's list overflows its viewport:
+    // the last row is only visible if `scrollChildIntoView` actually scrolled.
+    const repo = createTempDir("hunk-ext-sidebar-scroll-");
+    execSync("git init && git config user.email test@test && git config user.name test", {
+      cwd: repo,
+      stdio: "ignore",
+    });
+    const fileCount = 30;
+    const names = Array.from(
+      { length: fileCount },
+      (_, index) => `file-${String(index).padStart(2, "0")}.txt`,
+    );
+    for (const name of names) {
+      writeFileSync(join(repo, name), "one\n");
+    }
+    execSync("git add . && git commit -m init", { cwd: repo, stdio: "ignore" });
+    for (const name of names) {
+      writeFileSync(join(repo, name), "one\ntwo\n");
+    }
+
+    const extDir = createTempDir("hunk-ext-sidebar-scroll-ext-");
+    const logPath = join(extDir, "probe.log");
+    // A TSX fixture running the exact recipe docs/extensions.md publishes:
+    // a ref on the scrollbox, `id` props on the rows, and an effect calling
+    // `scrollChildIntoView` when the selection moves. The viewport read in the
+    // same effect proves the geometry side of the contract from extension code.
+    const extPath = join(extDir, "ext.tsx");
+    writeFileSync(
+      extPath,
+      `import { appendFileSync } from "node:fs";\n` +
+        `import { useEffect, useRef } from "react";\n` +
+        `import type { ScrollBoxRenderable } from "@opentui/core";\n` +
+        `import type { ExtensionSidebarViewProps, HunkExtensionAPI } from "hunkdiff/extension";\n` +
+        `\n` +
+        `function RefList({ files, selectedFileId, theme }: ExtensionSidebarViewProps) {\n` +
+        `  const scrollRef = useRef<ScrollBoxRenderable | null>(null);\n` +
+        `\n` +
+        `  useEffect(() => {\n` +
+        `    const viewportHeight = scrollRef.current?.viewport.height ?? 0;\n` +
+        `    appendFileSync(${JSON.stringify(logPath)}, "viewport " + viewportHeight + " follow " + selectedFileId + "\\n");\n` +
+        `    if (selectedFileId !== null) {\n` +
+        `      scrollRef.current?.scrollChildIntoView("probe-" + selectedFileId);\n` +
+        `    }\n` +
+        `  }, [selectedFileId]);\n` +
+        `\n` +
+        `  return (\n` +
+        `    <scrollbox ref={scrollRef} width="100%" height="100%" scrollY={true} focused={false}>\n` +
+        `      {files.map((file) => (\n` +
+        `        <box key={file.id} id={"probe-" + file.id} style={{ width: "100%", height: 1 }}>\n` +
+        `          <text\n` +
+        `            content={"ref:" + file.path}\n` +
+        `            style={{ fg: file.id === selectedFileId ? theme.accent : theme.text }}\n` +
+        `          />\n` +
+        `        </box>\n` +
+        `      ))}\n` +
+        `    </scrollbox>\n` +
+        `  );\n` +
+        `}\n` +
+        `\n` +
+        `export default function (hunk: HunkExtensionAPI) {\n` +
+        `  hunk.registerSidebarView({\n` +
+        `    id: "reflist",\n` +
+        `    title: "Ref list",\n` +
+        `    placement: "right",\n` +
+        `    defaultOpen: true,\n` +
+        `    component: RefList,\n` +
+        `  });\n` +
+        `}\n`,
+    );
+
+    const bootstrap = await launchWithExtension(repo, extPath);
+    await withAppHost(bootstrap, async (setup) => {
+      await flushUntil(
+        setup,
+        () => setup.captureCharFrame().includes("ref:file-00.txt"),
+        "the fixture pane to render its first row",
+      );
+      // The tail of the list starts outside the pane's viewport.
+      expect(setup.captureCharFrame()).not.toContain(`ref:file-${fileCount - 1}`);
+
+      // Walk the selection to the last file, one keypress per frame — the
+      // review coalesces navigation within a frame, so a single burst would
+      // move one file. Each step re-runs the fixture's follow effect, and the
+      // final row can only be on screen if `scrollChildIntoView` scrolled.
+      for (let step = 0; step < fileCount - 1; step += 1) {
+        await act(async () => {
+          await setup.mockInput.typeText(".");
+        });
+        await flush(setup);
+      }
+      await flushUntil(
+        setup,
+        () => setup.captureCharFrame().includes(`ref:file-${fileCount - 1}`),
+        "the fixture pane to follow the selection to the last row",
+      );
+
+      // The effect's ref read saw real pane geometry once layout had run — an
+      // immediate post-mount read is legitimately 0, which is exactly why the
+      // docs point viewport-dependent code at the layout/scroll events.
+      const viewportRows = readProbeLog(logPath)
+        .filter((line) => line.startsWith("viewport "))
+        .map((line) => Number(line.split(" ")[1]));
+      expect(Math.max(0, ...viewportRows)).toBeGreaterThan(0);
+    });
+  });
 });
