@@ -502,10 +502,11 @@ describe("extension sidebar views", () => {
 
     const extDir = createTempDir("hunk-ext-sidebar-scroll-ext-");
     const logPath = join(extDir, "probe.log");
-    // A TSX fixture running the exact recipe docs/extensions.md publishes:
-    // a ref on the scrollbox, `id` props on the rows, and an effect calling
-    // `scrollChildIntoView` when the selection moves. The viewport read in the
-    // same effect proves the geometry side of the contract from extension code.
+    // A TSX fixture running the exact recipe docs/extensions.md publishes: a
+    // ref on the scrollbox, `id` props on the rows, an effect calling
+    // `scrollChildIntoView` when the selection moves, and the documented
+    // event subscriptions reporting `scrollTop`/`viewport.height` — the whole
+    // committed ref surface, exercised from extension code.
     const extPath = join(extDir, "ext.tsx");
     writeFileSync(
       extPath,
@@ -518,8 +519,26 @@ describe("extension sidebar views", () => {
         `  const scrollRef = useRef<ScrollBoxRenderable | null>(null);\n` +
         `\n` +
         `  useEffect(() => {\n` +
-        `    const viewportHeight = scrollRef.current?.viewport.height ?? 0;\n` +
-        `    appendFileSync(${JSON.stringify(logPath)}, "viewport " + viewportHeight + " follow " + selectedFileId + "\\n");\n` +
+        `    const scrollBox = scrollRef.current;\n` +
+        `    if (!scrollBox) {\n` +
+        `      return;\n` +
+        `    }\n` +
+        `    const report = () => {\n` +
+        `      const top = scrollBox.scrollTop ?? 0;\n` +
+        `      const height = scrollBox.viewport.height ?? 0;\n` +
+        `      appendFileSync(${JSON.stringify(logPath)}, "geom " + top + " " + height + "\\n");\n` +
+        `    };\n` +
+        `    scrollBox.verticalScrollBar.on("change", report);\n` +
+        `    scrollBox.viewport.on("layout-changed", report);\n` +
+        `    scrollBox.viewport.on("resized", report);\n` +
+        `    return () => {\n` +
+        `      scrollBox.verticalScrollBar.off("change", report);\n` +
+        `      scrollBox.viewport.off("layout-changed", report);\n` +
+        `      scrollBox.viewport.off("resized", report);\n` +
+        `    };\n` +
+        `  }, []);\n` +
+        `\n` +
+        `  useEffect(() => {\n` +
         `    if (selectedFileId !== null) {\n` +
         `      scrollRef.current?.scrollChildIntoView("probe-" + selectedFileId);\n` +
         `    }\n` +
@@ -576,13 +595,20 @@ describe("extension sidebar views", () => {
         "the fixture pane to follow the selection to the last row",
       );
 
-      // The effect's ref read saw real pane geometry once layout had run — an
-      // immediate post-mount read is legitimately 0, which is exactly why the
-      // docs point viewport-dependent code at the layout/scroll events.
-      const viewportRows = readProbeLog(logPath)
-        .filter((line) => line.startsWith("viewport "))
-        .map((line) => Number(line.split(" ")[1]));
-      expect(Math.max(0, ...viewportRows)).toBeGreaterThan(0);
+      // The documented event subscriptions delivered real geometry: layout
+      // events reported a nonzero viewport height once the pane laid out, and
+      // the scrollbar change event reported a nonzero scrollTop once
+      // `scrollChildIntoView` moved the pane — both read through the ref, from
+      // extension code, exactly as the guide's bullets promise.
+      const geometry = readProbeLog(logPath)
+        .filter((line) => line.startsWith("geom "))
+        .map((line) => {
+          const [, top, height] = line.split(" ");
+          return { top: Number(top), height: Number(height) };
+        });
+      expect(geometry.length).toBeGreaterThan(0);
+      expect(Math.max(0, ...geometry.map((entry) => entry.height))).toBeGreaterThan(0);
+      expect(Math.max(0, ...geometry.map((entry) => entry.top))).toBeGreaterThan(0);
     });
   });
 });
