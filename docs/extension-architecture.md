@@ -95,6 +95,24 @@ surfaces, so a command and a sidebar can never disagree about what is selected.
 App reads the snapshot through a ref when a command fires, keeping the dispatch
 table stable as the review moves.
 
+`ctx.dialogs` is the one place extension code can interrupt the user, so its
+ordering and settlement live outside React in
+`src/ui/lib/extensionDialogs.ts` — one FIFO queue per App instance, minting a
+per-extension `dialogs` object, normalizing (and sanitizing) extension-authored
+text into a request the host draws, and answering by request id so a duplicated
+Enter cannot spill onto whatever was queued behind. App subscribes with
+`useSyncExternalStore`, renders the current request through
+`src/ui/components/chrome/ExtensionDialog.tsx` (confirm reuses `ConfirmDialog`;
+select and input are `ModalFrame` surfaces), and unmount calls `shutdown()` so
+every pending and queued dialog resolves its cancel value instead of leaving a
+handler awaiting forever. Key precedence in `useAppKeyboardShortcuts` places
+dialogs below Hunk's own app-critical prompts (repo trust, save-on-quit) and
+above menus, help, the theme selector, and the command table: an extension may
+interrupt review navigation, never a decision about the session itself. The
+frame always carries an `ext <id>` attribution row — the toast marker — because
+the title is extension-authored and a prompt must not be able to impersonate
+Hunk.
+
 Commands declare chords, not matchers: `src/ui/lib/keymap.ts` folds every
 command's `defaultKeys` against the user's `[keybindings]` table (user config
 layer only) into one id-to-chords answer, from which matchers, key labels, and

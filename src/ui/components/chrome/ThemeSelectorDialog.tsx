@@ -1,4 +1,5 @@
 import type { MouseEvent as TuiMouseEvent } from "@opentui/core";
+import { listWindowStart } from "../../lib/listWindow";
 import { fitText, padText } from "../../lib/text";
 import type { AppTheme } from "../../themes";
 import { ModalFrame } from "./ModalFrame";
@@ -8,16 +9,6 @@ export interface ThemeSelectorItem {
   label: string;
   description: string;
   active: boolean;
-}
-
-/** Keep the selected row visible in the fixed-height theme selector list. */
-function visibleWindowStart(selectedIndex: number, rowCount: number, visibleRows: number) {
-  if (rowCount <= visibleRows) {
-    return 0;
-  }
-
-  const centered = selectedIndex - Math.floor(visibleRows / 2);
-  return Math.min(Math.max(centered, 0), rowCount - visibleRows);
 }
 
 /** Render an opencode-style selector for Hunk themes. */
@@ -45,7 +36,7 @@ export function ThemeSelectorDialog({
   const bodyWidth = Math.max(1, width - 4);
   // ModalFrame contributes border/title/padding; reserve help/footer rows inside the body.
   const visibleRows = Math.max(4, modalHeight - 7);
-  const start = visibleWindowStart(selectedIndex, items.length, visibleRows);
+  const start = listWindowStart(selectedIndex, items.length, visibleRows);
   const visibleItems = items.slice(start, start + visibleRows);
   const markerWidth = 3;
   const descriptionWidth = 12;

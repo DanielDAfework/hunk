@@ -767,6 +767,63 @@ export interface ExtensionReviewSelection {
   readonly hunkIndex: number | null;
 }
 
+/** One question put to the user as a modal confirm dialog. */
+export interface ExtensionConfirmOptions {
+  title: string;
+  /** Optional body lines shown above the actions. */
+  body?: string;
+  /** Label for the accepting action. Defaults to "ok". */
+  confirmLabel?: string;
+  /** Label for the dismissing action. Defaults to "cancel". */
+  cancelLabel?: string;
+}
+
+/** A list of choices put to the user as a modal selector. */
+export interface ExtensionSelectOptions {
+  title: string;
+  /** The choices, shown in order. Must be non-empty. */
+  options: readonly string[];
+}
+
+/** One line of text asked of the user as a modal input field. */
+export interface ExtensionInputOptions {
+  title: string;
+  placeholder?: string;
+  /** Text the field starts with. */
+  initial?: string;
+}
+
+/**
+ * Ask the user questions from a command handler, one modal at a time.
+ *
+ * Every dialog is drawn by Hunk, not by the extension, and carries an
+ * attribution line naming the extension that raised it — a prompt cannot
+ * present itself as Hunk asking. Only one dialog is on screen at a time:
+ * concurrent requests queue in call order (FIFO), including across extensions,
+ * so a second question waits for the first to be answered rather than
+ * replacing it.
+ *
+ * Escape always cancels, resolving the cancel value (`false`, or `null`).
+ * Enter accepts: the confirm action, the highlighted option, or the typed text.
+ * A dialog raised while the app is tearing down — session shutdown, or a reload
+ * that unmounts the review — resolves its cancel value immediately, so a
+ * handler awaiting one is never left hanging.
+ *
+ * Bad arguments are a programming error rather than a user answer, so they
+ * reject instead of resolving: a missing or blank `title`, or a `select` with
+ * no options. Because a dialog call is only useful awaited, the rejection
+ * surfaces through the same path as any other handler failure — a warning toast
+ * naming the extension.
+ */
+export interface ExtensionDialogs {
+  /** Resolves true on confirm, false on cancel/escape. */
+  confirm(options: ExtensionConfirmOptions): Promise<boolean>;
+  /** Resolves the chosen option, or null on cancel/escape. */
+  select(options: ExtensionSelectOptions): Promise<string | null>;
+  /** Resolves the submitted text, or null on cancel/escape. */
+  input(options: ExtensionInputOptions): Promise<string | null>;
+}
+
 /** What a command handler receives when its key fires. */
 export interface ExtensionCommandContext extends ExtensionContext {
   sidebars: ExtensionSidebarControls;
@@ -777,6 +834,13 @@ export interface ExtensionCommandContext extends ExtensionContext {
    * still sees the selection the user ran the command from.
    */
   readonly selection: ExtensionReviewSelection;
+  /**
+   * Ask the user a question and await the answer.
+   *
+   * Valid for the whole life of the handler's promise, so a handler may open
+   * several dialogs in sequence with work in between.
+   */
+  readonly dialogs: ExtensionDialogs;
 }
 
 export type ExtensionCommandHandler = (ctx: ExtensionCommandContext) => void | Promise<void>;

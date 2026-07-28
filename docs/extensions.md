@@ -667,6 +667,78 @@ meanwhile.
 A handler may be async; a failure (sync or rejected) becomes a warning naming
 your extension.
 
+#### Asking the user
+
+`ctx.dialogs` puts a question on screen and waits for the answer. Three shapes,
+all promise-returning:
+
+- `confirm({ title, body?, confirmLabel?, cancelLabel? })` → `true` or `false`
+- `select({ title, options })` → the chosen string, or `null`
+- `input({ title, placeholder?, initial? })` → the typed string, or `null`
+
+```ts
+hunk.registerCommand(
+  { id: "reformat", title: "Reformat the selected file", key: "ctrl+r" },
+  async (ctx) => {
+    const file = ctx.selection.file;
+    if (!file) {
+      return;
+    }
+
+    const proceed = await ctx.dialogs.confirm({
+      title: `Reformat ${file.path}?`,
+      body: "The file is rewritten in place.",
+      confirmLabel: "reformat",
+    });
+
+    ctx.notify(proceed ? `Reformatting ${file.path}` : "Left it alone");
+  },
+);
+```
+
+`select` is the natural fit for acting on part of the selection — here, one hunk
+of the selected file:
+
+```ts
+hunk.registerCommand({ id: "pick-hunk", title: "Pick a hunk", key: "ctrl+k" }, async (ctx) => {
+  const file = ctx.selection.file;
+  const hunks = (file?.metadata as { hunks?: { header?: string }[] } | undefined)?.hunks ?? [];
+  if (hunks.length === 0) {
+    ctx.notify("Nothing to pick from", "warning");
+    return;
+  }
+
+  const picked = await ctx.dialogs.select({
+    title: "Which hunk?",
+    options: hunks.map((hunk, index) => hunk.header ?? `hunk ${index + 1}`),
+  });
+
+  if (picked !== null) {
+    ctx.notify(`You picked ${picked}`);
+  }
+});
+```
+
+Hunk draws the dialog, not you: your text fills the title, body, and choices,
+and the frame carries an `ext <your-id>` attribution line — the same marker
+`notify` toasts use — so a prompt can never present itself as Hunk asking.
+
+One dialog is on screen at a time. Concurrent requests queue in call order,
+across extensions too, so a second question waits its turn instead of replacing
+the first. While a dialog is up it owns the keyboard: Escape cancels (`false`,
+or `null`), Enter accepts — the confirm action, the highlighted option, or the
+typed text — and review shortcuts stay suppressed underneath. Confirm dialogs
+also answer to `y`/`n`, select dialogs to `↑`/`↓`, and every dialog's actions
+and rows are clickable.
+
+Two things resolve a dialog without the user: teardown, and bad arguments.
+A dialog pending when the review unmounts — session shutdown, or a reload that
+replaces the app — resolves its cancel value, so an awaiting handler is never
+left hanging, and a request made after that point cancels immediately. A blank
+`title`, or a `select` with no options, is a bug in the extension rather than an
+answer from the user, so the promise **rejects**; like any other handler
+failure, that surfaces as a warning naming your extension.
+
 ### `hunk.transformChangeset(fn)`
 
 Rewrite the loaded changeset before it reaches the review UI. Transforms run in

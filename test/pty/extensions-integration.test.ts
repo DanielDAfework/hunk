@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { Session } from "tuistory";
 import { createPtyHarness } from "./harness";
 
 const harness = createPtyHarness();
@@ -74,6 +75,49 @@ export default function (hunk) {
   });
 }
 `;
+
+/**
+ * An extension that asks before acting, so a real terminal exercises the whole
+ * dialog path: a registered key opens the modal, Enter resolves the handler's
+ * awaited promise, and the answer comes back as a toast.
+ */
+const DIALOG_EXTENSION_SOURCE = `export default function (hunk) {
+  hunk.registerCommand({ id: "ask", title: "Ask", key: "y" }, async (ctx) => {
+    const proceed = await ctx.dialogs.confirm({
+      title: "Reformat the changeset?",
+      body: "Nothing is written to disk.",
+      confirmLabel: "reformat",
+    });
+    ctx.notify(proceed ? "DIALOG ANSWERED YES" : "DIALOG ANSWERED NO");
+  });
+}
+`;
+
+/**
+ * Wait until the app is actually listening for keys.
+ *
+ * The keypress handler is bound after the first paint, so a key sent the moment
+ * the review appears on screen can land before anything is subscribed and be
+ * dropped — which reads as a broken command rather than as the startup race it
+ * is. Toggling the help overlay is a cheap key with an unmistakable effect, so
+ * proving that one landed is what makes the key a test actually cares about
+ * meaningful.
+ */
+async function pressUntilKeyboardIsLive(session: Session) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await session.press("?");
+    try {
+      await harness.waitForSnapshot(session, (text) => text.includes("Controls help"), 2_000);
+      await session.press("escape");
+      await harness.waitForSnapshot(session, (text) => !text.includes("Controls help"), 5_000);
+      return;
+    } catch {
+      // Dropped before the app was listening; the next press is the retry.
+    }
+  }
+
+  throw new Error("The app never reacted to a keypress.");
+}
 
 describe("PTY extensions", () => {
   test("trust prompt runs repo extensions after the user trusts the repository", async () => {
@@ -269,6 +313,59 @@ describe("PTY extensions", () => {
       // The same key toggles it away again.
       await session.press("y");
       await harness.waitForSnapshot(session, (text) => !text.includes("EXTSIDEBAR"), 20_000);
+    } finally {
+      session.close();
+    }
+  });
+
+  test("a command key opens an extension confirm dialog that enter resolves", async () => {
+    const configHome = harness.createIsolatedConfigHome();
+    const fixture = harness.createRepoExtensionFixture(DIALOG_EXTENSION_SOURCE);
+    const session = await harness.launchHunk({
+      args: [
+        "diff",
+        "--mode",
+        "stack",
+        // Load the fixture through the dev flag so it is trusted without a prompt.
+        "--extension",
+        join(fixture.dir, ".hunk", "extensions", "fixture.ts"),
+      ],
+      cwd: fixture.dir,
+      cols: 140,
+      rows: 24,
+      env: { XDG_CONFIG_HOME: configHome },
+    });
+
+    try {
+      const before = await harness.waitForSnapshot(
+        session,
+        (text) => text.includes("alpha.ts") && !text.includes("Run this repository's extensions?"),
+        20_000,
+      );
+      expect(before).not.toContain("Reformat the changeset?");
+      await pressUntilKeyboardIsLive(session);
+
+      await session.press("y");
+      const prompt = await harness.waitForSnapshot(
+        session,
+        (text) => text.includes("Reformat the changeset?"),
+        20_000,
+      );
+      expect(prompt).toContain("Nothing is written to disk.");
+      // The frame names the extension that raised the dialog, so a prompt
+      // cannot present itself as Hunk asking.
+      expect(prompt).toContain("ext fixture");
+      expect(prompt).toContain("enter/y reformat");
+
+      // Enter resolves the promise the handler is awaiting, and its answer
+      // comes back as an ordinary extension toast.
+      await session.press("enter");
+      const answered = await harness.waitForSnapshot(
+        session,
+        (text) => text.includes("DIALOG ANSWERED YES"),
+        20_000,
+      );
+      expect(answered).not.toContain("Reformat the changeset?");
     } finally {
       session.close();
     }

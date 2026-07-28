@@ -3,6 +3,7 @@ import { useKeyboard } from "@opentui/react";
 import { useRef } from "react";
 import type { MenuId } from "../components/chrome/menu";
 import { dispatchAppCommand, type AppCommand } from "../lib/appCommands";
+import type { ExtensionDialogRequest } from "../lib/extensionDialogs";
 import { isEscapeKey, isSaveDraftNoteKey } from "../lib/keyboard";
 
 type FocusArea = "files" | "filter" | "note";
@@ -23,6 +24,11 @@ export interface UseAppKeyboardShortcutsOptions {
    */
   commands: readonly AppCommand[];
   denyRepoExtensions: () => void;
+  /** The extension dialog currently on screen, or `null` when none is. */
+  extensionDialog: ExtensionDialogRequest | null;
+  acceptExtensionDialog: () => void;
+  cancelExtensionDialog: () => void;
+  moveExtensionDialogSelection: (delta: number) => void;
   extensionTrustPromptOpen: boolean;
   trustRepoExtensions: () => void;
   focusArea: FocusArea;
@@ -65,6 +71,10 @@ export function useAppKeyboardShortcuts({
   closeExtensionTrustPrompt,
   commands,
   denyRepoExtensions,
+  extensionDialog,
+  acceptExtensionDialog,
+  cancelExtensionDialog,
+  moveExtensionDialogSelection,
   extensionTrustPromptOpen,
   trustRepoExtensions,
   focusArea,
@@ -93,6 +103,12 @@ export function useAppKeyboardShortcuts({
   const saveConfigPromptOpenRef = useRef(saveConfigPromptOpen);
   const themeSelectorOpenRef = useRef(themeSelectorOpen);
   const extensionTrustPromptOpenRef = useRef(extensionTrustPromptOpen);
+  const extensionDialogRef = useRef(extensionDialog);
+  // These three close over live dialog state (the highlighted option, the typed
+  // text), so they are read through refs rather than captured once.
+  const acceptExtensionDialogRef = useRef(acceptExtensionDialog);
+  const cancelExtensionDialogRef = useRef(cancelExtensionDialog);
+  const moveExtensionDialogSelectionRef = useRef(moveExtensionDialogSelection);
 
   activeMenuIdRef.current = activeMenuId;
   commandsRef.current = commands;
@@ -103,6 +119,10 @@ export function useAppKeyboardShortcuts({
   saveConfigPromptOpenRef.current = saveConfigPromptOpen;
   themeSelectorOpenRef.current = themeSelectorOpen;
   extensionTrustPromptOpenRef.current = extensionTrustPromptOpen;
+  extensionDialogRef.current = extensionDialog;
+  acceptExtensionDialogRef.current = acceptExtensionDialog;
+  cancelExtensionDialogRef.current = cancelExtensionDialog;
+  moveExtensionDialogSelectionRef.current = moveExtensionDialogSelection;
 
   const consumeKey = (key: KeyEvent) => {
     key.preventDefault();
@@ -201,6 +221,72 @@ export function useAppKeyboardShortcuts({
     if (isEscapeKey(key)) {
       closeExtensionTrustPrompt();
       return true;
+    }
+
+    return true;
+  };
+
+  /**
+   * Own every key while an extension dialog is up.
+   *
+   * Modal in the same sense the trust prompt is: a question is on screen and no
+   * key may quietly do something else with the review behind it. It sits below
+   * Hunk's own app-critical prompts — those are about the session itself, and an
+   * extension may not outrank them — and above menus, help, and the command
+   * table.
+   *
+   * The input kind is the one exception to consuming keys outright: it returns
+   * handled without preventing the event, so the focused OpenTUI field still
+   * receives typing and editing keys while global shortcuts stay suppressed.
+   */
+  const handleExtensionDialogShortcut = (key: KeyEvent) => {
+    const dialog = extensionDialogRef.current;
+    if (!dialog) {
+      return false;
+    }
+
+    if (isEscapeKey(key)) {
+      consumeKey(key);
+      cancelExtensionDialogRef.current();
+      return true;
+    }
+
+    if (key.name === "return" || key.name === "enter") {
+      consumeKey(key);
+      acceptExtensionDialogRef.current();
+      return true;
+    }
+
+    if (dialog.kind === "select") {
+      if (key.name === "up") {
+        consumeKey(key);
+        moveExtensionDialogSelectionRef.current(-1);
+        return true;
+      }
+
+      if (key.name === "down" || key.name === "tab") {
+        consumeKey(key);
+        moveExtensionDialogSelectionRef.current(key.shift ? -1 : 1);
+        return true;
+      }
+    }
+
+    if (dialog.kind === "confirm") {
+      if (key.name === "y" || key.sequence === "y") {
+        consumeKey(key);
+        acceptExtensionDialogRef.current();
+        return true;
+      }
+
+      if (key.name === "n" || key.sequence === "n") {
+        consumeKey(key);
+        cancelExtensionDialogRef.current();
+        return true;
+      }
+    }
+
+    if (dialog.kind !== "input") {
+      consumeKey(key);
     }
 
     return true;
@@ -319,6 +405,10 @@ export function useAppKeyboardShortcuts({
     }
 
     if (handleSaveConfigPromptShortcut(key)) {
+      return;
+    }
+
+    if (handleExtensionDialogShortcut(key)) {
       return;
     }
 

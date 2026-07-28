@@ -4,7 +4,17 @@ import {
   type ScrollBoxRenderable,
 } from "@opentui/core";
 import { useRenderer, useTerminalDimensions } from "@opentui/react";
-import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useState, useRef } from "react";
+import {
+  Fragment,
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import {
   diffPersistedViewPreferences,
   saveGlobalViewPreferences,
@@ -36,6 +46,7 @@ import type {
 } from "../hunk-session/types";
 import { MenuBar } from "./components/chrome/MenuBar";
 import { ConfirmDialog, confirmDialogHeight } from "./components/chrome/ConfirmDialog";
+import { ExtensionDialog } from "./components/chrome/ExtensionDialog";
 import { ExtensionToast } from "./components/chrome/ExtensionToast";
 import { StatusBar } from "./components/chrome/StatusBar";
 import { DiffPane } from "./components/panes/DiffPane";
@@ -61,6 +72,7 @@ import {
 } from "./lib/appCommands";
 import { buildAppMenus } from "./lib/appMenus";
 import { buildExtensionAppCommands, extensionCommandKeyDefaults } from "./lib/extensionCommands";
+import { createExtensionDialogQueue } from "./lib/extensionDialogs";
 import { buildExtensionReviewSelection } from "./lib/extensionSelection";
 import { resolveCommandKeys } from "./lib/keymap";
 import {
@@ -497,6 +509,75 @@ export function App({
    */
   const revealSidebarAreaRef = useRef<() => void>(() => {});
 
+  // One dialog queue per review: every extension's `ctx.dialogs` is minted from
+  // it, so questions from different extensions share one FIFO and one modal.
+  const [extensionDialogQueue] = useState(createExtensionDialogQueue);
+  const queuedExtensionDialog = useSyncExternalStore(
+    extensionDialogQueue.subscribe,
+    extensionDialogQueue.current,
+    extensionDialogQueue.current,
+  );
+  // Pager mode never dispatches extension commands, so nothing can fill the
+  // queue there; resolving it to null anyway keeps the modal's rendering and
+  // its key ownership describing the same thing.
+  const extensionDialog = pagerMode ? null : queuedExtensionDialog;
+  const [extensionDialogSelectedIndex, setExtensionDialogSelectedIndex] = useState(0);
+  const [extensionDialogInputValue, setExtensionDialogInputValue] = useState("");
+  const extensionDialogId = extensionDialog?.id ?? null;
+  const extensionDialogInitialText =
+    extensionDialog?.kind === "input" ? extensionDialog.initial : "";
+  useEffect(() => {
+    // Per-dialog answer state, reset whenever a different question becomes the
+    // visible one: a queued dialog opens fresh rather than inheriting the
+    // highlight or the text the user was giving the dialog before it.
+    setExtensionDialogSelectedIndex(0);
+    setExtensionDialogInputValue(extensionDialogInitialText);
+  }, [extensionDialogId, extensionDialogInitialText]);
+
+  useEffect(() => {
+    // Teardown answers everything still waiting. A handler that awaits a dialog
+    // across a session reload or an exit gets its cancel value instead of a
+    // promise nothing will ever settle.
+    return () => extensionDialogQueue.shutdown();
+  }, [extensionDialogQueue]);
+
+  /** Answer the open dialog with the user's acceptance. */
+  const acceptExtensionDialog = () => {
+    if (!extensionDialog) {
+      return;
+    }
+
+    if (extensionDialog.kind === "select") {
+      extensionDialogQueue.accept(
+        extensionDialog.id,
+        extensionDialog.options[extensionDialogSelectedIndex],
+      );
+      return;
+    }
+
+    extensionDialogQueue.accept(
+      extensionDialog.id,
+      extensionDialog.kind === "input" ? extensionDialogInputValue : undefined,
+    );
+  };
+
+  /** Dismiss the open dialog, resolving its cancel value. */
+  const cancelExtensionDialog = () => {
+    if (extensionDialog) {
+      extensionDialogQueue.cancel(extensionDialog.id);
+    }
+  };
+
+  /** Move the highlight within a select dialog, wrapping at both ends. */
+  const moveExtensionDialogSelection = (delta: number) => {
+    if (extensionDialog?.kind !== "select") {
+      return;
+    }
+
+    const optionCount = extensionDialog.options.length;
+    setExtensionDialogSelectedIndex((current) => (current + delta + optionCount) % optionCount);
+  };
+
   /** Invoke one extension command with its context, containing any failure. */
   const runExtensionCommand = useCallback(
     (registered: RegisteredCommand) => {
@@ -515,6 +596,10 @@ export function App({
         // where the review was at that moment, even if it awaits and the user
         // navigates on.
         selection: getExtensionSelection(),
+        // Bound to the requesting extension for attribution, and valid for the
+        // whole life of the handler's promise — a handler may ask several
+        // questions in sequence with work between them.
+        dialogs: extensionDialogQueue.createDialogs(registered.extensionId),
       };
 
       try {
@@ -529,7 +614,7 @@ export function App({
     // `getExtensionSelection` is identity-stable (it reads refs), so the
     // dispatch table, keymap, and Extensions menu derived from this callback
     // do not rebuild on every `[`/`]` press.
-    [createSidebarControls, extensions, getExtensionSelection],
+    [createSidebarControls, extensionDialogQueue, extensions, getExtensionSelection],
   );
 
   const registeredExtensionCommands = useMemo(
@@ -1341,6 +1426,10 @@ export function App({
     closeExtensionTrustPrompt,
     commands: appCommands,
     denyRepoExtensions,
+    extensionDialog,
+    acceptExtensionDialog,
+    cancelExtensionDialog,
+    moveExtensionDialogSelection,
     extensionTrustPromptOpen,
     trustRepoExtensions,
     focusArea,
@@ -1692,6 +1781,21 @@ export function App({
             onClose={closeHelp}
           />
         </Suspense>
+      ) : null}
+
+      {extensionDialog ? (
+        <ExtensionDialog
+          inputValue={extensionDialogInputValue}
+          request={extensionDialog}
+          selectedIndex={extensionDialogSelectedIndex}
+          terminalHeight={terminal.height}
+          terminalWidth={terminal.width}
+          theme={baseTheme}
+          onAccept={acceptExtensionDialog}
+          onCancel={cancelExtensionDialog}
+          onChangeInput={setExtensionDialogInputValue}
+          onPickOption={setExtensionDialogSelectedIndex}
+        />
       ) : null}
 
       {!pagerMode && saveConfigPromptOpen ? (
