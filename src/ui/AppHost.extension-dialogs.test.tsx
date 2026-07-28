@@ -6,7 +6,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { testRender } from "@opentui/react/test-utils";
 import { act } from "react";
 import { loadAppBootstrap } from "../core/loaders";
-import type { AppBootstrap } from "../core/types";
+import type { AppBootstrap, CliInput } from "../core/types";
+import type { HunkSessionBrokerClient } from "../hunk-session/types";
 import { loadStartupExtensions } from "../extensions/startup";
 import { AppHost } from "./AppHost";
 
@@ -99,15 +100,59 @@ async function launchWithExtension(repo: string, extPath: string): Promise<AppBo
   return bootstrap;
 }
 
+/**
+ * A broker client stub that captures the bridge App registers with it.
+ *
+ * The daemon reload path matters to dialogs specifically: it reaches
+ * `reloadSession` without passing through the refresh key's wrapper, so it is
+ * the reload most likely to leave a stale question standing if cancellation
+ * were wired anywhere but the session swap itself.
+ */
+function createTestBrokerClient() {
+  let bridge: { dispatchCommand: (message: unknown) => Promise<unknown> } | null = null;
+
+  const client = {
+    setBridge(next: typeof bridge) {
+      bridge = next;
+    },
+    getRegistration() {
+      return { sessionId: "test-session" };
+    },
+    replaceSession() {},
+    updateSnapshot() {},
+    updateRegistration() {},
+    close() {},
+  } as unknown as HunkSessionBrokerClient;
+
+  return {
+    client,
+    /** Reload the way the daemon does, with a freshly parsed input. */
+    reload: async (nextInput: CliInput) => {
+      if (!bridge) {
+        throw new Error("App never registered a session bridge.");
+      }
+
+      return await bridge.dispatchCommand({
+        type: "command",
+        requestId: "test-request",
+        command: "reload_session",
+        input: { sessionId: "test-session", nextInput },
+      });
+    },
+  };
+}
+
 /** Mount one AppHost, run the body, and tear down. */
 async function withAppHost(
   bootstrap: AppBootstrap,
   body: (setup: Awaited<ReturnType<typeof testRender>>, quits: () => number) => Promise<void>,
+  hostClient?: HunkSessionBrokerClient,
 ) {
   let quitCount = 0;
   const setup = await testRender(
     <AppHost
       bootstrap={bootstrap}
+      hostClient={hostClient}
       onQuit={() => {
         quitCount += 1;
       }}
@@ -336,5 +381,56 @@ describe("extension dialogs", () => {
         "the handler to resolve the typed text",
       );
     });
+  });
+
+  test("a daemon-driven session reload cancels the open dialog", async () => {
+    const repo = createTestRepo("hunk-ext-dialog-reload-");
+    const extDir = createTempDir("hunk-ext-dialog-reload-ext-");
+    const logPath = join(extDir, "probe.log");
+    const extPath = join(extDir, "ext.ts");
+    writeDialogFixture(extPath, logPath, `ctx.dialogs.confirm({ title: "Still relevant?" })`);
+
+    const broker = createTestBrokerClient();
+    const bootstrap = await launchWithExtension(repo, extPath);
+    await withAppHost(
+      bootstrap,
+      async (setup) => {
+        await flushUntil(
+          setup,
+          () => setup.captureCharFrame().includes("alpha.txt"),
+          "the review to render",
+        );
+
+        await act(async () => {
+          await setup.mockInput.typeText("y");
+        });
+        await flushUntil(
+          setup,
+          () => setup.captureCharFrame().includes("Still relevant?"),
+          "the confirm dialog to open",
+        );
+
+        // The daemon path reaches reloadSession without the refresh key's
+        // wrapper, so this is the reload that would leave the question
+        // standing if cancellation hung off any single call site.
+        await act(async () => {
+          await broker.reload({ kind: "vcs", staged: false, options: {} });
+        });
+        await flushUntil(
+          setup,
+          () => {
+            const frame = setup.captureCharFrame();
+            return !frame.includes("Still relevant?") && frame.includes("alpha.txt");
+          },
+          "the reload to close the dialog over the replacement review",
+        );
+        await flushUntil(
+          setup,
+          () => readProbeLog(logPath).includes("answer false"),
+          "the handler to resolve the dialog's cancel value",
+        );
+      },
+      broker.client,
+    );
   });
 });
