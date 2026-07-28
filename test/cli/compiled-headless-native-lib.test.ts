@@ -148,33 +148,38 @@ describe("compiled headless native-library loading", () => {
     expect(nativeArtifacts(temp).length).toBeGreaterThan(0);
   });
 
-  compiledTest("does not extract OpenTUI for short-lived headless commands", () => {
-    const { env, temp } = createTestEnvironment();
-    const commands: Array<{ args: string[]; stdin?: string }> = [
-      { args: ["--help"] },
-      { args: ["--version"] },
-      { args: ["session", "--help"] },
-      { args: ["skill", "path"] },
-      { args: ["markup", "guide"] },
-      { args: ["markup", "render", "-"], stdin: "<text>Hello</text>\n" },
-      { args: ["pager"], stdin: "plain pager text\n" },
-      {
-        args: ["pager"],
-        stdin: "diff --git a/a.txt b/a.txt\n@@ -1 +1 @@\n-old\n+new\n",
-      },
-    ];
+  compiledTest(
+    "does not extract OpenTUI for short-lived headless commands",
+    () => {
+      const { env, temp } = createTestEnvironment();
+      const commands: Array<{ args: string[]; stdin?: string }> = [
+        { args: ["--help"] },
+        { args: ["--version"] },
+        { args: ["session", "--help"] },
+        { args: ["skill", "path"] },
+        { args: ["markup", "guide"] },
+        { args: ["markup", "render", "-"], stdin: "<text>Hello</text>\n" },
+        { args: ["pager"], stdin: "plain pager text\n" },
+        {
+          args: ["pager"],
+          stdin: "diff --git a/a.txt b/a.txt\n@@ -1 +1 @@\n-old\n+new\n",
+        },
+      ];
 
-    for (const command of commands) {
-      const proc = Bun.spawnSync([executable!, ...command.args], {
-        env,
-        stdin: command.stdin === undefined ? "ignore" : Buffer.from(command.stdin),
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-      expect(proc.exitCode).toBe(0);
-      expect(nativeArtifacts(temp)).toEqual([]);
-    }
-  });
+      for (const command of commands) {
+        const proc = Bun.spawnSync([executable!, ...command.args], {
+          env,
+          stdin: command.stdin === undefined ? "ignore" : Buffer.from(command.stdin),
+          stdout: "pipe",
+          stderr: "pipe",
+        });
+        expect(proc.exitCode).toBe(0);
+        expect(nativeArtifacts(temp)).toEqual([]);
+      }
+      // Cold compiled binaries on macOS may need more than Bun's default 5 seconds.
+    },
+    15_000,
+  );
 
   compiledLinuxTest("keeps captured-host static pager rendering OpenTUI-free", () => {
     const { env, temp } = createTestEnvironment();
