@@ -5,11 +5,14 @@ import type {
   ExtensionEventPayloads,
   ExtensionLoadResult,
 } from "./types";
+import type { Hunk } from "@pierre/diffs";
 import type {
+  ExtensionDiffHunk,
   ExtensionEventContext,
   ExtensionSidebarControls,
   ExtensionVcsFileChangeType,
 } from "../extension-api/types";
+import { summarizeHunk } from "../core/hunkSummary";
 
 /**
  * How long `shutdown` handlers may run before Hunk exits anyway.
@@ -81,6 +84,44 @@ export function readMetadataChangeType(metadata: unknown): ExtensionVcsFileChang
 export function readMetadataHunkCount(metadata: unknown): number {
   const hunks = (metadata as { hunks?: unknown } | null | undefined)?.hunks;
   return Array.isArray(hunks) ? hunks.length : 0;
+}
+
+/** The one frozen empty summary list, shared by every file with nothing to summarize. */
+const NO_HUNK_SUMMARIES: readonly ExtensionDiffHunk[] = Object.freeze([]);
+
+/** Summary lists already derived, keyed by the metadata that produced them. */
+const metadataHunkSummaries = new WeakMap<object, readonly ExtensionDiffHunk[]>();
+
+/**
+ * Summarize the hunks Hunk's diff engine parsed for one file.
+ *
+ * Same boundary as `readMetadataChangeType`: the parsed hunks live inside the
+ * opaque `metadata`, so the public views surface them as first-class
+ * `ExtensionDiffHunk` records instead of asking extensions to cast into an
+ * object Hunk promised not to describe. Derivation runs once per parsed diff —
+ * file views are rebuilt on every emit while the metadata behind them is
+ * stable, so summaries are cached by metadata object, and repeated views hand
+ * back the identical frozen list. A file whose metadata has no hunk array
+ * (binary, skipped) reads as the shared empty list rather than throwing.
+ */
+export function readMetadataHunkSummaries(metadata: unknown): readonly ExtensionDiffHunk[] {
+  if (metadata === null || typeof metadata !== "object") {
+    return NO_HUNK_SUMMARIES;
+  }
+
+  const cached = metadataHunkSummaries.get(metadata);
+  if (cached) {
+    return cached;
+  }
+
+  const hunks = (metadata as { hunks?: unknown }).hunks;
+  const summaries = Array.isArray(hunks)
+    ? Object.freeze(
+        (hunks as Hunk[]).map((hunk, index) => Object.freeze(summarizeHunk(hunk, index))),
+      )
+    : NO_HUNK_SUMMARIES;
+  metadataHunkSummaries.set(metadata, summaries);
+  return summaries;
 }
 
 /** Proxies already built for shared objects, so repeated views stay identical. */
@@ -192,7 +233,10 @@ export function toReadOnlyDeepView<T>(value: T): T {
  * `agent`) behind `toReadOnlyDeepView` — factored out so surfaces that hand
  * extensions a file list without a changeset envelope (a custom sidebar's
  * props, a command's selection) guard it identically. `changeType` is filled
- * from the diff metadata when the file does not carry it already.
+ * from the diff metadata when the file does not carry it already, and `hunks`
+ * always from the metadata — the parsed diff is authoritative, so a `hunks`
+ * value already on the file (say, spread through a transform) is replaced
+ * rather than trusted.
  */
 export function toReadOnlyFileViews(files: readonly ExtensionDiffFile[]): ExtensionDiffFile[] {
   const frozenFiles = files.map((file) => {
@@ -204,6 +248,7 @@ export function toReadOnlyFileViews(files: readonly ExtensionDiffFile[]): Extens
     return Object.freeze({
       ...file,
       ...(changeType ? { changeType } : {}),
+      hunks: readMetadataHunkSummaries(file.metadata),
       metadata: toReadOnlyDeepView(file.metadata),
       stats: toReadOnlyDeepView(file.stats),
       agent: toReadOnlyDeepView(file.agent),

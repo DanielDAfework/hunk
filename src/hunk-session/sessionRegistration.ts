@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { resolveExperimentalFeatures } from "../core/experimental";
-import { formatHunkHeader } from "../core/hunkHeader";
+import { summarizeHunk } from "../core/hunkSummary";
 import { hunkLineRange } from "../core/liveComments";
 import type { AppBootstrap } from "../core/types";
 import {
@@ -44,11 +44,9 @@ function buildSessionFiles(bootstrap: AppBootstrap): SessionReviewFile[] {
     deletions: file.stats.deletions,
     hunkCount: file.metadata.hunks.length,
     patch: file.patch,
-    hunks: file.metadata.hunks.map((hunk, index) => ({
-      index,
-      header: formatHunkHeader(hunk),
-      ...hunkLineRange(hunk),
-    })),
+    // The same derivation the extension API's file views use, so the two
+    // external views of a review never disagree on a hunk's header or spans.
+    hunks: file.metadata.hunks.map((hunk, index) => summarizeHunk(hunk, index)),
   }));
 }
 

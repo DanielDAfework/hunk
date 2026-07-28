@@ -41,6 +41,7 @@ export type {
   ExtensionChangeset,
   ExtensionContext,
   ExtensionDiffFile,
+  ExtensionDiffHunk,
   ExtensionCustomEventHandler,
   ExtensionEventBus,
   ExtensionEventContext,

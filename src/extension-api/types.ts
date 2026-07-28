@@ -109,6 +109,36 @@ export interface AgentFileContext {
 /* -------------------------------------------------------------------------- */
 
 /**
+ * One hunk of a reviewed file, summarized for extensions.
+ *
+ * A stable public view of the parsed diff: enough to build a hunk list, a
+ * progress checklist, or an annotation navigator without reaching into the
+ * opaque `metadata`. The shape matches what the agent session surface reports
+ * for hunks, so the two external views of a review never disagree.
+ */
+export interface ExtensionDiffHunk {
+  /**
+   * The hunk's position within its file, in review-stream render order.
+   *
+   * This is the same index `selectedHunkIndex` reports and
+   * `actions.selectHunk(fileId, hunkIndex)` accepts, so a hunk list built from
+   * these summaries can highlight and drive the selection directly.
+   */
+  index: number;
+  /** The unified-diff `@@` header, including any trailing context text. */
+  header: string;
+  /**
+   * Inclusive old-side line span the hunk covers, context lines included.
+   *
+   * Omitted when the hunk carries no usable line numbers — which real parsed
+   * diffs always do; only a transform-synthesized hunk can lack them.
+   */
+  oldRange?: [number, number];
+  /** Inclusive new-side line span the hunk covers, context lines included. */
+  newRange?: [number, number];
+}
+
+/**
  * One reviewed file, as extensions see it.
  *
  * Structurally a subset of Hunk's internal `DiffFile`, so the internal value
@@ -147,6 +177,17 @@ export interface ExtensionDiffFile {
   changeType?: ExtensionVcsFileChangeType;
   /** True when `stats` were counted from a partial read and undercount the file. */
   statsTruncated?: boolean;
+  /**
+   * Summaries of the hunks the diff engine parsed from this file, in render
+   * order — empty for a file with nothing to select (binary, skipped).
+   *
+   * Like `changeType`, this is filled on the read-only views Hunk hands
+   * outward (event payloads, sidebar props, a command's selection). It is
+   * derived from `metadata` at that boundary, so a transform neither receives
+   * nor needs to produce it — a `hunks` value on a transform's returned file
+   * is ignored in favor of what the metadata actually parses to.
+   */
+  hunks?: readonly ExtensionDiffHunk[];
   agent: AgentFileContext | null;
   isUntracked?: boolean;
   isBinary?: boolean;

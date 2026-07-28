@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { createTestDiffFile } from "../../test/helpers/diff-helpers";
 import {
   bindExtensionEventBus,
   emitExtensionCustomEvent,
@@ -6,6 +7,7 @@ import {
   emitExtensionEventBounded,
   emitExtensionEventToExtensions,
   readMetadataHunkCount,
+  readMetadataHunkSummaries,
   toReadOnlyFileViews,
 } from "./events";
 import { createExtensionNotificationHub } from "./notifications";
@@ -442,6 +444,57 @@ describe("read-only file views", () => {
     const seen = (view!.metadata as { cache: Map<string, string> }).cache;
     expect(seen).toBe(cache);
     expect(seen.get("k")).toBe("v");
+  });
+
+  test("fills hunk summaries from the parsed metadata", () => {
+    const file = createTestDiffFile({ context: 0 });
+    const [view] = toReadOnlyFileViews([file as never]);
+
+    expect(view!.hunks).toHaveLength(file.metadata.hunks.length);
+    expect(view!.hunks!.length).toBeGreaterThan(0);
+    for (const [index, summary] of view!.hunks!.entries()) {
+      expect(summary.index).toBe(index);
+      expect(summary.header).toMatch(/^@@ -\d/);
+      expect(summary.oldRange).toBeDefined();
+      expect(summary.newRange).toBeDefined();
+    }
+  });
+
+  test("hunk summaries are frozen and identical across conversions", () => {
+    const file = createTestDiffFile();
+    const [first] = toReadOnlyFileViews([file as never]);
+    const [second] = toReadOnlyFileViews([file as never]);
+
+    // Derived once per parsed diff: views are rebuilt on every emit, so the
+    // summaries are keyed by the metadata behind them, like the deep views.
+    expect(second!.hunks).toBe(first!.hunks);
+    expect(readMetadataHunkSummaries(file.metadata)).toBe(first!.hunks!);
+
+    expect(Object.isFrozen(first!.hunks)).toBe(true);
+    expect(Object.isFrozen(first!.hunks![0])).toBe(true);
+    expect(() => {
+      (first!.hunks as unknown as { header: string }[])[0]!.header = "@@ forged @@";
+    }).toThrow(TypeError);
+  });
+
+  test("hunk summaries always come from metadata, not from a stale field on the file", () => {
+    // A transform that spreads a frozen view carries an old `hunks` list along;
+    // the parsed diff is authoritative, so the boundary replaces it.
+    const file = { ...createTestFile(), hunks: [{ index: 9, header: "@@ stale @@" }] };
+    const [view] = toReadOnlyFileViews([file as never]);
+
+    expect(view!.hunks).toHaveLength(1);
+    expect(view!.hunks![0]!.index).toBe(0);
+    expect(view!.hunks![0]!.header).not.toBe("@@ stale @@");
+  });
+
+  test("files with no parsable hunks share one empty summary list", () => {
+    const binary = { ...createTestFile(), id: "bin", metadata: { type: "change" } };
+    const skipped = { ...createTestFile(), id: "skip", metadata: null };
+    const views = toReadOnlyFileViews([binary as never, skipped as never]);
+
+    expect(views[0]!.hunks).toEqual([]);
+    expect(views[1]!.hunks).toBe(views[0]!.hunks);
   });
 });
 

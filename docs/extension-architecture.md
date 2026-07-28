@@ -74,7 +74,10 @@ model — session view list, open-state reconciliation across reloads, and the
 layout plan deciding which open panes fit at what width.
 `src/ui/components/panes/ExtensionSidebarPane.tsx` mounts one view: frozen
 file views in, guarded actions out, error boundary scoped to the
-registration identity.
+registration identity. The frozen views fill `changeType` and the public
+`hunks` summaries from the opaque metadata at the view boundary
+(`src/extensions/events.ts`, deriving through `src/core/hunkSummary.ts` — the
+same helper the agent session surface reports hunks with).
 
 ## Command system
 

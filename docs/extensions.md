@@ -519,15 +519,15 @@ elements and need no import.
 
 The component receives fresh props as the app changes:
 
-| Prop                | What it is                                                                                                                                            |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `files`             | the visible reviewed files, review-stream order, filtered, frozen views (each carries `changeType` and `statsTruncated` beside the usual file fields) |
-| `selectedFileId`    | the selected file, or `null`                                                                                                                          |
-| `selectedHunkIndex` | the selected hunk within that file, or `null`                                                                                                         |
-| `width`             | terminal columns the sidebar pane occupies                                                                                                            |
-| `theme`             | hex color tokens from the active theme, updated on theme switch                                                                                       |
-| `keybindings`       | the current command bindings, resolved from defaults and the user's `[keybindings]` table                                                             |
-| `actions`           | navigation the sidebar may trigger                                                                                                                    |
+| Prop                | What it is                                                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `files`             | the visible reviewed files, review-stream order, filtered, frozen views (each carries `changeType`, `statsTruncated`, and `hunks` summaries beside the usual file fields) |
+| `selectedFileId`    | the selected file, or `null`                                                                                                                                              |
+| `selectedHunkIndex` | the selected hunk within that file, or `null`                                                                                                                             |
+| `width`             | terminal columns the sidebar pane occupies                                                                                                                                |
+| `theme`             | hex color tokens from the active theme, updated on theme switch                                                                                                           |
+| `keybindings`       | the current command bindings, resolved from defaults and the user's `[keybindings]` table                                                                                 |
+| `actions`           | navigation the sidebar may trigger                                                                                                                                        |
 
 `actions.selectFile(fileId)` and `actions.selectHunk(fileId, hunkIndex)` route
 through the same review controller as the built-in sidebar and the keyboard
@@ -536,6 +536,14 @@ shortcuts, so the review stream scrolls, selection updates, and the
 row. `actions.notify(message, type?)` shows a toast attributed to your
 extension. An action given a file id that is not currently visible is refused
 with a warning rather than corrupting the selection.
+
+The three hunk surfaces line up by design: each file's `hunks` lists public
+`ExtensionDiffHunk` summaries (`index`, the `@@` header, inclusive old/new
+line spans) in render order, `selectedHunkIndex` reports the same index, and
+`actions.selectHunk(fileId, hunkIndex)` accepts it. That is everything a hunk
+checklist, a per-hunk progress view, or an agent-annotation navigator needs —
+match an annotation's `oldRange`/`newRange` against the summaries' spans to
+find its hunk — without touching the opaque `metadata`.
 
 A component that owns a key event should ask the injected `keybindings`
 manager about a **command id**, rather than hard-coding the command's default
@@ -706,8 +714,7 @@ of the selected file:
 
 ```ts
 hunk.registerCommand({ id: "pick-hunk", title: "Pick a hunk", key: "ctrl+k" }, async (ctx) => {
-  const file = ctx.selection.file;
-  const hunks = (file?.metadata as { hunks?: { header?: string }[] } | undefined)?.hunks ?? [];
+  const hunks = ctx.selection.file?.hunks ?? [];
   if (hunks.length === 0) {
     ctx.notify("Nothing to pick from", "warning");
     return;
@@ -715,7 +722,7 @@ hunk.registerCommand({ id: "pick-hunk", title: "Pick a hunk", key: "ctrl+k" }, a
 
   const picked = await ctx.dialogs.select({
     title: "Which hunk?",
-    options: hunks.map((hunk, index) => hunk.header ?? `hunk ${index + 1}`),
+    options: hunks.map((hunk) => hunk.header || `hunk ${hunk.index + 1}`),
   });
 
   if (picked !== null) {
@@ -768,6 +775,14 @@ returns something the review UI could not draw — not a changeset with a `files
 array, a file missing `metadata.hunks` or `stats`, two files sharing an `id` —
 is skipped: the previous changeset carries forward and you get a warning naming
 your extension and the problem.
+
+You never need to reach into `metadata` to know what a file's hunks are: the
+read-only views Hunk hands outward (event payloads, sidebar props, a command's
+selection) carry a `hunks` list of public summaries — `index`, the `@@` header,
+and the inclusive old/new line spans, in render order. Like `changeType`, it is
+derived from the metadata at that boundary, so a transform neither receives nor
+produces it, and a stale value spread through a transform is replaced with what
+the metadata actually parses to.
 
 ### `hunk.on(event, handler)`
 
