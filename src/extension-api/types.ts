@@ -738,9 +738,40 @@ export interface ExtensionSidebarControls {
   isOpen(viewId: string): boolean;
 }
 
+/**
+ * The review selection at one moment, as extensions see it.
+ *
+ * A snapshot rather than a live window onto the review: the values describe
+ * where the user was when the command fired, and never change afterwards.
+ */
+export interface ExtensionReviewSelection {
+  /**
+   * The selected file among the currently visible (filtered) files, or `null`.
+   *
+   * The same frozen read-only view a sidebar component receives in its `files`
+   * prop, so holding or mutating it cannot reach the review model. `null` when
+   * nothing is selected, or when the selection points at a file the current
+   * file filter hides.
+   */
+  file: ExtensionDiffFile | null;
+  /**
+   * The selected hunk's index within that file, or `null` when no hunk is
+   * selected — including whenever `file` is `null`, and for a file with no
+   * hunks to select (a binary or skipped file).
+   */
+  hunkIndex: number | null;
+}
+
 /** What a command handler receives when its key fires. */
 export interface ExtensionCommandContext extends ExtensionContext {
   sidebars: ExtensionSidebarControls;
+  /**
+   * Where the review was pointing when this command fired.
+   *
+   * Captured at invocation, not live: a handler that awaits and reads it again
+   * still sees the selection the user ran the command from.
+   */
+  readonly selection: ExtensionReviewSelection;
 }
 
 export type ExtensionCommandHandler = (ctx: ExtensionCommandContext) => void | Promise<void>;

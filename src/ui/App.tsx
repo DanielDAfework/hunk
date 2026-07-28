@@ -22,7 +22,7 @@ import type {
 import { canReloadInput } from "../core/watch";
 import { sanitizeTerminalLine } from "../lib/terminalText";
 import { resolveExtensionCommands } from "../extensions/apply";
-import { emitExtensionEvent } from "../extensions/events";
+import { emitExtensionEvent, toReadOnlyFileViews } from "../extensions/events";
 import { writeExtensionTrust } from "../extensions/trust";
 import type {
   ExtensionCommandContext,
@@ -61,6 +61,7 @@ import {
 } from "./lib/appCommands";
 import { buildAppMenus } from "./lib/appMenus";
 import { buildExtensionAppCommands, extensionCommandKeyDefaults } from "./lib/extensionCommands";
+import { buildExtensionReviewSelection } from "./lib/extensionSelection";
 import { resolveCommandKeys } from "./lib/keymap";
 import {
   buildSessionSidebarViews,
@@ -318,6 +319,20 @@ export function App({
   const filteredFiles = review.visibleFiles;
   const selectedFile = review.selectedFile;
   const selectedHunkIndex = review.selectedHunkIndex;
+  const selectedFileId = selectedFile?.id ?? null;
+  // The one conversion of the visible review files into the frozen views every
+  // extension surface sees: sidebar props and command-handler selection both
+  // read from this list, so they can never describe the review differently.
+  const extensionFileViews = useMemo(() => toReadOnlyFileViews(filteredFiles), [filteredFiles]);
+  const extensionSelection = useMemo(
+    () =>
+      buildExtensionReviewSelection({
+        files: extensionFileViews,
+        selectedFileId,
+        selectedHunkIndex,
+      }),
+    [extensionFileViews, selectedFileId, selectedHunkIndex],
+  );
   const moveToAnnotatedFile = review.moveToAnnotatedFile;
   const moveToAnnotatedHunk = review.moveToAnnotatedHunk;
   const moveToFile = review.moveToFile;
@@ -461,6 +476,17 @@ export function App({
    */
   const revealSidebarAreaRef = useRef<() => void>(() => {});
 
+  /**
+   * The selection commands are handed, read when a command fires.
+   *
+   * Kept in a ref rather than in `runExtensionCommand`'s dependencies: the
+   * dispatch table, the keymap, and the Extensions menu are all derived from
+   * that callback, and rebuilding them on every `[`/`]` press to carry a value
+   * only read at invocation would be wasted work.
+   */
+  const extensionSelectionRef = useRef(extensionSelection);
+  extensionSelectionRef.current = extensionSelection;
+
   /** Invoke one extension command with its context, containing any failure. */
   const runExtensionCommand = useCallback(
     (registered: RegisteredCommand) => {
@@ -475,6 +501,9 @@ export function App({
         cwd: extensions?.context.cwd ?? process.cwd(),
         notify: (message, type) => extensions?.context.notify(message, type),
         sidebars: createSidebarControls(registered.extensionId),
+        // Snapshot semantics: the handler sees where the review was when its
+        // key fired, even if it awaits and the user navigates on.
+        selection: extensionSelectionRef.current,
       };
 
       try {
@@ -566,7 +595,6 @@ export function App({
     );
   }, [keymap, showSessionNotice]);
 
-  const selectedFileId = selectedFile?.id ?? null;
   useEffect(() => {
     const timer = setTimeout(() => {
       emitExtensionEvent(extensions, "selection_changed", {
@@ -1393,8 +1421,9 @@ export function App({
     <ExtensionSidebarPane
       registered={pane.view.registered}
       files={filteredFiles}
-      selectedFileId={selectedFileId}
-      selectedHunkIndex={selectedFileId === null ? null : selectedHunkIndex}
+      fileViews={extensionFileViews}
+      selectedFileId={extensionSelection.file?.id ?? null}
+      selectedHunkIndex={extensionSelection.hunkIndex}
       showTopChrome={showMenuBar}
       theme={activeTheme}
       width={pane.width}

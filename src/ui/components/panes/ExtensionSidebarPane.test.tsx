@@ -6,6 +6,7 @@ import type {
   ExtensionSidebarActions,
   ExtensionSidebarViewProps,
 } from "../../../extension-api/types";
+import { toReadOnlyFileViews } from "../../../extensions/events";
 import type { RegisteredSidebarView } from "../../../extensions/types";
 import { resolveTheme } from "../../themes";
 import { ExtensionSidebarPane } from "./ExtensionSidebarPane";
@@ -69,6 +70,7 @@ describe("ExtensionSidebarPane actions", () => {
           return <text content="probe" />;
         })}
         files={files}
+        fileViews={toReadOnlyFileViews(files)}
         selectedFileId={null}
         selectedHunkIndex={null}
         showTopChrome={true}
@@ -130,6 +132,7 @@ describe("ExtensionSidebarPane failure recovery", () => {
         <ExtensionSidebarPane
           registered={registered}
           files={files}
+          fileViews={toReadOnlyFileViews(files)}
           selectedFileId={null}
           selectedHunkIndex={null}
           showTopChrome={true}

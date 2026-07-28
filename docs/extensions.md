@@ -636,6 +636,33 @@ controls for opening sidebar views:
   with `s`, so the open is never silent.
 - `ctx.sidebars.isOpen(viewId)` reports current state.
 
+`ctx.selection` is where the review was pointing when the command fired — the
+same selection a sidebar component sees in its props, so a command never has to
+track `selection_changed` itself to know what the user is looking at:
+
+```ts
+hunk.registerCommand(
+  { id: "show-selection", title: "Show the selected file", key: "ctrl+y" },
+  (ctx) => {
+    const { file, hunkIndex } = ctx.selection;
+    if (!file) {
+      ctx.notify("No file selected");
+      return;
+    }
+
+    ctx.notify(hunkIndex === null ? file.path : `${file.path} — hunk ${hunkIndex + 1}`);
+  },
+);
+```
+
+`selection.file` is a frozen read-only view, identical to the entries in a
+sidebar's `files` prop, and is `null` when nothing is selected or when the
+current filter hides the selected file. `selection.hunkIndex` is that file's
+selected hunk, and `null` whenever `file` is — or when the file has no hunks to
+select. The values are captured when the command fires: a handler that awaits
+still sees the selection it was run from, not wherever the user navigated to
+meanwhile.
+
 A handler may be async; a failure (sync or rejected) becomes a warning naming
 your extension.
 

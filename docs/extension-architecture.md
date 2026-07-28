@@ -88,7 +88,12 @@ commands. Extension
 `src/ui/lib/extensionCommands.ts` — built-ins win key conflicts, refused one
 chord at a time and detected by probing matchers with a synthesized event
 (`src/lib/commandKeys.ts`). Command handlers receive sidebar open/close
-controls, which is how a registered key opens an extension's sidebar.
+controls, which is how a registered key opens an extension's sidebar, plus a
+`selection` snapshot resolved by `src/ui/lib/extensionSelection.ts` from the
+same frozen file views the sidebar panes render — one conversion feeding both
+surfaces, so a command and a sidebar can never disagree about what is selected.
+App reads the snapshot through a ref when a command fires, keeping the dispatch
+table stable as the review moves.
 
 Commands declare chords, not matchers: `src/ui/lib/keymap.ts` folds every
 command's `defaultKeys` against the user's `[keybindings]` table (user config

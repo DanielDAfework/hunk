@@ -1,12 +1,12 @@
 import { Component, useMemo, type ReactNode } from "react";
 import type {
+  ExtensionDiffFile,
   ExtensionNotifyType,
   ExtensionSidebarActions,
   ExtensionSidebarTheme,
   ExtensionSidebarViewProps,
 } from "../../../extension-api/types";
 import { BuiltInSidebarView } from "../../../extensions/default/ui/sidebar";
-import { toReadOnlyFileViews } from "../../../extensions/events";
 import type { ExtensionNotifySink, RegisteredSidebarView } from "../../../extensions/types";
 import type { DiffFile } from "../../../core/types";
 import type { AppTheme } from "../../themes";
@@ -107,6 +107,7 @@ function toSidebarTheme(theme: AppTheme): ExtensionSidebarTheme {
 export function ExtensionSidebarPane({
   registered,
   files,
+  fileViews,
   selectedFileId,
   selectedHunkIndex,
   showTopChrome,
@@ -118,8 +119,19 @@ export function ExtensionSidebarPane({
   onRenderFailure,
 }: {
   registered: RegisteredSidebarView;
-  /** The visible review-stream files, already filtered like the built-in sidebar's. */
+  /**
+   * The visible review-stream files, already filtered like the built-in
+   * sidebar's. Host-side only: the guarded actions validate navigation targets
+   * against it, while the component sees `fileViews`.
+   */
   files: DiffFile[];
+  /**
+   * The same files as frozen read-only views, converted once by the host.
+   *
+   * Passed in rather than derived here so sidebar props and the selection
+   * command handlers receive come out of one conversion.
+   */
+  fileViews: ExtensionDiffFile[];
   selectedFileId: string | null;
   selectedHunkIndex: number | null;
   showTopChrome: boolean;
@@ -138,7 +150,6 @@ export function ExtensionSidebarPane({
   onRenderFailure?: () => void;
 }) {
   const { extensionId } = registered;
-  const publicFiles = useMemo(() => toReadOnlyFileViews(files), [files]);
   const publicTheme = useMemo(() => Object.freeze(toSidebarTheme(theme)), [theme]);
 
   const actions = useMemo<ExtensionSidebarActions>(() => {
@@ -207,7 +218,7 @@ export function ExtensionSidebarPane({
   const View = registered.view.component as (props: ExtensionSidebarViewProps) => ReactNode;
 
   const viewProps: ExtensionSidebarViewProps = {
-    files: publicFiles,
+    files: fileViews,
     selectedFileId,
     selectedHunkIndex,
     width,

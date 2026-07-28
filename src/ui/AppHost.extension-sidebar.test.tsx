@@ -208,6 +208,67 @@ describe("extension sidebar views", () => {
     });
   });
 
+  test("a command handler sees the current review selection", async () => {
+    const repo = createTestRepo("hunk-ext-selection-");
+    // Outside the repo, so the fixture and its log never join the review as
+    // untracked files and shift the selection this test drives.
+    const extDir = createTempDir("hunk-ext-selection-ext-");
+    const logPath = join(extDir, "probe.log");
+    const extPath = join(extDir, "ext.ts");
+    // The handler reads only `ctx.selection` — no `selection_changed` handler
+    // shadowing the selection into module state, which is the whole point.
+    writeFileSync(
+      extPath,
+      `import { appendFileSync } from "node:fs";\n` +
+        `export default function (hunk) {\n` +
+        `  hunk.registerCommand({ id: "probe", title: "Probe selection", key: "y" }, (ctx) => {\n` +
+        `    const file = ctx.selection.file;\n` +
+        `    appendFileSync(\n` +
+        `      ${JSON.stringify(logPath)},\n` +
+        `      "selection " + (file ? file.path : "none") + "#" + ctx.selection.hunkIndex +\n` +
+        `        " frozen=" + Object.isFrozen(file) + "\\n",\n` +
+        `    );\n` +
+        `  });\n` +
+        `}\n`,
+    );
+
+    const bootstrap = await launchWithExtension(repo, extPath);
+    await withAppHost(bootstrap, async (setup) => {
+      await flushUntil(
+        setup,
+        () => setup.captureCharFrame().includes("alpha.txt"),
+        "the built-in sidebar to render",
+      );
+
+      // The review opens on the first file's first hunk, and the handler sees
+      // exactly that without having tracked anything itself.
+      await act(async () => {
+        await setup.mockInput.typeText("y");
+      });
+      await flushUntil(
+        setup,
+        () => readProbeLog(logPath).includes("selection alpha.txt#0 frozen=true"),
+        "the command to report the startup selection",
+      );
+
+      // `]` moves the review stream to the next hunk, which is the one hunk of
+      // the second file; the next run reports the new selection rather than a
+      // snapshot captured when the command was registered.
+      await act(async () => {
+        await setup.mockInput.typeText("]");
+      });
+      await flush(setup);
+      await act(async () => {
+        await setup.mockInput.typeText("y");
+      });
+      await flushUntil(
+        setup,
+        () => readProbeLog(logPath).includes("selection beta.txt#0 frozen=true"),
+        "the command to report the selection after navigating",
+      );
+    });
+  });
+
   test("opening a view through a command reveals a sidebar area hidden with s", async () => {
     const repo = createTestRepo("hunk-ext-sidebar-reveal-");
     const extPath = join(createTempDir("hunk-ext-sidebar-reveal-ext-"), "ext.ts");

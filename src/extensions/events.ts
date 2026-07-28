@@ -66,6 +66,20 @@ export function readMetadataChangeType(metadata: unknown): ExtensionVcsFileChang
 }
 
 /**
+ * Read how many hunks Hunk's diff engine parsed for one file, if any.
+ *
+ * Same boundary as `readMetadataChangeType`: `metadata` is opaque to
+ * extensions, so the one place that knows its real shape stays here rather
+ * than spreading casts across the surfaces that hand extensions file views.
+ * A file the engine could not parse into hunks — binary, skipped — reads as
+ * zero rather than throwing.
+ */
+export function readMetadataHunkCount(metadata: unknown): number {
+  const hunks = (metadata as { hunks?: unknown } | null | undefined)?.hunks;
+  return Array.isArray(hunks) ? hunks.length : 0;
+}
+
+/**
  * Build the read-only file-list view extension UI code receives.
  *
  * The same isolation story as `toReadOnlyChangesetView` — frozen shallow
