@@ -313,3 +313,47 @@ stream-and-screen abstraction; this prototype built the interface semantics
 (jobs, exit codes, digests, budgets, awaiting-input) that no one in the field
 has. The two are complementary, and the semantics are the durable, portable
 part.
+
+### How coding-agent harnesses handle this today (pi source read)
+
+The benchmark's "naive full capture" baseline is fair for exec-style MCP
+servers, but real coding-agent harnesses are smarter, and reading pi's source
+(`earendil-works/pi`, `packages/coding-agent/src/core/tools/bash.ts` and
+`bash-executor.ts`) shows exactly how much of this problem they already
+solve — and which parts they deliberately punt:
+
+- **Output flooding: solved, more crudely.** pi strips ANSI, deletes every
+  `\r` outright, tail-truncates to 2,000 lines / 50 KB, and writes the full
+  output to a temp file whose path is given to the model — the agent then
+  greps the temp file *with more bash calls*. That is a genuinely elegant
+  minimal design (bash itself is the query language). But it ships the whole
+  tail regardless of need: re-running our scenarios against pi's actual
+  policy, tsc-200-errors ships ~7,000 tokens (fits under the cap) vs our
+  404, and git-log-10k ships the truncation window (~12,000 tokens) vs our
+  643 — the digest+query flow still wins ~17x even against a real harness,
+  because tail-truncation is need-blind. And deleting `\r` doesn't collapse
+  progress bars, it concatenates every frame into one giant line — pi's
+  truncation code has a special `lastLinePartial` case to paper over exactly
+  this.
+- **Interactivity: punted, explicitly.** pi runs commands through
+  `child_process.spawn` with pipes — no PTY at all — so interactive programs
+  hit EOF and fail fast instead of hanging. Its bundled `interactive-shell`
+  extension says it in a comment: *"This only intercepts user `!` commands,
+  not agent bash tool calls. If the agent runs an interactive command, it
+  will fail (which is fine)."* Password prompts, `rm -i`, host-key checks:
+  fail-or-avoid, never answer.
+- **Persistent sessions and long-running processes: punted, explicitly.**
+  Each pi bash call is a fresh shell (no cwd/env/venv persistence), and the
+  README states the policy in five words: **"No background bash. Use
+  tmux."** — i.e., outsource exactly this daemon's job to a human-shaped
+  multiplexer the agent must screen-scrape.
+
+So the harness state of the art already covers the biggest chunk of the
+value (bounded output) with tail-truncation + temp file, which shrinks the
+headline savings but doesn't erase them (~17x remains on the error-heavy
+cases, because digests are need-shaped and truncation isn't). What no
+harness covers — and pi documents as out of scope rather than unsolved — is
+precisely this prototype's core: real PTYs with job-scoped exit codes,
+awaiting-input as a detected, answerable state, and supervised long-running
+processes. "Use tmux" is the strongest third-party argument for the PTY
+supervisor thesis in this document.
