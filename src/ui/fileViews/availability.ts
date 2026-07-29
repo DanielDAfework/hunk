@@ -1,18 +1,8 @@
-import type { DiffFile } from "../../core/types";
-
 export const FILE_VIEW_DRAFT_UNAVAILABLE_REASON =
   "File presentations are unavailable while drafting an inline review note • using raw diff";
 
 /** Draft editing remains raw-only; committed notes are resolved from validated source bindings. */
-export function fileViewUnavailableReason({
-  file: _file,
-  hasDraftNote,
-  showAgentNotes: _showAgentNotes,
-}: {
-  file: DiffFile;
-  hasDraftNote: boolean;
-  showAgentNotes: boolean;
-}) {
+export function fileViewUnavailableReason({ hasDraftNote }: { hasDraftNote: boolean }) {
   return hasDraftNote ? FILE_VIEW_DRAFT_UNAVAILABLE_REASON : null;
 }
 

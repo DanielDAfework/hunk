@@ -32,6 +32,15 @@ function resolveTestLayout(
   };
 }
 
+/** Measure a note-less presentation at one explicit content width. */
+function measureTestGeometry(fileView: ResolvedFileViewLayout, width: number) {
+  return measureFileViewGeometry({
+    resolved: fileView,
+    plannedRows: buildFileViewRenderPlan(fileView.layout, []).rows,
+    width,
+  });
+}
+
 const layout: ExtensionFileViewLayout = {
   rows: [
     { id: "heading", spans: [{ text: "Heading" }] },
@@ -63,7 +72,7 @@ describe("FileView custom rows", () => {
       after: "b",
     });
     const fileView = resolveTestLayout(layout, 20);
-    const geometry = measureFileViewGeometry(file, fileView);
+    const geometry = measureTestGeometry(fileView, 20);
     const setup = await testRender(
       <FileView
         file={file}
@@ -109,7 +118,11 @@ describe("FileView custom rows", () => {
         annotation: { id: "note", summary: "Review bound output", newRange: [1, 1] },
       },
     ]);
-    const geometry = measureFileViewGeometry(file, fileView, plan.rows, 60);
+    const geometry = measureFileViewGeometry({
+      resolved: fileView,
+      plannedRows: plan.rows,
+      width: 60,
+    });
     const setup = await testRender(
       <FileView
         file={file}
@@ -172,7 +185,7 @@ describe("FileView custom rows", () => {
       after: "b",
     });
     const fileView = resolveTestLayout(customLayout, 20);
-    const geometry = measureFileViewGeometry(file, fileView);
+    const geometry = measureTestGeometry(fileView, 20);
     const setup = await testRender(
       <FileView
         file={file}
@@ -229,7 +242,7 @@ describe("FileView custom rows", () => {
     };
     const file = createTestDiffFile({ id: "themed", path: "themed.ts" });
     const fileView = resolveTestLayout(themedLayout, 20);
-    const geometry = measureFileViewGeometry(file, fileView);
+    const geometry = measureTestGeometry(fileView, 20);
     let switchTheme = () => {};
 
     function Harness() {
@@ -306,7 +319,7 @@ describe("FileView custom rows", () => {
         <FileView
           file={file}
           fileView={fileView}
-          geometry={measureFileViewGeometry(file, fileView)}
+          geometry={measureTestGeometry(fileView, 20)}
           selectedHunkIndex={selectedHunkIndex}
           theme={resolveTheme("github-dark-default", null)}
           visibleBodyBounds={visible ? { top: 0, height: 1 } : { top: 1, height: 0 }}
@@ -378,7 +391,11 @@ describe("FileView custom rows", () => {
         annotation: { summary: "WINDOWED NOTE", newRange: [500, 500] },
       },
     ]);
-    const geometry = measureFileViewGeometry(file, fileView, plan.rows, 20);
+    const geometry = measureFileViewGeometry({
+      resolved: fileView,
+      plannedRows: plan.rows,
+      width: 20,
+    });
     const setup = await testRender(
       <FileView
         file={file}
@@ -435,7 +452,7 @@ describe("FileView custom rows", () => {
       after: "b",
     });
     const fileView = resolveTestLayout(clippedLayout, 20);
-    const geometry = measureFileViewGeometry(file, fileView);
+    const geometry = measureTestGeometry(fileView, 20);
     const setup = await testRender(
       <FileView
         file={file}
@@ -495,7 +512,7 @@ describe("FileView custom rows", () => {
       <FileView
         file={file}
         fileView={fileView}
-        geometry={measureFileViewGeometry(file, fileView)}
+        geometry={measureTestGeometry(fileView, 20)}
         selectedHunkIndex={0}
         theme={resolveTheme("github-dark-default", null)}
         width={20}

@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { createTestDiffFile } from "../../../test/helpers/diff-helpers";
 import type { ExtensionFileViewLayout } from "../../extension-api/types";
 import { measureAgentInlineNoteHeight } from "../components/panes/AgentInlineNote";
 import { measureFileViewGeometry } from "./geometry";
@@ -8,12 +7,6 @@ import { buildFileViewRenderPlan } from "./renderPlan";
 
 describe("file-view geometry", () => {
   test("uses declared component heights while retaining stable row ids and hunk bounds", () => {
-    const file = createTestDiffFile({
-      id: "custom-file",
-      path: "custom.ts",
-      before: "old\n",
-      after: "new\n",
-    });
     const layout: ExtensionFileViewLayout = {
       rows: [
         { id: "intro", spans: [{ text: "intro" }] },
@@ -36,7 +29,11 @@ describe("file-view geometry", () => {
 
     const checked = validateFileViewLayout(layout, 2, 80);
     if (!checked.valid) throw new Error(checked.issue);
-    const geometry = measureFileViewGeometry(file, checked.value);
+    const geometry = measureFileViewGeometry({
+      resolved: checked.value,
+      plannedRows: buildFileViewRenderPlan(checked.value.layout, []).rows,
+      width: 80,
+    });
 
     expect(geometry.rowBounds.map((row) => row.height)).toEqual([...checked.value.rowHeights]);
     expect(geometry.bodyHeight).toBe(6);
@@ -62,7 +59,6 @@ describe("file-view geometry", () => {
   });
 
   test("measures 10,000 rows and hunks through linear retained extents", () => {
-    const file = createTestDiffFile({ id: "large", path: "large.ts" });
     const checked = validateFileViewLayout(
       {
         rows: Array.from({ length: 10_000 }, (_, index) => ({
@@ -78,7 +74,11 @@ describe("file-view geometry", () => {
       80,
     );
     if (!checked.valid) throw new Error(checked.issue);
-    const geometry = measureFileViewGeometry(file, checked.value);
+    const geometry = measureFileViewGeometry({
+      resolved: checked.value,
+      plannedRows: buildFileViewRenderPlan(checked.value.layout, []).rows,
+      width: 80,
+    });
 
     expect(geometry.bodyHeight).toBe(10_000);
     expect(geometry.hunkAnchorRows.get(9_999)).toBe(9_999);
@@ -86,7 +86,6 @@ describe("file-view geometry", () => {
   });
 
   test("measures host notes and underlying rows from one planned stream", () => {
-    const file = createTestDiffFile({ id: "noted", path: "noted.ts" });
     const checked = validateFileViewLayout(
       {
         rows: [
@@ -115,7 +114,11 @@ describe("file-view geometry", () => {
       layout: "stack",
       width: 80,
     });
-    const geometry = measureFileViewGeometry(file, checked.value, plan.rows, 80);
+    const geometry = measureFileViewGeometry({
+      resolved: checked.value,
+      plannedRows: plan.rows,
+      width: 80,
+    });
 
     expect(geometry.fileViewRows).toBe(plan.rows);
     expect(geometry.rowBounds.map((row) => row.height)).toEqual([noteHeight, 2]);

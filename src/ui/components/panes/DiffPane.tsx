@@ -708,12 +708,11 @@ export function DiffPane({
       files.map((file) => {
         const plannedFileView = fileViewRenderPlans.get(file.id);
         if (plannedFileView) {
-          return measureFileViewGeometry(
-            file,
-            plannedFileView.fileView,
-            plannedFileView.rows,
-            diffContentWidth,
-          );
+          return measureFileViewGeometry({
+            resolved: plannedFileView.fileView,
+            plannedRows: plannedFileView.rows,
+            width: diffContentWidth,
+          });
         }
         return measureDiffSectionGeometry(
           file,

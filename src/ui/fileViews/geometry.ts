@@ -1,10 +1,9 @@
-import type { DiffFile } from "../../core/types";
 import { measureAgentInlineNoteHeight } from "../components/panes/AgentInlineNote";
 import { reviewRowId } from "../lib/ids";
 import type { PlannedHunkBounds } from "../diff/plannedReviewRows";
 import type { DiffSectionGeometry, DiffSectionRowBounds } from "../diff/diffSectionGeometry";
 import type { ValidatedFileViewLayout } from "./layout";
-import { buildFileViewRenderPlan, type PlannedFileViewRow } from "./renderPlan";
+import type { PlannedFileViewRow } from "./renderPlan";
 
 /** Measure one extension or host-note row in the alternate presentation stream. */
 function plannedFileViewRowHeight(
@@ -25,13 +24,21 @@ function plannedFileViewRowHeight(
   });
 }
 
-/** Build host-owned scroll, note, and hunk geometry for one alternate file presentation. */
-export function measureFileViewGeometry(
-  _file: DiffFile,
-  resolved: ValidatedFileViewLayout,
-  plannedRows: readonly PlannedFileViewRow[] = buildFileViewRenderPlan(resolved.layout, []).rows,
-  width = 1,
-): DiffSectionGeometry {
+/**
+ * Build host-owned scroll, note, and hunk geometry for one alternate file presentation.
+ *
+ * `plannedRows` and `width` are required together: note heights depend on the same content width the
+ * rows are painted at, so a defaulted width would silently measure notes for the wrong terminal.
+ */
+export function measureFileViewGeometry({
+  resolved,
+  plannedRows,
+  width,
+}: {
+  resolved: ValidatedFileViewLayout;
+  plannedRows: readonly PlannedFileViewRow[];
+  width: number;
+}): DiffSectionGeometry {
   const { layout } = resolved;
   const rowBounds: DiffSectionRowBounds[] = [];
   const rowBoundsByKey = new Map<string, DiffSectionRowBounds>();

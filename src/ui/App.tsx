@@ -368,14 +368,12 @@ export function App({
     const reasons = new Map<string, string>();
     for (const file of filteredFiles) {
       const reason = fileViewUnavailableReason({
-        file,
         hasDraftNote: review.draftNote?.fileId === file.id,
-        showAgentNotes,
       });
       if (reason) reasons.set(file.id, reason);
     }
     return reasons;
-  }, [filteredFiles, review.draftNote?.fileId, showAgentNotes]);
+  }, [filteredFiles, review.draftNote?.fileId]);
   const fileViewUnavailableReasonsRef = useRef(fileViewUnavailableReasons);
   fileViewUnavailableReasonsRef.current = fileViewUnavailableReasons;
   const availableFileViewSelectionState = useMemo(
