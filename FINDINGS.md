@@ -31,7 +31,7 @@ in this container (see 1.2).
   loop and invalidate the original), and enumerating `/proc/self/fd` finds
   *no* fd pointing at `/dev/ptmx`, so there is nothing to write to from JS.
 
-**bun-pty 1.x** (Rust core accessed via `bun:ffi`) was tested next and passed
+**bun-pty 0.4.x** (Rust core accessed via `bun:ffi`) was tested next and passed
 the same probe: full write→execute→read round-trip
 (`echo DDD-$((6*7))` → `DDD-42` captured), plus `pid`, `resize`, `kill`,
 `onExit`. It avoids Bun's node-net layer entirely, which is exactly where
@@ -117,5 +117,151 @@ prototype's actual thesis; the pieces exist separately everywhere.
 
 ## Phase 3 — Eval
 
-(To be filled in after the build: token-savings table for the five scenarios,
-detector precision/recall, and answers to the four open questions.)
+### 3.1 Token benchmark: naive capture vs digest+query
+
+Method: each scenario runs for real through the daemon (real PTY, real
+commands, real network where needed). Token estimates are chars/4 throughout.
+Three baselines per scenario:
+
+- **naive_raw** — the raw PTY stream for the job: what a "run command, return
+  the output" MCP server ships (escapes, redraws and all).
+- **naive_stripped** — a smarter naive server that strips ANSI but doesn't
+  collapse redraws or paginate.
+- **digest_flow** — what an agent actually receives here: the `wait()` digest
+  JSON plus the JSON of each `read_output` query the scenario's task needs.
+
+| scenario | task | naive_raw | naive_stripped | digest_flow | savings vs raw |
+| --- | --- | ---: | ---: | ---: | ---: |
+| npm install (cold cache, 143 pkgs) | succeeded? warnings? | 220 | 74 | 197 | **1.1x** |
+| pip install (numpy+requests, cold) | succeeded? warnings? | 1,380 | 1,119 | 660 | **2.1x** |
+| tsc, 200 type errors | error count + first 3 | 10,805 | 7,303 | 404 | **26.7x** |
+| git log --oneline, 10k commits | 15 most recent commits | 121,972 | 121,967 | 643 | **189.7x** |
+| dev server (never exits) | did it bind to a port? | 189* | 189* | 311 | 0.6x* |
+| find / -name '*.conf' | locate resolv.conf | 3,675 | 3,675 | 642 | **5.7x** |
+
+Raw data: `bench/results.json`; reproduce with `bun run bench`.
+
+**The ≥10x target on scenarios 1–3, investigated as instructed:**
+
+- **tsc and git log clear it easily** (26.7x, 189.7x). Savings scale with
+  output size: the digest is a bounded ~30-line window, so the ratio is
+  roughly `output_size / constant`.
+- **npm install misses it (1.1x), and the reason is a genuine finding:
+  npm 10 on a TTY is self-collapsing.** It renders one spinner line via
+  `ESC[1G ESC[0K` redraws and a one-line summary — ~900 raw bytes total for a
+  143-package cold install. The "progress bars pollute captured output"
+  premise is a real problem for pip, cargo, docker, yarn-classic era tools,
+  but modern npm already solved its own output hygiene. Normalization still
+  pays (raw→normalized is 220→59 tokens, 3.7x, because the spinner frames
+  collapse), but there is simply nothing big to save. (This benchmark also
+  exposed that our normalizer initially treated only `\r` as a redraw;
+  npm's `ESC[1G` column-reset idiom is now handled equivalently.)
+- **pip lands at 2.1x** for a different reason worth stating plainly: for
+  small-to-medium outputs (~500 normalized tokens), the digest's fixed
+  30-line head/tail preview is a large fraction of the whole output, so the
+  flow cost approaches the output cost. The digest's value in that regime is
+  not savings, it's a **bounded ceiling** — the agent pays ~O(30 lines) no
+  matter whether the command printed 500 tokens or 500,000. The naive
+  baseline has no ceiling at all.
+- **dev server is the degenerate case that proves the model**: naive capture
+  of a never-exiting stream has no defined "answer point" at all — a naive
+  exec server just hangs. The 0.6x at the 4-second mark is beside the point;
+  the stream grows ~39 tokens/s, so a 10-minute naive capture would ship
+  ~23,000 tokens (if it ever returned), while the digest answer stays ~311
+  and `wait(timeout)` returns with `state: "running"` immediately.
+
+### 3.2 Awaiting-input detector: precision/recall
+
+12-case suite (`test/detector-eval.test.ts`), run against real programs on
+real PTYs. Two environment substitutions, both recorded in the test header:
+the container runs as root (su/sudo never prompt root), so the sudo case is
+`passwd <user>` — the same echo-off-tty-read class; and there is no ssh
+client, so the host-key case is the exact OpenSSH prompt text emitted by a
+script that blocks on stdin.
+
+| case | result | latency | signal that fired |
+| --- | --- | --- | --- |
+| passwd password prompt | TP | 1.0s | blocked read(2) on tty; pattern: password |
+| git push, credential prompt (local 401) | TP | 0.8s | blocked read (git-remote-http); pattern: colon |
+| npm init questionnaire | TP | 1.5s | termios: echo off (readline raw mode) |
+| rm -i confirmation | TP | 1.0s | blocked read (rm); pattern: question |
+| less on a 5k-line file | TP | 1.0s | blocked read (less) |
+| apt-get remove confirmation | TP | 2.5s | blocked read (apt-get); pattern: yes-no |
+| python input() | TP | 1.0s | blocked read (python3); pattern: colon |
+| ssh host-key prompt (simulated) | TP | 1.0s | blocked read (python3); pattern: question |
+| sleep then output | TN | — | — |
+| output ending in ":" then silence | TN | — | — |
+| silent computation | TN | — | — |
+| shell `read` from a pipe (not tty) | TN | — | — |
+| **precision 1.00 · recall 1.00** | | | |
+
+The design lesson: the brief's proposed signals (quiet + prompt regexes +
+termios) work, but the highest-precision signal wasn't in the brief:
+**"is any process in the foreground process group blocked in `read(2)` on a
+terminal fd"** (readable from `/proc/<pid>/syscall`). It fired on 7 of 8
+positives and cannot fire for compute-quiet negatives. With it in front,
+trailing-line regexes were demoted: strong shapes (password / pager / yes-no)
+may still decide alone, but weak shapes (trailing `?` / `:`) only *annotate*
+— which is exactly what kills the "build output ends with a colon, then
+silence" false positive that a pattern-first detector walks into. termios
+remains necessary for the readline-raw-mode family (npm init's epoll-based
+reader never blocks in read(2); echo-off termios catches it).
+
+### 3.3 Open questions, answered empirically
+
+**1. Does collapsing progress redraws ever destroy information an agent
+needed?** Yes — the counterexample is a transient diagnostic drawn *into* the
+redrawn line and then overwritten: `\rerror: mirror timed out, retrying` →
+`\rdownloading 55%` → `done`. Pure final-frame collapse stores only `done`;
+the agent never learns a retry happened. Two mitigations are implemented:
+(a) the normalizer preserves overwritten frames matching a diagnostic pattern
+(error/warn/fail/timeout/refused/denied), capped at 20 frames so a
+`"0 errors"`-style progress bar can't flood the store (both behaviors unit
+tested); (b) the raw log always allows byte-level recovery. With those two,
+we could not construct a case where needed information is unrecoverable.
+
+**2. Is per-job output the right granularity, or does `&` break it?**
+Foreground jobs: per-job is right, and OSC 133 makes the boundaries exact.
+Background jobs break clean attribution, in a bounded way: output from a
+`cmd &` that outlives its launching job lands in whatever window is open —
+the next job's output (misattribution) or between jobs. The daemon's answer
+is a session-level **orphan buffer**: data outside any C..D window is
+captured there rather than lost (integration-tested with a disowned
+background writer). Misattribution *during* a subsequent job remains
+possible; the honest fix at the architecture level is "one session per
+long-running background concern" — sessions are cheap and first-class, which
+is why. A production version could tag jobs that launched background pids
+(the shell reports `$!`) and warn on their digests.
+
+**3. What's the right default digest size?** The 10+20 default was right or
+irrelevant in 5 of 6 scenarios: wrong only for git-log-10k, where the task
+("last 15") needed 15 lines and head has 10 — a 15+30 digest would have
+answered it with zero queries for ~90 extra tokens (measured per scenario in
+`digest_size_study` in results.json; 15+30 costs +25–90 tokens over 10+20 on
+real outputs). Tasks like "how many errors" or "find the warnings" are never
+digest-satisfiable — they need `total_matches` from grep regardless of digest
+size. So: bump the default to ~15 head lines (cheap, catches "show me the
+top/recent N" asks), don't chase digest-only answers beyond that; the fixed
+preview is already the dominant cost of the flow for small outputs (see pip).
+
+**4. Should `wait` support incremental deltas?** Yes — implemented and worth
+it. `wait(job_id, timeout_ms, since_line)` returns the digest plus only lines
+after the cursor, and `read_output {mode:"delta"}` does the same standalone.
+On the dev-server stream, three consecutive polls returned 106+58+58 tokens
+with no line ever shipped twice (cursors 17→27→37). Without deltas, the
+"watch a dev server" loop re-ships an ever-growing tail on every poll; with
+them the cost per poll is proportional to *new* output only. The cursor is a
+plain line number the agent passes back, which survives daemon statelessness
+between calls and is hard to misuse — `last_line` in every response is the
+next `since_line`.
+
+### 3.4 Loose ends worth carrying forward
+
+- zsh integration is written but unverified (no zsh in the container).
+- The alt-screen "final frame" is a frame-boundary approximation, not a
+  terminal-emulation snapshot; `tui_mode: true` plus the raw log is the
+  contract.
+- `attach` is a read-only tail of the raw log; a real mirror plane wants
+  follow-mode with terminal size sync.
+- Token estimates are chars/4 everywhere; swapping in a real tokenizer only
+  changes the constants, not the ratios.

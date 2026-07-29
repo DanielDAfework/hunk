@@ -11,9 +11,10 @@ import { SessionManager } from "./manager";
 import { QueryError } from "./store";
 import type { OutputQuery } from "./types";
 
-/** Wrap a result object as an MCP text content block (JSON payload). */
+/** Wrap a result object as an MCP text content block. Compact JSON on
+ * purpose: indentation is pure token overhead for a model reader. */
 function jsonResult(obj: unknown) {
-  return { content: [{ type: "text" as const, text: JSON.stringify(obj, null, 2) }] };
+  return { content: [{ type: "text" as const, text: JSON.stringify(obj) }] };
 }
 
 function errorResult(err: unknown) {

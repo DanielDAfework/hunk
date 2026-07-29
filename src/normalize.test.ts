@@ -23,6 +23,37 @@ describe("StreamNormalizer", () => {
     expect(r.notes.join(" ")).toContain("4999");
   });
 
+  test("transient diagnostic frames inside a progress line are preserved", () => {
+    const raw =
+      "\rdownloading 10%" +
+      "\rerror: mirror timed out, retrying" +
+      "\rdownloading 55%" +
+      "\rdownloading 100%\ndone\n";
+    const r = normalizeText(raw);
+    expect(r.lines).toEqual(["error: mirror timed out, retrying", "downloading 100%", "done"]);
+    expect(r.notes.join(" ")).toContain("preserved");
+  });
+
+  test("preserved-frame flood is bounded (a '0 errors' progress bar can't spam)", () => {
+    let raw = "";
+    for (let i = 1; i <= 500; i++) raw += `\rbuilt ${i}/500, 0 errors`;
+    raw += "\n";
+    const r = normalizeText(raw);
+    // 20 kept frames max, plus the final line.
+    expect(r.lines.length).toBe(21);
+    expect(r.lines.at(-1)).toBe("built 500/500, 0 errors");
+  });
+
+  test("ESC[1G column-reset redraws (npm spinner) collapse like CR", () => {
+    // npm draws its spinner as ESC[1G ESC[0K <char> repeatedly.
+    let raw = "";
+    for (const c of ["\\", "|", "/", "-", "\\", "|"]) raw += `\x1b[1G\x1b[0K${c}`;
+    raw += "\x1b[1G\x1b[0Kadded 143 packages in 7s\n";
+    const r = normalizeText(raw);
+    expect(r.lines).toEqual(["added 143 packages in 7s"]);
+    expect(r.collapsedOverwrites).toBe(6);
+  });
+
   test("cursor-up repaint approximation pops rewritten lines", () => {
     // Emulates npm-style multi-line spinner: draw 2 lines, move up 2, redraw.
     const raw = "fetching a\r\nfetching b\r\n\x1b[2A\x1b[Kfetched a\r\n\x1b[Kfetched b\r\n";

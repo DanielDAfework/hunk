@@ -36,6 +36,12 @@ export interface NormalizedSnapshot {
 const ESC = "\x1b";
 const BEL = "\x07";
 
+/** Overwritten frames matching this are preserved instead of collapsed. */
+const INTERESTING_FRAME_RE = /\b(error|warn(ing)?|fail(ed|ure)?|fatal|timeout|refused|denied)s?\b/i;
+/** Bound on preserved frames so a progress bar containing "error" in every
+ * repaint (e.g. "0 errors") can't flood the store. */
+const MAX_KEPT_FRAMES = 20;
+
 export class StreamNormalizer {
   private lines: string[] = [];
   private current = "";
@@ -52,6 +58,7 @@ export class StreamNormalizer {
   collapsedOverwrites = 0;
   collapsedRepaintLines = 0;
   droppedTuiFrames = 0;
+  keptFrames = 0;
 
   feed(chunk: string): void {
     this.bytes += Buffer.byteLength(chunk, "utf8");
@@ -94,8 +101,18 @@ export class StreamNormalizer {
       if (this.crPending) {
         // Printable after bare CR: the program is redrawing this line.
         if (this.current.length > 0) {
-          this.collapsedOverwrites += 1;
-          this.current = "";
+          // Open question 1 mitigation: a transient frame that looks like a
+          // diagnostic ("error: mirror timeout" flashed inside a progress
+          // line) is the one thing collapsing could destroy that an agent
+          // actually needs. Keep a bounded number of such frames as real
+          // lines instead of dropping them.
+          if (this.keptFrames < MAX_KEPT_FRAMES && INTERESTING_FRAME_RE.test(this.current)) {
+            this.pushLine();
+            this.keptFrames += 1;
+          } else {
+            this.collapsedOverwrites += 1;
+            this.current = "";
+          }
         }
         this.crPending = false;
       }
@@ -195,6 +212,12 @@ export class StreamNormalizer {
       // Erase-in-line: with CR-collapse semantics there is nothing to erase.
       return;
     }
+    if (final === "G") {
+      // Cursor-to-column: column 1 (or unspecified) is a carriage return in
+      // disguise — npm's spinner redraws with ESC[1G ESC[0K instead of \r.
+      if (params === "" || params === "1") this.crPending = true;
+      return;
+    }
     // Everything else (colors, modes, bracketed paste...) is styling: drop.
   }
 
@@ -241,6 +264,10 @@ export class StreamNormalizer {
     const notes: string[] = [];
     if (this.collapsedOverwrites > 0)
       notes.push(`[progress output collapsed: ${this.collapsedOverwrites} line updates]`);
+    if (this.keptFrames > 0)
+      notes.push(
+        `[${this.keptFrames} overwritten progress frames preserved because they looked like diagnostics]`,
+      );
     if (this.collapsedRepaintLines > 0)
       notes.push(`[multi-line repaints collapsed: ${this.collapsedRepaintLines} rewritten lines removed]`);
     if (this.tuiMode)

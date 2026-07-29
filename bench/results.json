@@ -1,0 +1,208 @@
+[
+  {
+    "scenario": "npm-install",
+    "task": "did it succeed; list warnings",
+    "exit_code": 0,
+    "raw_bytes": 877,
+    "naive_raw_tokens": 220,
+    "naive_stripped_tokens": 74,
+    "normalized_full_tokens": 59,
+    "digest_tokens": 144,
+    "query_tokens": 53,
+    "digest_flow_tokens": 197,
+    "savings_vs_naive_raw": 1.1,
+    "savings_vs_naive_stripped": 0.4,
+    "queries": [
+      "{\"mode\":\"grep\",\"pattern\":\"[Ww]arn|WARN\",\"context\":0,\"max_matches\":10}"
+    ],
+    "task_answer_preview": " [total_matches=0]",
+    "digest_size_study": {
+      "10+20": {
+        "tokens": 144,
+        "satisfies_task": false
+      },
+      "15+30": {
+        "tokens": 144,
+        "satisfies_task": false
+      },
+      "25+50": {
+        "tokens": 144,
+        "satisfies_task": false
+      }
+    },
+    "notes": [
+      "[progress output collapsed: 50 line updates]"
+    ]
+  },
+  {
+    "scenario": "pip-install",
+    "task": "did it succeed; list warnings",
+    "exit_code": 0,
+    "raw_bytes": 5520,
+    "naive_raw_tokens": 1380,
+    "naive_stripped_tokens": 1119,
+    "normalized_full_tokens": 509,
+    "digest_tokens": 606,
+    "query_tokens": 54,
+    "digest_flow_tokens": 660,
+    "savings_vs_naive_raw": 2.1,
+    "savings_vs_naive_stripped": 1.7,
+    "queries": [
+      "{\"mode\":\"grep\",\"pattern\":\"[Ww]arn|WARN|[Ee]rror\",\"context\":0,\"max_matches\":10}"
+    ],
+    "task_answer_preview": " [total_matches=0]",
+    "digest_size_study": {
+      "10+20": {
+        "tokens": 241,
+        "satisfies_task": false
+      },
+      "15+30": {
+        "tokens": 331,
+        "satisfies_task": false
+      },
+      "25+50": {
+        "tokens": 521,
+        "satisfies_task": false
+      }
+    },
+    "notes": [
+      "[progress output collapsed: 12 line updates]"
+    ]
+  },
+  {
+    "scenario": "tsc-200-errors",
+    "task": "how many errors; show first 3",
+    "exit_code": 2,
+    "raw_bytes": 43220,
+    "naive_raw_tokens": 10805,
+    "naive_stripped_tokens": 7303,
+    "normalized_full_tokens": 7052,
+    "digest_tokens": 278,
+    "query_tokens": 126,
+    "digest_flow_tokens": 404,
+    "savings_vs_naive_raw": 26.7,
+    "savings_vs_naive_stripped": 18.1,
+    "queries": [
+      "{\"mode\":\"grep\",\"pattern\":\"error TS\",\"context\":0,\"max_matches\":3}"
+    ],
+    "task_answer_preview": "1:errors.ts:1:7 - error TS2322: Type 'string' is not assignable to type 'number'. / -- / 6:errors.ts:2:7 - error TS2322: Type 'string' is not assignable to type 'number'. [total_matches=200]",
+    "digest_size_study": {
+      "10+20": {
+        "tokens": 278,
+        "satisfies_task": false
+      },
+      "15+30": {
+        "tokens": 392,
+        "satisfies_task": false
+      },
+      "25+50": {
+        "tokens": 620,
+        "satisfies_task": false
+      }
+    },
+    "notes": []
+  },
+  {
+    "scenario": "git-log-10k",
+    "task": "show the 15 most recent commits",
+    "exit_code": 0,
+    "raw_bytes": 487885,
+    "naive_raw_tokens": 121972,
+    "naive_stripped_tokens": 121967,
+    "normalized_full_tokens": 119464,
+    "digest_tokens": 415,
+    "query_tokens": 228,
+    "digest_flow_tokens": 643,
+    "savings_vs_naive_raw": 189.7,
+    "savings_vs_naive_stripped": 189.7,
+    "queries": [
+      "{\"mode\":\"head\",\"lines\":15}"
+    ],
+    "task_answer_preview": "7bdb688 commit 10000: adjust module 9 threshold / b7dedd6 commit 9999: adjust module 8 threshold / 972cb35 commit 9998: adjust module 7 threshold",
+    "digest_size_study": {
+      "10+20": {
+        "tokens": 415,
+        "satisfies_task": false
+      },
+      "15+30": {
+        "tokens": 598,
+        "satisfies_task": true
+      },
+      "25+50": {
+        "tokens": 963,
+        "satisfies_task": true
+      }
+    },
+    "notes": []
+  },
+  {
+    "scenario": "dev-server",
+    "task": "did it bind to a port (job never exits)",
+    "exit_code": null,
+    "raw_bytes": 756,
+    "naive_raw_tokens": 189,
+    "naive_stripped_tokens": 189,
+    "normalized_full_tokens": 182,
+    "digest_tokens": 259,
+    "query_tokens": 52,
+    "digest_flow_tokens": 311,
+    "savings_vs_naive_raw": 0.6,
+    "savings_vs_naive_stripped": 0.6,
+    "queries": [
+      "{\"mode\":\"grep\",\"pattern\":\"Listening on\",\"context\":0,\"max_matches\":1}"
+    ],
+    "task_answer_preview": "4:Listening on http://localhost:35597 [total_matches=1]",
+    "digest_size_study": {
+      "10+20": {
+        "tokens": 133,
+        "satisfies_task": true
+      },
+      "15+30": {
+        "tokens": 165,
+        "satisfies_task": true
+      },
+      "25+50": {
+        "tokens": 228,
+        "satisfies_task": true
+      }
+    },
+    "notes": [
+      "job intentionally still running at measurement time; killed afterwards",
+      "delta streaming: 3 polls returned 106+58+58 tokens, no line ever shipped twice (cursors 17->27->37)",
+      "stream grows ~39 tokens/s: naive capture of a 10-minute run would ship ~23200 tokens (and never terminates); the digest stays ~311"
+    ]
+  },
+  {
+    "scenario": "find-conf",
+    "task": "locate resolv.conf among all *.conf files",
+    "exit_code": 0,
+    "raw_bytes": 14700,
+    "naive_raw_tokens": 3675,
+    "naive_stripped_tokens": 3675,
+    "normalized_full_tokens": 3589,
+    "digest_tokens": 439,
+    "query_tokens": 203,
+    "digest_flow_tokens": 642,
+    "savings_vs_naive_raw": 5.7,
+    "savings_vs_naive_stripped": 5.7,
+    "queries": [
+      "{\"mode\":\"grep\",\"pattern\":\"resolv\\\\.conf\",\"context\":0,\"max_matches\":10}"
+    ],
+    "task_answer_preview": "32:/etc/resolv.conf / -- / 272:/usr/lib/systemd/resolv.conf [total_matches=30]",
+    "digest_size_study": {
+      "10+20": {
+        "tokens": 439,
+        "satisfies_task": false
+      },
+      "15+30": {
+        "tokens": 629,
+        "satisfies_task": false
+      },
+      "25+50": {
+        "tokens": 892,
+        "satisfies_task": false
+      }
+    },
+    "notes": []
+  }
+]
