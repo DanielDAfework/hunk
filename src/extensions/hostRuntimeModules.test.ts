@@ -34,7 +34,9 @@ function writeTempExtension(name: string, contents: string) {
 
 async function importTempExtension(path: string) {
   registerHostRuntimeModules([path]);
-  return (await import(pathToFileURL(path).href)) as { default: Record<string, unknown> };
+  return (await import(pathToFileURL(path).href)) as {
+    default: Record<string, unknown>;
+  };
 }
 
 describe("registerHostRuntimeModules", () => {
@@ -97,13 +99,15 @@ describe("registerHostRuntimeModules", () => {
         `};\n` +
         `const register = (hunk) => hunk.registerFileView({\n` +
         `  id: "tsx", title: "TSX", matches: () => true,\n` +
-        `  layout: () => ({ rows: [{ id: "row", spans: [{ text: "fallback" }], height: 2, component: Row }], hunks: [] }),\n` +
+        `  layout: () => ({ rows: [{ id: "row", spans: [{ text: "fallback" }], component: { height: 2, render: Row } }], hunkRows: [] }),\n` +
         `});\n` +
         `export default { Row, TextAttributes, makeElement: () => <Row width={20} height={2} selected={false} rowIndex={0} />, register, useState };\n`,
     );
 
     const mod = await importTempExtension(path);
-    const registered: { layout: () => { rows: Array<{ component: unknown }> } }[] = [];
+    const registered: {
+      layout: () => { rows: Array<{ component: unknown }> };
+    }[] = [];
     const register = mod.default.register as (hunk: {
       registerFileView(view: (typeof registered)[number]): void;
     }) => void;
@@ -112,7 +116,9 @@ describe("registerHostRuntimeModules", () => {
     expect(mod.default.useState).toBe(useState);
     expect(mod.default.TextAttributes).toBe(TextAttributes);
     expect(isValidElement((mod.default.makeElement as () => unknown)())).toBe(true);
-    expect(registered[0]?.layout().rows[0]?.component).toBe(mod.default.Row);
+    expect(
+      (registered[0]?.layout().rows[0]?.component as { render?: unknown } | undefined)?.render,
+    ).toBe(mod.default.Row);
   });
 
   test("serves hunkdiff/extension runtime values", async () => {

@@ -165,8 +165,14 @@ describe("registerFileView", () => {
     const issues: ExtensionLoadIssue[] = [];
     const component = () => null;
     const layout = () => ({
-      rows: [{ id: "custom", spans: [{ text: "fallback" }], height: 2, component }],
-      hunks: [],
+      rows: [
+        {
+          id: "custom",
+          spans: [{ text: "fallback" }],
+          component: { height: 2, render: component },
+        },
+      ],
+      hunkRows: [],
     });
 
     runExtensionFactory({

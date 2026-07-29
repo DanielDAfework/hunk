@@ -1,5 +1,22 @@
+import type { RegisteredFileView } from "../../extensions/types";
+
 /** Raw is implicit: only files explicitly switched away from raw have an entry. */
 export type FileViewSelectionState = Readonly<Record<string, string>>;
+
+/** Resolve one registered view key as `<extensionId>:<viewId>`. */
+export function registeredFileViewKey(view: RegisteredFileView) {
+  return `${view.extensionId}:${view.view.id}`;
+}
+
+/** Resolve a bare local or qualified file-view id without reserving extension ids. */
+export function resolveRegisteredFileView(
+  views: readonly RegisteredFileView[],
+  extensionId: string,
+  viewId: string,
+) {
+  const key = viewId.includes(":") ? viewId : `${extensionId}:${viewId}`;
+  return views.find((view) => registeredFileViewKey(view) === key);
+}
 
 /** Reconcile per-file selections after filtering/reload removes files or views. */
 export function reconcileFileViewSelections(

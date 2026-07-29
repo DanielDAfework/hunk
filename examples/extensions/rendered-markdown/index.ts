@@ -4,7 +4,6 @@ import type {
   ExtensionFileChangeRange,
   ExtensionFileViewRow,
   ExtensionFileViewSpan,
-  ExtensionFileViewTextAttribute,
 } from "hunkdiff/extension";
 
 const MAX_MARKDOWN_SOURCE_LENGTH = 200_000;
@@ -20,6 +19,7 @@ interface RenderedMarkdownRow {
 }
 
 type SpanPresentation = Omit<ExtensionFileViewSpan, "text">;
+type FileViewTextAttribute = NonNullable<ExtensionFileViewSpan["attributes"]>[number];
 
 /** Index source offsets once so token-to-line mapping stays linear for large documents. */
 function createSourceIndex(source: string): SourceIndex {
@@ -90,7 +90,7 @@ function appendInlineLines(target: ExtensionFileViewSpan[][], nested: ExtensionF
 /** Add one generic text attribute without coupling the host to Markdown semantics. */
 function withAttribute(
   presentation: SpanPresentation,
-  attribute: ExtensionFileViewTextAttribute,
+  attribute: FileViewTextAttribute,
 ): SpanPresentation {
   return {
     ...presentation,
@@ -101,7 +101,7 @@ function withAttribute(
 /** Convert Marked inline tokens into generic symbolic host-rendered spans. */
 function renderInlineTokens(
   tokens: readonly Token[] | undefined,
-  presentation: SpanPresentation = { tone: "text" },
+  presentation: SpanPresentation = {},
 ): ExtensionFileViewSpan[][] {
   const lines: ExtensionFileViewSpan[][] = [[]];
   for (const token of tokens ?? []) {
@@ -169,7 +169,7 @@ function renderInlineTokens(
 /** Ensure every symbolic row occupies at least one visible terminal cell. */
 function nonEmptySpans(
   spans: ExtensionFileViewSpan[],
-  presentation: SpanPresentation = { tone: "text" },
+  presentation: SpanPresentation = {},
 ): ExtensionFileViewSpan[] {
   return spans.length > 0 ? spans : [{ text: " ", ...presentation }];
 }
@@ -181,13 +181,19 @@ function renderBlock(
   width: number,
 ): RenderedMarkdownRow[] {
   const rows = (lines: ExtensionFileViewSpan[][], fallback?: SpanPresentation) =>
-    lines.map((spans) => ({ spans: nonEmptySpans(spans, fallback), sourceRange }));
+    lines.map((spans) => ({
+      spans: nonEmptySpans(spans, fallback),
+      sourceRange,
+    }));
 
   switch (token.type) {
     case "space":
       return rows([[]]);
     case "heading": {
-      const heading = { tone: "accent" as const, attributes: ["bold" as const] };
+      const heading = {
+        tone: "accent" as const,
+        attributes: ["bold" as const],
+      };
       return rows(renderInlineTokens((token as Tokens.Heading).tokens, heading), heading);
     }
     case "paragraph":
@@ -202,7 +208,12 @@ function renderBlock(
       const output: RenderedMarkdownRow[] = [];
       if (fenced) {
         output.push({
-          spans: [{ text: `┌─${code.lang ? ` ${code.lang.trim()}` : ""}`, tone: "muted" }],
+          spans: [
+            {
+              text: `┌─${code.lang ? ` ${code.lang.trim()}` : ""}`,
+              tone: "muted",
+            },
+          ],
           sourceRange: [sourceRange[0], sourceRange[0]],
         });
       }
@@ -246,7 +257,10 @@ function renderBlock(
           output.push({
             sourceRange,
             spans: [
-              { text: lineIndex === 0 ? marker : " ".repeat(marker.length), tone: "muted" },
+              {
+                text: lineIndex === 0 ? marker : " ".repeat(marker.length),
+                tone: "muted",
+              },
               ...nonEmptySpans(spans),
             ],
           });
@@ -265,7 +279,7 @@ function renderBlock(
       const header = table.header.map(cellText);
       output.push({
         sourceRange: [sourceRange[0], sourceRange[0]],
-        spans: [{ text: header.join(" │ "), tone: "text" }],
+        spans: [{ text: header.join(" │ ") }],
       });
       output.push({
         sourceRange: [
@@ -283,14 +297,14 @@ function renderBlock(
         const sourceLine = Math.min(sourceRange[1], sourceRange[0] + index + 2);
         output.push({
           sourceRange: [sourceLine, sourceLine],
-          spans: [{ text: cells.map(cellText).join(" │ "), tone: "text" }],
+          spans: [{ text: cells.map(cellText).join(" │ ") }],
         });
       });
       return output;
     }
     case "html": {
       const visible = (token as Tokens.HTML).text.replace(/<[^>]*>/g, "").trim();
-      return rows([[{ text: visible || " ", tone: "text" }]]);
+      return rows([[{ text: visible || " " }]]);
     }
     case "def":
       return rows([[]]);
@@ -343,7 +357,6 @@ function hasUnterminatedFence(source: string) {
 function rowWasAdded(row: RenderedMarkdownRow, changes: readonly ExtensionFileChangeRange[]) {
   return changes.some(
     (change) =>
-      change.side === "new" &&
       change.kind === "added" &&
       change.range[0] <= row.sourceRange[1] &&
       change.range[1] >= row.sourceRange[0],
@@ -353,7 +366,7 @@ function rowWasAdded(row: RenderedMarkdownRow, changes: readonly ExtensionFileCh
 /** Resolve an inclusive source range to the rendered rows that best represent it. */
 function renderedBounds(
   rows: readonly RenderedMarkdownRow[],
-  range: [number, number],
+  range: readonly [number, number],
 ): [number, number] {
   const overlapping = rows.flatMap((row, index) =>
     row.sourceRange[0] <= range[1] && row.sourceRange[1] >= range[0] ? [index] : [],
@@ -391,18 +404,18 @@ const renderedMarkdownExtension: ExtensionFactory = (hunk) => {
     matches(file) {
       return /\.md(?:own)?$/i.test(file.path) && !file.isBinary && !file.isTooLarge;
     },
-    async layout(input, context) {
-      const source = await input.documents.read("new", context.signal);
+    async layout(input) {
+      const source = await input.readDocument("new");
       if (
         !source ||
-        source.text.length > MAX_MARKDOWN_SOURCE_LENGTH ||
-        context.signal.aborted ||
-        hasUnterminatedFence(source.text)
+        source.length > MAX_MARKDOWN_SOURCE_LENGTH ||
+        input.signal.aborted ||
+        hasUnterminatedFence(source)
       ) {
         return null;
       }
 
-      const renderedRows = renderMarkdown(source.text, context.width);
+      const renderedRows = renderMarkdown(source, input.width);
       if (renderedRows.length === 0) return null;
       const rows: ExtensionFileViewRow[] = renderedRows.map((row, index) => ({
         id: `rendered:${index}`,
@@ -410,9 +423,9 @@ const renderedMarkdownExtension: ExtensionFactory = (hunk) => {
           ? row.spans.map((span) => ({ ...span, tone: "added" as const }))
           : row.spans,
       }));
-      const hunks = (input.file.hunks ?? []).map((hunk) => {
+      const hunkRows = (input.file.hunks ?? []).map((hunk) => {
         const changedRanges = input.changes.filter(
-          (change) => change.hunkIndex === hunk.index && change.side === "new",
+          (change) => change.hunkIndex === hunk.index && change.kind === "added",
         );
         const sourceRange: [number, number] = changedRanges.length
           ? [
@@ -421,10 +434,10 @@ const renderedMarkdownExtension: ExtensionFactory = (hunk) => {
             ]
           : (hunk.newRange ?? [1, 1]);
         const [startRow, endRow] = renderedBounds(renderedRows, sourceRange);
-        return { index: hunk.index, startRow, endRow };
+        return { startRow, endRow };
       });
 
-      return { rows, hunks };
+      return { rows, hunkRows };
     },
   });
 };

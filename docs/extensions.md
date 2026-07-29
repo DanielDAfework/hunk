@@ -187,7 +187,7 @@ cannot mutate the registry mid-session.
 
 ### `hunk.apiVersion`
 
-The API generation this Hunk speaks (currently `1`). Branch on it if you want
+The API generation this Hunk speaks (currently `2`). Branch on it if you want
 one file to support several Hunk versions.
 
 ### `hunk.registerTheme(theme)`
@@ -673,20 +673,19 @@ export default function (hunk: HunkExtensionAPI) {
     id: "plain-markdown",
     title: "Plain Markdown",
     matches: (file) => file.path.endsWith(".md"),
-    async layout(input, { width, signal }) {
-      const document = await input.documents.read("new", signal);
-      if (!document || document.text.length > 100_000) return null;
+    async layout(input) {
+      const document = await input.readDocument("new");
+      if (!document || document.length > 100_000) return null;
 
-      const rows = document.text.split("\n").map((text, index) => ({
+      const rows = document.split("\n").map((text, index) => ({
         id: `line:${index + 1}`,
-        spans: [{ text: text || " ", tone: "text" as const }],
+        spans: [{ text: text || " " }],
       }));
       if (rows.length === 0) return null;
 
       return {
         rows,
-        hunks: (input.file.hunks ?? []).map((hunk) => ({
-          index: hunk.index,
+        hunkRows: (input.file.hunks ?? []).map((hunk) => ({
           startRow: Math.max(0, (hunk.newRange?.[0] ?? 1) - 1),
           endRow: Math.min(rows.length - 1, (hunk.newRange?.[1] ?? 1) - 1),
         })),
@@ -696,24 +695,31 @@ export default function (hunk: HunkExtensionAPI) {
 }
 ```
 
-`input.file` is the same frozen public `ExtensionDiffFile` sidebars receive.
-`input.changes` exposes typed added, removed, and context ranges without
-Pierre metadata. `documents.read("old" | "new")` is lazy and cached by Hunk;
-it resolves an exact document or `null` when that side is absent, unavailable,
-too large, or fails to load. Never treat `null` as an exception: return `null`
-from `layout` to keep raw diff active.
+`layout` receives one readonly input containing `file`, `width`, `signal`,
+`changes`, and `readDocument`. `input.file` is the same frozen public
+`ExtensionDiffFile` sidebars receive. `input.changes` exposes typed added and
+removed ranges without Pierre metadata;
+complete old/new hunk ranges remain available through `input.file.hunks`.
+`readDocument("old" | "new")` is lazy and cached by Hunk; it resolves exact
+text or `null` when that side is absent, unavailable, too large, or fails to
+load. Never treat `null` as an exception: return `null` from `layout` to keep
+raw diff active.
 
-Layouts use generic symbolic tones (`text`, `muted`, `accent`, `accent-muted`,
-`syntax`, `added`, `removed`) and optional terminal attributes (`bold`, `italic`,
-`underline`, `strikethrough`). Hunk resolves those primitives only while
-painting, so the host does not learn the extension's content format and
-measurement remains theme-independent. Every parsed hunk needs one in-bounds,
-inclusive row range. Invalid, oversized, cancelled, or throwing layouts are
-isolated with one warning and fall back to raw diff.
+Layouts use an omitted tone for ordinary text and generic symbolic tones
+(`muted`, `accent`, `accent-muted`, `syntax`, `added`, `removed`) plus optional
+terminal attributes (`bold`, `italic`, `underline`, `strikethrough`). Hunk
+resolves those primitives only while painting, so the host does not learn the
+extension's content format and measurement remains theme-independent. Every
+parsed hunk needs one in-bounds, inclusive `hunkRows` entry at the same array
+position as `input.file.hunks`. Invalid, oversized, cancelled, or throwing
+layouts are isolated with one warning and fall back to raw diff. An experimental
+custom row keeps symbolic fallback spans and declares its fixed painter
+atomically as `component: { height, render }`; see the linked JSX POC for its
+clipping and error boundaries.
 
 A command handler can control the selected file's view through
 `ctx.fileViews.select("view-id")`, `toggle("view-id")`, and
-`isActive("view-id")`; pass `"raw"` to `select` to restore raw rendering.
+`isActive("view-id")`; pass `null` to `select` to restore raw rendering.
 Bare ids address the calling extension; use `"other-extension:view-id"` to
 address another registered view.
 

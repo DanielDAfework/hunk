@@ -4,6 +4,7 @@ import type { ExtensionFileViewLayout } from "../../extension-api/types";
 import type { RegisteredFileView } from "../../extensions/types";
 import { fileViewHunkCount, createFileViewInput } from "./host";
 import { validateFileViewLayout } from "./layout";
+import { registeredFileViewKey } from "./state";
 
 /** Bound asynchronous third-party layout work so raw diff never waits indefinitely. */
 export const FILE_VIEW_LAYOUT_TIMEOUT_MS = 1_500;
@@ -18,11 +19,6 @@ interface CacheEntry {
   key: string;
   width: number;
   layout: ExtensionFileViewLayout | null;
-}
-
-/** Resolve one registered view key as `<extensionId>:<viewId>`. */
-export function registeredFileViewKey(view: RegisteredFileView) {
-  return `${view.extensionId}:${view.view.id}`;
 }
 
 /** Race one third-party layout against the host resource budget without leaking a timer. */
@@ -83,8 +79,9 @@ export function useFileViewLayouts({
         if (!registered) {
           continue;
         }
+        const input = createFileViewInput(file, width, controller.signal);
         try {
-          if (!registered.view.matches(createFileViewInput(file).file)) {
+          if (!registered.view.matches(input.file)) {
             continue;
           }
         } catch {
@@ -105,14 +102,7 @@ export function useFileViewLayouts({
         }
 
         try {
-          const candidate = await layoutWithTimeout(
-            Promise.resolve(
-              registered.view.layout(createFileViewInput(file), {
-                width,
-                signal: controller.signal,
-              }),
-            ),
-          );
+          const candidate = await layoutWithTimeout(Promise.resolve(registered.view.layout(input)));
           if (controller.signal.aborted || !active) {
             return;
           }
@@ -129,7 +119,12 @@ export function useFileViewLayouts({
             cache.current.set(cacheKey, { file, key, width, layout: null });
             continue;
           }
-          cache.current.set(cacheKey, { file, key, width, layout: checked.value.layout });
+          cache.current.set(cacheKey, {
+            file,
+            key,
+            width,
+            layout: checked.value.layout,
+          });
           next.set(file.id, { key, layout: checked.value.layout });
         } catch {
           if (controller.signal.aborted || !active) {

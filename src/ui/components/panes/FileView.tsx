@@ -4,16 +4,18 @@ import type {
   ExtensionFileViewLayout,
   ExtensionFileViewRow,
   ExtensionFileViewRowComponentProps,
-  ExtensionFileViewTextAttribute,
-  ExtensionFileViewTone,
+  ExtensionFileViewSpan,
 } from "../../../extension-api/types";
 import type { AppTheme } from "../../themes";
 import type { DiffSectionGeometry } from "../../diff/diffSectionGeometry";
 import type { VisibleBodyBounds } from "../../diff/rowWindowing";
 import { reviewRowId } from "../../lib/ids";
 
+type FileViewTone = ExtensionFileViewSpan["tone"];
+type FileViewTextAttribute = NonNullable<ExtensionFileViewSpan["attributes"]>[number];
+
 /** Resolve a generic file-view tone only at paint time, keeping layout theme-independent. */
-function fileViewToneColor(tone: ExtensionFileViewTone | undefined, theme: AppTheme) {
+function fileViewToneColor(tone: FileViewTone, theme: AppTheme) {
   switch (tone) {
     case "muted":
       return theme.muted;
@@ -32,7 +34,7 @@ function fileViewToneColor(tone: ExtensionFileViewTone | undefined, theme: AppTh
   }
 }
 
-const FILE_VIEW_ATTRIBUTE_BITS: Record<ExtensionFileViewTextAttribute, number> = {
+const FILE_VIEW_ATTRIBUTE_BITS: Record<FileViewTextAttribute, number> = {
   bold: TextAttributes.BOLD,
   italic: TextAttributes.ITALIC,
   underline: TextAttributes.UNDERLINE,
@@ -40,7 +42,7 @@ const FILE_VIEW_ATTRIBUTE_BITS: Record<ExtensionFileViewTextAttribute, number> =
 };
 
 /** Combine generic emphasis attributes into OpenTUI's terminal bitmask. */
-function fileViewTextAttributes(attributes: readonly ExtensionFileViewTextAttribute[] | undefined) {
+function fileViewTextAttributes(attributes: readonly FileViewTextAttribute[] | undefined) {
   return (attributes ?? []).reduce(
     (combined, attribute) => combined | FILE_VIEW_ATTRIBUTE_BITS[attribute],
     TextAttributes.NONE,
@@ -53,7 +55,7 @@ export function isFileViewRowSelected(
   rowIndex: number,
   selectedHunkIndex: number,
 ) {
-  const selectedHunk = layout.hunks.find((hunk) => hunk.index === selectedHunkIndex);
+  const selectedHunk = layout.hunkRows[selectedHunkIndex];
   return Boolean(
     selectedHunk && rowIndex >= selectedHunk.startRow && rowIndex <= selectedHunk.endRow,
   );
@@ -144,8 +146,8 @@ function FileViewComponent({
       ) : null}
       {rowWindow.rows.map(({ row, index }) => {
         const selected = isFileViewRowSelected(layout, index, selectedHunkIndex);
-        const fixedHeight = row.component ? row.height : undefined;
-        const View = row.component as
+        const fixedHeight = row.component?.height;
+        const View = row.component?.render as
           | ((props: ExtensionFileViewRowComponentProps) => ReactNode)
           | undefined;
         const fallback = <SymbolicFileViewRow row={row} theme={theme} />;

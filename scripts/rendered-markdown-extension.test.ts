@@ -31,30 +31,33 @@ describe("rendered Markdown example extension", () => {
       key: "f8",
     });
     const toggled: string[] = [];
-    commandHandler({ fileViews: { toggle: (viewId: string) => toggled.push(viewId) } } as never);
+    commandHandler({
+      fileViews: { toggle: (viewId: string) => toggled.push(viewId) },
+    } as never);
     expect(toggled).toEqual(["rendered-markdown"]);
-    expect(view.matches({ path: "README.md", isBinary: false, isTooLarge: false } as never)).toBe(
-      true,
-    );
+    expect(
+      view.matches({
+        path: "README.md",
+        isBinary: false,
+        isTooLarge: false,
+      } as never),
+    ).toBe(true);
 
-    const layout = await view.layout(
-      {
-        file: {
-          id: "readme",
-          path: "README.md",
-          patch: "",
-          stats: { additions: 1, deletions: 0 },
-          metadata: {},
-          agent: null,
-          hunks: [{ index: 0, header: "@@", newRange: [2, 2] }],
-        },
-        changes: [{ hunkIndex: 0, side: "new", range: [2, 2], kind: "added" }],
-        documents: {
-          read: async () => ({ availability: "exact" as const, text: "# Hello\nnew item\n" }),
-        },
+    const layout = await view.layout({
+      file: {
+        id: "readme",
+        path: "README.md",
+        patch: "",
+        stats: { additions: 1, deletions: 0 },
+        metadata: {},
+        agent: null,
+        hunks: [{ index: 0, header: "@@", newRange: [2, 2] }],
       },
-      { width: 80, signal: new AbortController().signal },
-    );
+      width: 80,
+      signal: new AbortController().signal,
+      changes: [{ hunkIndex: 0, range: [2, 2], kind: "added" }],
+      readDocument: async () => "# Hello\nnew item\n",
+    });
 
     expect(layout?.rows).toEqual([
       {
@@ -63,50 +66,45 @@ describe("rendered Markdown example extension", () => {
       },
       { id: "rendered:1", spans: [{ text: "new item", tone: "added" }] },
     ]);
-    expect(layout?.hunks).toEqual([{ index: 0, startRow: 1, endRow: 1 }]);
+    expect(layout?.hunkRows).toEqual([{ startRow: 1, endRow: 1 }]);
   });
 
   test("renders lists, quotes, tables, inline emphasis, links, and fenced code", async () => {
     const { view } = registerMarkdownTestView();
-    const layout = await view.layout(
-      {
-        file: {
-          id: "guide",
-          path: "guide.md",
-          patch: "",
-          stats: { additions: 0, deletions: 0 },
-          metadata: {},
-          agent: null,
-          hunks: [],
-        },
-        changes: [],
-        documents: {
-          read: async () => ({
-            availability: "exact" as const,
-            text: [
-              "# Guide",
-              "",
-              "Use **bold**, *emphasis*, and [docs](https://example.com).",
-              "",
-              "- first",
-              "- second",
-              "",
-              "> quoted",
-              "",
-              "| A | B |",
-              "|---|---|",
-              "| 1 | 2 |",
-              "",
-              "```ts",
-              "const answer = 42",
-              "```",
-              "",
-            ].join("\n"),
-          }),
-        },
+    const layout = await view.layout({
+      file: {
+        id: "guide",
+        path: "guide.md",
+        patch: "",
+        stats: { additions: 0, deletions: 0 },
+        metadata: {},
+        agent: null,
+        hunks: [],
       },
-      { width: 80, signal: new AbortController().signal },
-    );
+      width: 80,
+      signal: new AbortController().signal,
+      changes: [],
+      readDocument: async () =>
+        [
+          "# Guide",
+          "",
+          "Use **bold**, *emphasis*, and [docs](https://example.com).",
+          "",
+          "- first",
+          "- second",
+          "",
+          "> quoted",
+          "",
+          "| A | B |",
+          "|---|---|",
+          "| 1 | 2 |",
+          "",
+          "```ts",
+          "const answer = 42",
+          "```",
+          "",
+        ].join("\n"),
+    });
 
     const text = layout?.rows.map((row) => row.spans.map((span) => span.text).join(""));
     expect(text).toContain("Guide");
@@ -138,22 +136,14 @@ describe("rendered Markdown example extension", () => {
       },
       changes: [],
     } as const;
+    const request = {
+      ...base,
+      width: 80,
+      signal: new AbortController().signal,
+    };
+    await expect(view.layout({ ...request, readDocument: async () => null })).resolves.toBeNull();
     await expect(
-      view.layout(
-        { ...base, documents: { read: async () => null } },
-        { width: 80, signal: new AbortController().signal },
-      ),
-    ).resolves.toBeNull();
-    await expect(
-      view.layout(
-        {
-          ...base,
-          documents: {
-            read: async () => ({ availability: "exact" as const, text: "```ts\nopen" }),
-          },
-        },
-        { width: 80, signal: new AbortController().signal },
-      ),
+      view.layout({ ...request, readDocument: async () => "```ts\nopen" }),
     ).resolves.toBeNull();
   });
 });

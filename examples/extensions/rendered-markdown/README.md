@@ -27,7 +27,7 @@ bun install
 
 Hunk discovers the folder automatically on later launches. Open **View** and choose **File presentation: Rendered Markdown**, or press `F8`. The command is named `rendered-markdown.toggle-rendered-markdown` for `[keybindings]` customization.
 
-Raw Pierre diff remains the default and fallback. The preview shows the parsed new document, retains hunk navigation and selection highlighting, and yields to raw rendering while inline review notes are visible so notes are never hidden.
+Raw Pierre diff remains the default and fallback. The preview reads exact text through `input.readDocument`, returns hunk row bounds in source-hunk order, retains hunk navigation and selection highlighting, and yields to raw rendering while inline review notes are visible so notes are never hidden.
 
 ## Why it returns rows instead of an OpenTUI Markdown component
 

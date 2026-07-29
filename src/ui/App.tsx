@@ -81,9 +81,14 @@ import { buildAppMenus } from "./lib/appMenus";
 import { buildExtensionAppCommands, extensionCommandKeyDefaults } from "./lib/extensionCommands";
 import { createExtensionDialogQueue } from "./lib/extensionDialogs";
 import { buildExtensionReviewSelection } from "./lib/extensionSelection";
-import { useFileViewLayouts, registeredFileViewKey } from "./fileViews/useFileViews";
+import { useFileViewLayouts } from "./fileViews/useFileViews";
 import { availableFileViewSelections, fileViewUnavailableReason } from "./fileViews/availability";
-import { reconcileFileViewSelections, selectFileView } from "./fileViews/state";
+import {
+  reconcileFileViewSelections,
+  registeredFileViewKey,
+  resolveRegisteredFileView,
+  selectFileView,
+} from "./fileViews/state";
 import { createExtensionSidebarKeybindings, resolveCommandKeys } from "./lib/keymap";
 import {
   buildSessionSidebarViews,
@@ -555,15 +560,10 @@ export function App({
   /** Build host-owned file-presentation controls for one extension command. */
   const createFileViewControls = useCallback(
     (extensionId: string): ExtensionFileViewControls => {
-      const resolve = (viewId: string) => {
-        if (viewId === "raw") return null;
-        const key = viewId.includes(":") ? viewId : `${extensionId}:${viewId}`;
-        return (
-          sessionFileViewsRef.current.find((view) => registeredFileViewKey(view) === key) ?? null
-        );
-      };
+      const resolve = (viewId: string) =>
+        resolveRegisteredFileView(sessionFileViewsRef.current, extensionId, viewId);
       const selectedId = () => extensionSelectionInputsRef.current.selectedFileId;
-      const select = (viewId: string) => {
+      const select = (viewId: string | null) => {
         const fileId = selectedId();
         if (!fileId) {
           showSessionNotice(
@@ -572,12 +572,12 @@ export function App({
           return;
         }
         const unavailableReason = fileViewUnavailableReasonsRef.current.get(fileId);
-        if (viewId !== "raw" && unavailableReason) {
+        if (viewId !== null && unavailableReason) {
           showSessionNotice(unavailableReason);
           return;
         }
-        const registered = resolve(viewId);
-        if (viewId !== "raw" && !registered) {
+        const registered = viewId === null ? undefined : resolve(viewId);
+        if (viewId !== null && !registered) {
           showSessionNotice(`Extension ${extensionId} targeted unknown file view "${viewId}"`);
           return;
         }
@@ -615,7 +615,7 @@ export function App({
             registered &&
             fileViewSelectionsRef.current[fileId] === registeredFileViewKey(registered)
           ) {
-            select("raw");
+            select(null);
           } else {
             select(viewId);
           }

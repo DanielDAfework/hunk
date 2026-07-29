@@ -37,7 +37,7 @@ describe("summarizeHunk", () => {
       expect(summaries[index]!.newRange).toBeDefined();
     }
 
-    const publicFile = createFileViewInput(file).file;
+    const publicFile = createFileViewInput(file, 80, new AbortController().signal).file;
     const jsxLayout = createJsxFileViewLayout(publicFile);
     expect(jsxLayout).not.toBeNull();
     expect(validateFileViewLayout(jsxLayout, summaries.length, 80)).toMatchObject({ valid: true });

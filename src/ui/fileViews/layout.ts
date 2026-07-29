@@ -1,8 +1,4 @@
-import type {
-  ExtensionFileViewHunkBounds,
-  ExtensionFileViewLayout,
-  ExtensionFileViewRow,
-} from "../../extension-api/types";
+import type { ExtensionFileViewLayout, ExtensionFileViewRow } from "../../extension-api/types";
 import { measureSanitizedTextWidth, wrapSanitizedTextByWidth } from "../lib/text";
 
 /** Resource limits keep one extension layout from exhausting the review stream. */
@@ -12,15 +8,7 @@ export const FILE_VIEW_MAX_TEXT_LENGTH = 1_000_000;
 export const FILE_VIEW_MAX_COMPONENT_ROW_HEIGHT = 256;
 export const FILE_VIEW_MAX_COMPONENT_HEIGHT = 100_000;
 
-const FILE_VIEW_TONES = new Set([
-  "text",
-  "muted",
-  "accent",
-  "accent-muted",
-  "syntax",
-  "added",
-  "removed",
-]);
+const FILE_VIEW_TONES = new Set(["muted", "accent", "accent-muted", "syntax", "added", "removed"]);
 const FILE_VIEW_TEXT_ATTRIBUTES = new Set(["bold", "italic", "underline", "strikethrough"]);
 
 export interface ValidatedFileViewLayout {
@@ -45,11 +33,17 @@ export function validateFileViewLayout(
   }
 
   const layout = value as ExtensionFileViewLayout;
-  if (!Array.isArray(layout.rows) || !Array.isArray(layout.hunks)) {
-    return { valid: false, issue: "layout must include rows and hunks arrays" };
+  if (!Array.isArray(layout.rows) || !Array.isArray(layout.hunkRows)) {
+    return {
+      valid: false,
+      issue: "layout must include rows and hunkRows arrays",
+    };
   }
   if (layout.rows.length > FILE_VIEW_MAX_ROWS) {
-    return { valid: false, issue: `layout has more than ${FILE_VIEW_MAX_ROWS} rows` };
+    return {
+      valid: false,
+      issue: `layout has more than ${FILE_VIEW_MAX_ROWS} rows`,
+    };
   }
 
   const ids = new Set<string>();
@@ -67,29 +61,31 @@ export function validateFileViewLayout(
       return { valid: false, issue: `rows[${index}] repeats id "${row.id}"` };
     }
     ids.add(row.id);
-    const hasComponent = row.component !== undefined;
-    const hasHeight = row.height !== undefined;
-    if (hasComponent !== hasHeight) {
-      return {
-        valid: false,
-        issue: `rows[${index}] must declare component and height together`,
-      };
-    }
-    if (hasComponent) {
-      if (typeof row.component !== "function") {
-        return { valid: false, issue: `rows[${index}].component is not a function` };
+    const component = row.component;
+    if (component !== undefined) {
+      if (!component || typeof component !== "object" || Array.isArray(component)) {
+        return {
+          valid: false,
+          issue: `rows[${index}].component is not an object`,
+        };
+      }
+      if (typeof component.render !== "function") {
+        return {
+          valid: false,
+          issue: `rows[${index}].component.render is not a function`,
+        };
       }
       if (
-        !Number.isInteger(row.height) ||
-        row.height! < 1 ||
-        row.height! > FILE_VIEW_MAX_COMPONENT_ROW_HEIGHT
+        !Number.isInteger(component.height) ||
+        component.height < 1 ||
+        component.height > FILE_VIEW_MAX_COMPONENT_ROW_HEIGHT
       ) {
         return {
           valid: false,
-          issue: `rows[${index}].height must be an integer from 1 to ${FILE_VIEW_MAX_COMPONENT_ROW_HEIGHT}`,
+          issue: `rows[${index}].component.height must be an integer from 1 to ${FILE_VIEW_MAX_COMPONENT_ROW_HEIGHT}`,
         };
       }
-      componentHeight += row.height!;
+      componentHeight += component.height;
       if (componentHeight > FILE_VIEW_MAX_COMPONENT_HEIGHT) {
         return {
           valid: false,
@@ -105,13 +101,22 @@ export function validateFileViewLayout(
     for (const span of row.spans) {
       spanCount += 1;
       if (spanCount > FILE_VIEW_MAX_SPANS) {
-        return { valid: false, issue: `layout has more than ${FILE_VIEW_MAX_SPANS} spans` };
+        return {
+          valid: false,
+          issue: `layout has more than ${FILE_VIEW_MAX_SPANS} spans`,
+        };
       }
       if (!span || typeof span.text !== "string" || span.text.includes("\n")) {
-        return { valid: false, issue: `rows[${index}] contains an invalid span` };
+        return {
+          valid: false,
+          issue: `rows[${index}] contains an invalid span`,
+        };
       }
       if (span.tone !== undefined && !FILE_VIEW_TONES.has(span.tone)) {
-        return { valid: false, issue: `rows[${index}] contains an invalid span tone` };
+        return {
+          valid: false,
+          issue: `rows[${index}] contains an invalid span tone`,
+        };
       }
       if (
         span.attributes !== undefined &&
@@ -121,7 +126,10 @@ export function validateFileViewLayout(
               typeof attribute !== "string" || !FILE_VIEW_TEXT_ATTRIBUTES.has(attribute),
           ))
       ) {
-        return { valid: false, issue: `rows[${index}] contains invalid span attributes` };
+        return {
+          valid: false,
+          issue: `rows[${index}] contains invalid span attributes`,
+        };
       }
       textLength += span.text.length;
       if (textLength > FILE_VIEW_MAX_TEXT_LENGTH) {
@@ -134,33 +142,30 @@ export function validateFileViewLayout(
     }
     // Component geometry is declared before mount; symbolic rows retain width-driven wrapping.
     rowHeights.push(
-      hasComponent
-        ? row.height!
+      component
+        ? component.height
         : Math.max(1, wrapSanitizedTextByWidth(rowText, usableWidth).length),
     );
   }
 
-  if (layout.hunks.length !== hunkCount) {
+  if (layout.hunkRows.length !== hunkCount) {
     return {
       valid: false,
-      issue: `layout has ${layout.hunks.length} hunk bounds for ${hunkCount} hunks`,
+      issue: `layout has ${layout.hunkRows.length} hunk bounds for ${hunkCount} hunks`,
     };
   }
-  const hunkIndexes = new Set<number>();
-  for (const [position, hunk] of layout.hunks.entries()) {
+  for (const [position, hunk] of layout.hunkRows.entries()) {
     if (
       !hunk ||
-      !Number.isInteger(hunk.index) ||
-      hunk.index < 0 ||
-      hunk.index >= hunkCount ||
       !isRowIndex(hunk.startRow, layout.rows.length) ||
       !isRowIndex(hunk.endRow, layout.rows.length) ||
-      hunk.startRow > hunk.endRow ||
-      hunkIndexes.has(hunk.index)
+      hunk.startRow > hunk.endRow
     ) {
-      return { valid: false, issue: `hunks[${position}] is not a unique in-bounds row range` };
+      return {
+        valid: false,
+        issue: `hunkRows[${position}] is not an in-bounds row range`,
+      };
     }
-    hunkIndexes.add(hunk.index);
   }
 
   return { valid: true, value: { layout, rowHeights } };
@@ -168,8 +173,8 @@ export function validateFileViewLayout(
 
 /** Return the terminal height for one symbolic row at a concrete content width. */
 export function measureFileViewRow(row: ExtensionFileViewRow, width: number) {
-  if (row.component && Number.isInteger(row.height) && row.height! > 0) {
-    return row.height!;
+  if (row.component && Number.isInteger(row.component.height) && row.component.height > 0) {
+    return row.component.height;
   }
   const text = row.spans.map((span) => span.text).join("");
   // Preserve one empty symbolic row so extensions can express intentional vertical spacing.
@@ -185,9 +190,4 @@ export function fileViewRowText(row: ExtensionFileViewRow, width: number) {
 /** Exposed only for tests that ensure terminal measurement treats wide text as cells, not UTF-16. */
 export function measureFileViewRowWidth(row: ExtensionFileViewRow) {
   return measureSanitizedTextWidth(row.spans.map((span) => span.text).join(""));
-}
-
-/** Resolve one hunk record without spreading coordinate lookup policy around callers. */
-export function fileViewHunkBounds(layout: ExtensionFileViewLayout, hunkIndex: number) {
-  return layout.hunks.find((hunk: ExtensionFileViewHunkBounds) => hunk.index === hunkIndex);
 }
