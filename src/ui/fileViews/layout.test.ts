@@ -103,12 +103,18 @@ describe("file-view layout validation", () => {
     expect(
       validateFileViewSourceRanges(valid.value.layout, { old: "a\nb\n", new: "a\nb\nc" }),
     ).toBeNull();
-    expect(validateFileViewSourceRanges(valid.value.layout, { old: "a\nb\n", new: null })).toBe(
-      "rows[1].sourceRanges[0] targets unavailable new source",
-    );
-    expect(validateFileViewSourceRanges(valid.value.layout, { old: "a\n", new: "a\nb\nc" })).toBe(
-      "rows[0].sourceRanges[0] exceeds the old source bounds",
-    );
+    // Unreadable source and a wrong binding are reported as different kinds so the host can
+    // attribute an environment condition separately from an extension mistake.
+    expect(validateFileViewSourceRanges(valid.value.layout, { old: "a\nb\n", new: null })).toEqual({
+      kind: "unavailable-source",
+      detail: "rows[1].sourceRanges[0] targets unavailable new source",
+    });
+    expect(
+      validateFileViewSourceRanges(valid.value.layout, { old: "a\n", new: "a\nb\nc" }),
+    ).toEqual({
+      kind: "out-of-bounds",
+      detail: "rows[0].sourceRanges[0] exceeds the old source bounds",
+    });
 
     expect(
       validateFileViewLayout(

@@ -296,11 +296,22 @@ function exactSourceLineCount(source: string) {
   return withoutTerminator.split("\n").length;
 }
 
+/**
+ * Why one accepted layout's row bindings could not be verified.
+ *
+ * `unavailable-source` is an environment condition the host could not resolve; `out-of-bounds` is a
+ * binding the extension got wrong. Callers report them differently so attribution stays honest.
+ */
+export interface FileViewSourceBindingIssue {
+  readonly kind: "unavailable-source" | "out-of-bounds";
+  readonly detail: string;
+}
+
 /** Validate accepted row bindings against the exact source documents the host can read. */
 export function validateFileViewSourceRanges(
   layout: ExtensionFileViewLayout,
   documents: Readonly<Partial<Record<ExtensionFileSide, string | null>>>,
-) {
+): FileViewSourceBindingIssue | null {
   const lineCounts: Partial<Record<ExtensionFileSide, number | null>> = {};
   for (const side of ["old", "new"] as const) {
     const source = documents[side];
@@ -311,10 +322,16 @@ export function validateFileViewSourceRanges(
     for (const [rangeIndex, sourceRange] of (row.sourceRanges ?? []).entries()) {
       const lineCount = lineCounts[sourceRange.side];
       if (lineCount === undefined || lineCount === null) {
-        return `rows[${rowIndex}].sourceRanges[${rangeIndex}] targets unavailable ${sourceRange.side} source`;
+        return {
+          kind: "unavailable-source",
+          detail: `rows[${rowIndex}].sourceRanges[${rangeIndex}] targets unavailable ${sourceRange.side} source`,
+        };
       }
       if (sourceRange.range[1] > lineCount) {
-        return `rows[${rowIndex}].sourceRanges[${rangeIndex}] exceeds the ${sourceRange.side} source bounds`;
+        return {
+          kind: "out-of-bounds",
+          detail: `rows[${rowIndex}].sourceRanges[${rangeIndex}] exceeds the ${sourceRange.side} source bounds`,
+        };
       }
     }
   }

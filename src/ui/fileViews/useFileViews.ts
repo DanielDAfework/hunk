@@ -113,7 +113,8 @@ function createLayoutController(parentSignal: AbortSignal) {
  * Run one extension layout with a child cancellation lifetime.
  *
  * The child is aborted on timeout, parent supersession, and successful or failed completion.
- * Promise.race detaches the host from extensions that resolve after their budget has expired.
+ * Every awaited phase races the same budget, so neither third-party layout code nor the host
+ * source reads its bindings require can hold a preparation slot past the deadline.
  */
 export async function runFileViewLayoutRequest(
   registered: RegisteredFileView,
@@ -141,12 +142,13 @@ export async function runFileViewLayoutRequest(
         once: true,
       });
     });
+    // Aborting the controller stops the host from waiting; an already-issued source read may still
+    // settle on its own, but it can no longer keep this preparation slot occupied.
+    const withinBudget = <T>(work: Promise<T>) => Promise.race([work, deadline, cancelled]);
     const input = createFileViewInput(file, width, controller.signal, snapshot);
-    const candidate = await Promise.race([
+    const candidate = await withinBudget(
       Promise.resolve().then(() => registered.view.layout(input)),
-      deadline,
-      cancelled,
-    ]);
+    );
     if (controller.signal.aborted || parentSignal.aborted) {
       throw new Error("layout aborted");
     }
@@ -162,17 +164,23 @@ export async function runFileViewLayoutRequest(
         (row.sourceRanges ?? []).map((sourceRange) => sourceRange.side),
       ),
     );
-    const documents = Object.fromEntries(
-      await Promise.all(
+    const documents = await withinBudget(
+      Promise.all(
         [...requiredSides].map(async (side) => [side, await input.readDocument(side)] as const),
-      ),
+      ).then((entries) => Object.fromEntries(entries)),
     );
     if (controller.signal.aborted || parentSignal.aborted) {
       throw new Error("layout aborted");
     }
     const bindingIssue = validateFileViewSourceRanges(checked.value.layout, documents);
     if (bindingIssue) {
-      throw new Error(`invalid layout: ${bindingIssue}`);
+      // Unreadable source is an environment condition, so keep it distinguishable from a layout
+      // the extension actually got wrong.
+      throw new Error(
+        bindingIssue.kind === "unavailable-source"
+          ? `unavailable source: ${bindingIssue.detail}`
+          : `invalid layout: ${bindingIssue.detail}`,
+      );
     }
     return checked.value;
   } finally {
@@ -291,14 +299,17 @@ export function useFileViewLayouts({
       } catch (error) {
         if (controller.signal.aborted || !active) return;
         const detail = error instanceof Error ? error.message : String(error);
-        const invalid = detail.startsWith("invalid layout: ");
-        reportOnce(
-          registered,
-          `${file.id}:${key}:${invalid ? detail : "layout"}`,
-          invalid
-            ? `Extension ${registered.extensionId} file view "${registered.view.id}" returned an ${detail} • using raw diff`
-            : `Extension ${registered.extensionId} file view "${registered.view.id}" failed laying out ${file.path} • using raw diff`,
-        );
+        const view = `Extension ${registered.extensionId} file view "${registered.view.id}"`;
+        // Dedupe on the failure category, never on a thrown message an extension could vary.
+        const [category, attributed] = detail.startsWith("invalid layout: ")
+          ? [detail, `${view} returned an ${detail} • using raw diff`]
+          : detail.startsWith("unavailable source: ")
+            ? [
+                "unavailable-source",
+                `${view} needs source for ${file.path} that Hunk could not read • using raw diff`,
+              ]
+            : ["layout", `${view} failed laying out ${file.path} • using raw diff`];
+        reportOnce(registered, `${file.id}:${key}:${category}`, attributed);
         cacheLayoutResult(cache.current, cacheKey, { file, registered, resolved: null });
       }
     };

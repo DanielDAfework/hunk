@@ -76,6 +76,48 @@ describe("file-view layout request lifetime", () => {
     expect(sourceFetcher.calls).toEqual(["new"]);
   });
 
+  test("times out a hung binding read instead of holding the preparation slot", async () => {
+    let resolveRead: ((value: string | null) => void) | undefined;
+    const sourceFetcher = createTestSourceFetcher(
+      () =>
+        new Promise<string | null>((resolve) => {
+          resolveRead = resolve;
+        }),
+    );
+    const sourceFile = createTestDiffFile({
+      id: "hung",
+      path: "hung.ts",
+      before: "old\n",
+      after: "new\n",
+      sourceFetcher,
+    });
+    // The extension itself returns immediately; only the host read its bindings require hangs.
+    const view = createTestView(({ file: inputFile }) => ({
+      rows: [
+        {
+          id: "bound-row",
+          spans: [{ text: "bound" }],
+          sourceRanges: [{ side: "new", range: [1, 1] }],
+        },
+      ],
+      hunkRows: (inputFile.hunks ?? []).map(() => ({ startRow: 0, endRow: 0 })),
+    }));
+
+    let settlements = 0;
+    await runFileViewLayoutRequest(view, sourceFile, 80, new AbortController().signal, 5).then(
+      () => settlements++,
+      () => settlements++,
+    );
+    expect(settlements).toBe(1);
+    // The read was issued and is still pending, so the budget — not the read — released the slot.
+    expect(sourceFetcher.calls).toEqual(["new"]);
+    expect(resolveRead).toBeDefined();
+
+    resolveRead?.("new\n");
+    await Promise.resolve();
+    expect(settlements).toBe(1);
+  });
+
   test("aborts on timeout and ignores a late extension result", async () => {
     let signal: AbortSignal | undefined;
     let resolveLate: ((value: null) => void) | undefined;
