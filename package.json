@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "bun-pty": "^0.4.10",
+    "node-pty": "^1.1.0",
+    "zod": "^4.4.3"
+  }
+}
