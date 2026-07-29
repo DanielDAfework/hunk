@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type {
+  ExtensionDiffFile,
+  ExtensionFileViewLayout,
   ExtensionFileViewRowComponentProps,
   ExtensionFileViewTone,
   ExtensionFactory,
@@ -17,7 +19,12 @@ function hunkCard(
     return (
       <box
         style={{ width, height, flexDirection: "column" }}
-        onMouseDown={() => setExpanded((value) => !value)}
+        onMouseUp={(event) => {
+          if (event.button !== 0 || event.isDragging) return;
+          event.preventDefault();
+          event.stopPropagation();
+          setExpanded((value) => !value);
+        }}
       >
         <text
           content={`${marker} ${title}`}
@@ -29,48 +36,47 @@ function hunkCard(
   };
 }
 
+/** Build the deterministic two-row-per-hunk layout used by the live TSX example. */
+export function createJsxFileViewLayout(file: ExtensionDiffFile): ExtensionFileViewLayout | null {
+  const hunks = file.hunks ?? [];
+  if (hunks.length < 2) return null;
+
+  const rows = hunks.flatMap((item) => {
+    const range = item.newRange ?? item.oldRange;
+    const rangeLabel = range ? `lines ${range[0]}–${range[1]}` : "unknown lines";
+    return [
+      {
+        id: `hunk-${item.index}-summary`,
+        spans: [{ text: `Hunk ${item.index + 1}: ${item.header}`, tone: "accent" as const }],
+        height: 2,
+        component: hunkCard(`Hunk ${item.index + 1}`, `${rangeLabel} · ${item.header}`, "added"),
+      },
+      {
+        id: `hunk-${item.index}-detail`,
+        spans: [{ text: `${rangeLabel} (symbolic fallback)`, tone: "muted" as const }],
+        height: 2,
+        component: hunkCard("Changed range", rangeLabel, "accent"),
+      },
+    ];
+  });
+
+  return {
+    rows,
+    hunks: hunks.map((item) => ({
+      index: item.index,
+      startRow: item.index * 2,
+      endRow: item.index * 2 + 1,
+    })),
+  };
+}
+
 /** Register an opt-in multi-hunk TSX presentation proof of concept. */
 const register: ExtensionFactory = (hunk) => {
   hunk.registerFileView({
     id: "jsx-cards",
     title: "JSX hunk cards (POC)",
     matches: (file) => (file.hunks?.length ?? 0) >= 2,
-    layout: ({ file }) => {
-      const hunks = file.hunks ?? [];
-      if (hunks.length < 2) return null;
-
-      const rows = hunks.flatMap((item) => {
-        const range = item.newRange ?? item.oldRange;
-        const rangeLabel = range ? `lines ${range[0]}–${range[1]}` : "unknown lines";
-        return [
-          {
-            id: `hunk-${item.index}-summary`,
-            spans: [{ text: `Hunk ${item.index + 1}: ${item.header}`, tone: "accent" as const }],
-            height: 2,
-            component: hunkCard(
-              `Hunk ${item.index + 1}`,
-              `${rangeLabel} · ${item.header}`,
-              "added",
-            ),
-          },
-          {
-            id: `hunk-${item.index}-detail`,
-            spans: [{ text: `${rangeLabel} (symbolic fallback)`, tone: "muted" as const }],
-            height: 2,
-            component: hunkCard("Changed range", rangeLabel, "accent"),
-          },
-        ];
-      });
-
-      return {
-        rows,
-        hunks: hunks.map((item) => ({
-          index: item.index,
-          startRow: item.index * 2,
-          endRow: item.index * 2 + 1,
-        })),
-      };
-    },
+    layout: ({ file }) => createJsxFileViewLayout(file),
   });
 
   hunk.registerCommand(

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createPtyHarness } from "./harness";
@@ -9,6 +9,7 @@ const RENDERED_MARKDOWN_EXTENSION = join(
   import.meta.dir,
   "../../examples/extensions/rendered-markdown",
 );
+const JSX_FILE_VIEW_EXTENSION = join(import.meta.dir, "../../examples/extensions/jsx-file-view");
 setDefaultTimeout(30_000);
 
 afterEach(() => {
@@ -100,6 +101,50 @@ describe("PTY file views", () => {
     } finally {
       session.close();
       rmSync(pair.directory, { recursive: true, force: true });
+    }
+  });
+
+  test("runs the real folder TSX view by key and menu across two hunks", async () => {
+    const pair = harness.createMultiHunkFilePair();
+    // A fresh folder root avoids Bun reusing an extension module imported by another live test.
+    const extension = join(pair.dir, "jsx-runtime-proof");
+    cpSync(JSX_FILE_VIEW_EXTENSION, extension, { recursive: true });
+    const session = await harness.launchHunk({
+      args: ["diff", "--extension", extension, "--mode", "stack", pair.before, pair.after],
+      cwd: pair.dir,
+      cols: 140,
+      rows: 24,
+    });
+
+    try {
+      await session.waitForText(/before\.ts/, { timeout: 20_000 });
+      await harness.ensureKeyboardIsLive(session);
+      await session.press("f8");
+      let custom = await session.waitForText(/▶ Hunk 1/, { timeout: 20_000 });
+      expect(custom).toContain("Hunk 2");
+      expect(custom).toContain("row 0 · click for detail");
+      expect(custom).not.toContain("invalid span");
+
+      await session.click(/▶ Hunk 1/);
+      custom = await session.waitForText(/lines 1–4 · @@ -1,4 \+1,4 @@/);
+      expect(custom).not.toContain("row 0 · click for detail");
+
+      await session.press("]");
+      const secondHunk = await session.waitForText(/▶ Hunk 2/);
+      expect(secondHunk).not.toContain("▶ Hunk 1");
+
+      await session.press("f8");
+      const raw = await session.waitForText(/line60 = 6000/);
+      expect(raw).not.toContain("Hunk 1");
+
+      await session.click(/Extensions/);
+      const menu = await session.waitForText(/Toggle JSX hunk cards \(POC\)/);
+      expect(menu).toMatch(/Toggle JSX hunk cards \(POC\)\s+F8/);
+      await session.click(/Toggle JSX hunk cards \(POC\)/);
+      const menuDispatched = await session.waitForText(/▶ Hunk 2/);
+      expect(menuDispatched).toContain("Hunk 1");
+    } finally {
+      session.close();
     }
   });
 
