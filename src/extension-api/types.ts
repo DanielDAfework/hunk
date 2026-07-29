@@ -217,118 +217,78 @@ export type ChangesetTransform = (
 /** A side of a reviewed source document. */
 export type ExtensionFileSide = "old" | "new";
 
-/**
- * An exact source document made available by the host.
- *
- * A missing side (a newly-created file has no old document, for example), an
- * unavailable source provider, a read failure, and a resource-limit refusal
- * all resolve to `null`. Extensions must treat `null` as a normal fallback
- * condition rather than an error worth surfacing to the user.
- */
-export interface ExtensionExactFileDocument {
-  availability: "exact";
-  text: string;
-}
-
-/** Host-backed, lazy full-document reads for a file-view layout. */
-export interface ExtensionFileDocuments {
-  /**
-   * Read one full source document once. The host deduplicates reads per file
-   * and side for the lifetime of this layout request; `signal` cancels only
-   * this caller's wait, never the shared source read.
-   *
-   * Patch text is already available as `input.file.patch`; it is deliberately
-   * not presented as a document because a patch is not an exact source file.
-   */
-  read(side: ExtensionFileSide, signal?: AbortSignal): Promise<ExtensionExactFileDocument | null>;
-}
-
-/** One changed source-line range, inclusive on both ends. */
+/** One added or removed source-line range, inclusive on both ends. */
 export interface ExtensionFileChangeRange {
-  hunkIndex: number;
-  side: ExtensionFileSide;
-  range: [number, number];
-  kind: "added" | "removed" | "context";
+  readonly hunkIndex: number;
+  /** Added ranges belong to the new side; removed ranges belong to the old side. */
+  readonly kind: "added" | "removed";
+  readonly range: readonly [number, number];
 }
-
-/** A generic semantic color the host maps to its active terminal theme at paint time. */
-export type ExtensionFileViewTone =
-  | "text"
-  | "muted"
-  | "accent"
-  | "accent-muted"
-  | "syntax"
-  | "added"
-  | "removed";
-
-/** Theme-independent terminal emphasis for one symbolic span. */
-export type ExtensionFileViewTextAttribute = "bold" | "italic" | "underline" | "strikethrough";
 
 /** One symbolic run in a host-rendered file-view row. */
 export interface ExtensionFileViewSpan {
-  text: string;
-  tone?: ExtensionFileViewTone;
-  attributes?: readonly ExtensionFileViewTextAttribute[];
+  readonly text: string;
+  /** A generic semantic color the host maps to its active terminal theme at paint time. */
+  readonly tone?: "muted" | "accent" | "accent-muted" | "syntax" | "added" | "removed";
+  /** Theme-independent terminal emphasis. */
+  readonly attributes?: readonly ("bold" | "italic" | "underline" | "strikethrough")[];
 }
 
 /** Bounded paint-only props handed to a custom file-view row component. */
 export interface ExtensionFileViewRowComponentProps {
   /** Available terminal columns inside the host-owned row wrapper. */
-  width: number;
+  readonly width: number;
   /** Fixed terminal rows reserved by the host. */
-  height: number;
+  readonly height: number;
   /** Whether this row falls inside the selected hunk bounds. */
-  selected: boolean;
+  readonly selected: boolean;
   /** Zero-based position in the validated file-view layout. */
-  rowIndex: number;
+  readonly rowIndex: number;
 }
 
-/**
- * A custom row painter rendered inside host-owned geometry.
- *
- * This is a plain React function component that may return OpenTUI elements.
- * Its return type stays opaque so this import-free module does not publish
- * React types. Prefer a closure when the painter needs semantic layout data.
- */
 /** A row in a host-owned, terminal-safe file-view layout. */
 export interface ExtensionFileViewRow {
   /** A stable identifier within this layout result. */
-  id: string;
+  readonly id: string;
   /** Symbolic host-rendered content, also used if a custom component fails. */
-  spans: readonly ExtensionFileViewSpan[];
-  /** Fixed terminal height for a custom component row. Required with `component`. */
-  height?: number;
-  /** Optional React/OpenTUI painter clipped inside the declared fixed height. */
-  component?: (props: ExtensionFileViewRowComponentProps) => unknown;
-}
-
-/** One hunk's inclusive row extent in a file-view layout. */
-export interface ExtensionFileViewHunkBounds {
-  index: number;
-  startRow: number;
-  endRow: number;
+  readonly spans: readonly ExtensionFileViewSpan[];
+  /**
+   * Experimental fixed-height React/OpenTUI painter, clipped inside host-owned geometry.
+   * Height and render are one descriptor so a typed layout cannot declare either alone.
+   */
+  readonly component?: {
+    readonly height: number;
+    readonly render: (props: ExtensionFileViewRowComponentProps) => unknown;
+  };
 }
 
 /** The deterministic, symbolic layout returned by a file-view extension. */
 export interface ExtensionFileViewLayout {
-  rows: readonly ExtensionFileViewRow[];
-  /** Every parsed diff hunk must have one inclusive row extent. */
-  hunks: readonly ExtensionFileViewHunkBounds[];
+  readonly rows: readonly ExtensionFileViewRow[];
+  /** Inclusive row extents ordered to correspond to `input.file.hunks`. */
+  readonly hunkRows: readonly {
+    readonly startRow: number;
+    readonly endRow: number;
+  }[];
 }
 
 /** Immutable input a file-view renderer receives for one file. */
 export interface ExtensionFileViewInput {
-  file: ExtensionDiffFile;
-  documents: ExtensionFileDocuments;
-  changes: readonly ExtensionFileChangeRange[];
-}
-
-/** Bounded host context for one file-view layout request. */
-export interface ExtensionFileViewLayoutContext {
+  readonly file: ExtensionDiffFile;
   /** Available terminal columns. Layout must be deterministic for this width. */
-  width: number;
+  readonly width: number;
   /** Aborts when a resize, reload, selection change, or extension reload supersedes this work. */
-  signal: AbortSignal;
+  readonly signal: AbortSignal;
+  readonly changes: readonly ExtensionFileChangeRange[];
+  /**
+   * Read one exact full source document. Reads are lazy and deduplicated per
+   * file and side for this layout request. A missing side, unavailable source,
+   * read failure, or resource-limit refusal resolves to `null`.
+   *
+   * Patch text is already available as `input.file.patch`; it is deliberately
+   * not presented as a document because a patch is not an exact source file.
+   */
+  readDocument(side: ExtensionFileSide): Promise<string | null>;
 }
 
 /** A host-rendered alternative presentation for an individual file in the review stream. */
@@ -339,7 +299,6 @@ export interface ExtensionFileView {
   /** Return `null` whenever the view cannot safely present this file; Hunk renders raw diff. */
   layout(
     input: ExtensionFileViewInput,
-    context: ExtensionFileViewLayoutContext,
   ): ExtensionFileViewLayout | null | Promise<ExtensionFileViewLayout | null>;
 }
 
@@ -519,7 +478,7 @@ export type ExtensionVcsFileChangeType =
   | "deleted";
 
 /** Which side of a change a source read asks for. */
-export type ExtensionVcsFileSide = "old" | "new";
+export type ExtensionVcsFileSide = ExtensionFileSide;
 
 /** The one file and side Hunk wants full source text for. */
 export interface ExtensionVcsFileSourceRequest {
@@ -939,8 +898,8 @@ export interface ExtensionSidebarControls {
 
 /** Select or inspect the active file presentation from an extension command. */
 export interface ExtensionFileViewControls {
-  /** Select this extension's matching view (or `"raw"`) for the current file. */
-  select(viewId: string): void;
+  /** Select this extension's matching view, or pass `null` to restore raw rendering. */
+  select(viewId: string | null): void;
   /** Switch this extension's view on/off, returning to raw when it was active. */
   toggle(viewId: string): void;
   /** Report whether this extension's view is active for the current file. */

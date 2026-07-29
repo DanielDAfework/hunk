@@ -17,7 +17,11 @@ const layout: ExtensionFileViewLayout = {
     { id: "body", spans: [{ text: "Body" }] },
     { id: "tail", spans: [{ text: "Tail" }] },
   ],
-  hunks: [{ index: 2, startRow: 1, endRow: 2 }],
+  hunkRows: [
+    { startRow: 0, endRow: 0 },
+    { startRow: 0, endRow: 0 },
+    { startRow: 1, endRow: 2 },
+  ],
 };
 
 describe("FileView hunk selection", () => {
@@ -75,22 +79,25 @@ describe("FileView custom rows", () => {
         {
           id: "custom-a",
           spans: [{ text: "FALLBACK A" }],
-          height: 2,
-          component: customRow("A"),
+          component: { height: 2, render: customRow("A") },
         },
         {
           id: "custom-b",
           spans: [{ text: "FALLBACK B" }],
-          height: 2,
-          component: customRow("B"),
+          component: { height: 2, render: customRow("B") },
         },
       ],
-      hunks: [
-        { index: 0, startRow: 1, endRow: 1 },
-        { index: 1, startRow: 2, endRow: 2 },
+      hunkRows: [
+        { startRow: 1, endRow: 1 },
+        { startRow: 2, endRow: 2 },
       ],
     };
-    const file = createTestDiffFile({ id: "custom", path: "custom.ts", before: "a", after: "b" });
+    const file = createTestDiffFile({
+      id: "custom",
+      path: "custom.ts",
+      before: "a",
+      after: "b",
+    });
     const geometry = measureFileViewGeometry(file, customLayout, 20);
     const setup = await testRender(
       <FileView
@@ -112,7 +119,12 @@ describe("FileView custom rows", () => {
       expect(frame).toContain("CUSTOM A");
       expect(frame).not.toContain("CUSTOM B");
       expect(frame).not.toContain("BEFORE");
-      expect(paintProps.at(-1)).toEqual({ width: 20, height: 2, selected: true, rowIndex: 1 });
+      expect(paintProps.at(-1)).toEqual({
+        width: 20,
+        height: 2,
+        selected: true,
+        rowIndex: 1,
+      });
     } finally {
       await act(async () => setup.renderer.destroy());
     }
@@ -124,20 +136,27 @@ describe("FileView custom rows", () => {
         {
           id: "clipped",
           spans: [{ text: "CLIPPED FALLBACK" }],
-          height: 1,
-          component: () => (
-            <box style={{ width: 40, height: 3, flexDirection: "column" }}>
-              <text content="VISIBLE CUSTOM" />
-              <text content="HIDDEN OVERFLOW" />
-              <text content="HIDDEN OVERFLOW" />
-            </box>
-          ),
+          component: {
+            height: 1,
+            render: () => (
+              <box style={{ width: 40, height: 3, flexDirection: "column" }}>
+                <text content="VISIBLE CUSTOM" />
+                <text content="HIDDEN OVERFLOW" />
+                <text content="HIDDEN OVERFLOW" />
+              </box>
+            ),
+          },
         },
         { id: "after", spans: [{ text: "AFTER ROW" }] },
       ],
-      hunks: [{ index: 0, startRow: 0, endRow: 1 }],
+      hunkRows: [{ startRow: 0, endRow: 1 }],
     };
-    const file = createTestDiffFile({ id: "clipped", path: "clipped.ts", before: "a", after: "b" });
+    const file = createTestDiffFile({
+      id: "clipped",
+      path: "clipped.ts",
+      before: "a",
+      after: "b",
+    });
     const geometry = measureFileViewGeometry(file, clippedLayout, 20);
     const setup = await testRender(
       <FileView
@@ -173,15 +192,22 @@ describe("FileView custom rows", () => {
         {
           id: "broken",
           spans: [{ text: "SAFE FALLBACK" }],
-          height: 2,
-          component: () => {
-            throw new Error("broken custom row");
+          component: {
+            height: 2,
+            render: () => {
+              throw new Error("broken custom row");
+            },
           },
         },
       ],
-      hunks: [{ index: 0, startRow: 0, endRow: 0 }],
+      hunkRows: [{ startRow: 0, endRow: 0 }],
     };
-    const file = createTestDiffFile({ id: "broken", path: "broken.ts", before: "a", after: "b" });
+    const file = createTestDiffFile({
+      id: "broken",
+      path: "broken.ts",
+      before: "a",
+      after: "b",
+    });
     const originalConsoleError = console.error;
     console.error = () => {};
     const setup = await testRender(

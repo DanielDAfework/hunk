@@ -17,19 +17,17 @@ describe("file-view geometry", () => {
         {
           id: "custom-a",
           spans: [{ text: "custom fallback" }],
-          height: 3,
-          component: () => null,
+          component: { height: 3, render: () => null },
         },
         {
           id: "custom-b",
           spans: [{ text: "custom fallback" }],
-          height: 2,
-          component: () => null,
+          component: { height: 2, render: () => null },
         },
       ],
-      hunks: [
-        { index: 0, startRow: 0, endRow: 1 },
-        { index: 1, startRow: 2, endRow: 2 },
+      hunkRows: [
+        { startRow: 0, endRow: 1 },
+        { startRow: 2, endRow: 2 },
       ],
     };
 
@@ -37,7 +35,11 @@ describe("file-view geometry", () => {
 
     expect(geometry.bodyHeight).toBe(6);
     expect(
-      geometry.rowBounds.map(({ stableKey, top, height }) => ({ stableKey, top, height })),
+      geometry.rowBounds.map(({ stableKey, top, height }) => ({
+        stableKey,
+        top,
+        height,
+      })),
     ).toEqual([
       { stableKey: "file-view:intro", top: 0, height: 1 },
       { stableKey: "file-view:custom-a", top: 1, height: 3 },

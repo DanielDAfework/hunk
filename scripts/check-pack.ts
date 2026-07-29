@@ -23,6 +23,8 @@ import {
 } from "hunkdiff/extension";
 import type {
   ExtensionChangeset,
+  ExtensionFileViewRow,
+  ExtensionFileViewRowComponentProps,
   ExtensionReviewSelection,
   ExtensionVcsAdapter,
   ExtensionVcsDiffInput,
@@ -45,6 +47,51 @@ export default function (hunk: HunkExtensionAPI) {
   };
   hunk.registerTheme(theme);
   hunk.registerFileLanguage(".zig", "zig");
+
+  const renderRow = (_props: ExtensionFileViewRowComponentProps) => null;
+  const componentRow: ExtensionFileViewRow = {
+    id: "component",
+    spans: [{ text: "fallback" }],
+    component: { height: 2, render: renderRow },
+  };
+  const invalidComponentRow: ExtensionFileViewRow = {
+    id: "invalid",
+    spans: [],
+    // @ts-expect-error Height and render cannot be unpaired in a component descriptor.
+    component: { height: 1 },
+  };
+  void invalidComponentRow;
+  const invalidToneRow: ExtensionFileViewRow = {
+    id: "invalid-tone",
+    // @ts-expect-error Ordinary text omits tone; "text" is not a semantic tone.
+    spans: [{ text: "invalid", tone: "text" }],
+  };
+  void invalidToneRow;
+  hunk.registerFileView({
+    id: "raw",
+    title: "A view whose extension id is raw",
+    matches: (file) => file.path.endsWith(".md"),
+    async layout(input) {
+      const document: string | null = await input.readDocument("new");
+      const firstRange: readonly [number, number] | undefined = input.changes[0]?.range;
+      const firstChange = input.changes[0];
+      if (firstChange) {
+        // @ts-expect-error File-view ranges are immutable tuples.
+        firstChange.range[0] = 1;
+      }
+      // @ts-expect-error The single layout input is readonly.
+      input.width = 1;
+      hunk.log(document ?? String(firstRange?.[0] ?? input.width));
+      return {
+        rows: [componentRow],
+        hunkRows: (input.file.hunks ?? []).map(() => ({ startRow: 0, endRow: 0 })),
+      };
+    },
+  });
+  hunk.registerCommand({ id: "raw-view", title: "Raw view" }, (ctx) => {
+    ctx.fileViews.select("raw");
+    ctx.fileViews.select(null);
+  });
 
   const adapter: ExtensionVcsAdapter = {
     id: "hg",
@@ -231,6 +278,26 @@ if (pack.name !== "hunkdiff") {
   throw new Error(`Expected npm package name to be hunkdiff, got ${pack.name}.`);
 }
 
+const extensionTypes = readFileSync(
+  path.join(repoRoot, "dist", "npm", "extension", "extension-api", "types.d.ts"),
+  "utf8",
+);
+if (/^\s*import\b/m.test(extensionTypes)) {
+  throw new Error("The public extension-api/types declaration must remain import-free.");
+}
+for (const removedType of [
+  "ExtensionExactFileDocument",
+  "ExtensionFileDocuments",
+  "ExtensionFileViewHunkBounds",
+  "ExtensionFileViewLayoutContext",
+  "ExtensionFileViewTextAttribute",
+  "ExtensionFileViewTone",
+]) {
+  if (extensionTypes.includes(removedType)) {
+    throw new Error(`Removed file-view helper type was emitted: ${removedType}`);
+  }
+}
+
 // The allowlist above proves the published extension surface contains only what
 // it should. This proves it is actually *usable*: a consumer compiling against
 // the declarations, under both the strict Node ESM resolution and the permissive
@@ -244,7 +311,10 @@ const { modes } = checkExtensionConsumerTypes({
   repoRoot,
   sources: [
     { name: "consumer.ts", text: CONSUMER_SOURCE },
-    ...docExamples.map((example) => ({ name: example.name, text: example.text })),
+    ...docExamples.map((example) => ({
+      name: example.name,
+      text: example.text,
+    })),
   ],
 });
 

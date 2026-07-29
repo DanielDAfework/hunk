@@ -1,14 +1,14 @@
 # Fixed-height JSX file-view rows (POC)
 
-This worktree experiments with one constrained escape hatch in the symbolic file-view contract. A validated row may pair a fixed integer `height` with a React function `component`. Hunk mounts that component as a real React/OpenTUI element while keeping the normal review-stream layout declarative and host-owned. Like all Hunk extensions, this is a cooperative trusted-code contract rather than a sandbox.
+This worktree experiments with one constrained escape hatch in the symbolic file-view contract. A validated row may include one atomic `component: { height, render }` descriptor. Hunk mounts `render` as a real React/OpenTUI component while keeping the normal review-stream layout declarative and host-owned. Like all Hunk extensions, this is a cooperative trusted-code contract rather than a sandbox.
 
 ## Contract
 
 - Layout still happens before paint and supplies stable row IDs plus one inclusive row range for every parsed hunk.
 - Every custom row must retain symbolic `spans`. They are rendered if the component fails, and symbolic-only layouts continue through the existing renderer unchanged.
-- A component row must declare both `component` and `height`. The component must be a function, one row is limited to 256 terminal lines, and all component rows in a layout are limited to 100,000 lines. Existing row/span/text limits still apply. An invalid layout falls back to raw diff.
+- A component row declares height and renderer atomically as `component: { height, render }`. `render` must be a function, one row is limited to 256 terminal lines, and all component rows in a layout are limited to 100,000 lines. Existing row/span/text limits still apply. An invalid layout falls back to raw diff.
 - Hunk passes only `width`, fixed `height`, `selected`, and zero-based `rowIndex`. A per-row closure can capture arbitrary parsed or semantic data without adding an opaque payload to the host contract.
-- Hunk mounts the component inside a fixed `height`/`minHeight`/`maxHeight`, `flexShrink: 0`, overflow-hidden wrapper. No post-mount measurement feeds back into geometry. Stable IDs, hunk bounds, selection, scrolling, and row windowing remain host-owned.
+- Hunk mounts `component.render` inside a fixed `component.height`/`minHeight`/`maxHeight`, `flexShrink: 0`, overflow-hidden wrapper. No post-mount measurement feeds back into geometry. Stable IDs, hunk bounds, selection, scrolling, and row windowing remain host-owned.
 
 ## Deliberate limits
 

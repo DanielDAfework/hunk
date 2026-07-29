@@ -3,7 +3,7 @@ import type {
   ExtensionDiffFile,
   ExtensionFileViewLayout,
   ExtensionFileViewRowComponentProps,
-  ExtensionFileViewTone,
+  ExtensionFileViewSpan,
   ExtensionFactory,
 } from "hunkdiff/extension";
 
@@ -11,7 +11,7 @@ import type {
 function hunkCard(
   title: string,
   detail: string,
-  tone: ExtensionFileViewTone,
+  tone: ExtensionFileViewSpan["tone"],
 ): (props: ExtensionFileViewRowComponentProps) => ReactNode {
   return function HunkCard({ width, height, selected, rowIndex }) {
     const [expanded, setExpanded] = useState(false);
@@ -47,25 +47,33 @@ export function createJsxFileViewLayout(file: ExtensionDiffFile): ExtensionFileV
     return [
       {
         id: `hunk-${item.index}-summary`,
-        spans: [{ text: `Hunk ${item.index + 1}: ${item.header}`, tone: "accent" as const }],
-        height: 2,
-        component: hunkCard(`Hunk ${item.index + 1}`, `${rangeLabel} · ${item.header}`, "added"),
+        spans: [
+          {
+            text: `Hunk ${item.index + 1}: ${item.header}`,
+            tone: "accent" as const,
+          },
+        ],
+        component: {
+          height: 2,
+          render: hunkCard(`Hunk ${item.index + 1}`, `${rangeLabel} · ${item.header}`, "added"),
+        },
       },
       {
         id: `hunk-${item.index}-detail`,
         spans: [{ text: `${rangeLabel} (symbolic fallback)`, tone: "muted" as const }],
-        height: 2,
-        component: hunkCard("Changed range", rangeLabel, "accent"),
+        component: {
+          height: 2,
+          render: hunkCard("Changed range", rangeLabel, "accent"),
+        },
       },
     ];
   });
 
   return {
     rows,
-    hunks: hunks.map((item) => ({
-      index: item.index,
-      startRow: item.index * 2,
-      endRow: item.index * 2 + 1,
+    hunkRows: hunks.map((_, position) => ({
+      startRow: position * 2,
+      endRow: position * 2 + 1,
     })),
   };
 }

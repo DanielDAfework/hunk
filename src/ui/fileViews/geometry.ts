@@ -35,11 +35,11 @@ export function measureFileViewGeometry(
 
   const hunkAnchorRows = new Map<number, number>();
   const hunkBounds = new Map<number, PlannedHunkBounds>();
-  for (const hunk of layout.hunks) {
+  for (const [hunkIndex, hunk] of layout.hunkRows.entries()) {
     const start = rowBounds[hunk.startRow]!;
     const end = rowBounds[hunk.endRow]!;
-    hunkAnchorRows.set(hunk.index, start.top);
-    hunkBounds.set(hunk.index, {
+    hunkAnchorRows.set(hunkIndex, start.top);
+    hunkBounds.set(hunkIndex, {
       top: start.top,
       height: end.top + end.height - start.top,
       startRowId: reviewRowId(start.key),
