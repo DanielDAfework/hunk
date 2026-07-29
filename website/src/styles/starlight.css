@@ -101,8 +101,8 @@ h4 {
   .right-sidebar-panel .sl-container {
     max-width: calc(
       (
-          min(100vw, var(--hunk-shell-max)) - var(--sl-sidebar-width) - 2 * var(--sl-content-pad-x) -
-            2 * var(--sl-sidebar-pad-x)
+          min(100vw, var(--hunk-shell-max)) - var(--sl-sidebar-width) - 2 *
+            var(--sl-content-pad-x) - 2 * var(--sl-sidebar-pad-x)
         ) *
         0.25
     );
