@@ -1,5 +1,16 @@
 # Documentation media
 
+## Feature showcase captures
+
+`public/feature-*.{webp,mp4,webm}` are captured from the real TUI by `scripts/capture-media.ts`: it drives `bun run src/main.tsx` inside a PTY (tuistory), renders styled terminal frames to retina images at devicePixelRatio 2 (ghostty-opentui), composites a synthetic mouse pointer where the storyboard moves one (`scripts/assets/pointer.png`), and assembles clips into looping mp4 + webm with ffmpeg. Regenerate after user-visible changes to the review stream, layouts, mouse affordances, or themes:
+
+```bash
+bun run website/scripts/capture-media.ts            # everything
+bun run website/scripts/capture-media.ts mouse      # one asset: stream|mouse|layout|themes
+```
+
+Video assets need an ffmpeg with libx264 and libvpx-vp9 on PATH (or pointed at via `FFMPEG=`). Like the other rituals in this file it is optional and Unix-oriented; website builds and tests never run it.
+
 The two workflow captures in `public/docs/images/` are optimized copies of the current product screenshots embedded in the repository README:
 
 - `review-stream.webp` — `https://github.com/user-attachments/assets/35605618-be3f-479e-b6e0-edb089910651`

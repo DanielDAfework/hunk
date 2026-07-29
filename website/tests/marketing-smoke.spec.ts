@@ -119,6 +119,38 @@ test("feature cards deep-link into the matching documentation page", async ({ pa
   );
 });
 
+test("feature showcase leads with real TUI captures and deep-links each feature", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  // The review-stream still plus one clip per interactive feature.
+  await expect(page.locator(".show-media img")).toHaveAttribute("src", "/feature-stream.webp");
+  const clips = page.locator(".show-media video");
+  await expect(clips).toHaveCount(3);
+  for (const base of ["feature-mouse", "feature-layout", "feature-themes"]) {
+    const clip = page.locator(`.show-media video:has(source[src='/${base}.webm'])`);
+    await expect(clip.locator(`source[src='/${base}.mp4']`)).toHaveCount(1);
+  }
+
+  await expect(page.getByRole("link", { name: /Keyboard & mouse reference/ })).toHaveAttribute(
+    "href",
+    "/docs/start/keyboard-and-mouse/",
+  );
+  await expect(page.getByRole("link", { name: /Layout & display options/ })).toHaveAttribute(
+    "href",
+    "/docs/configure/layout-and-display/",
+  );
+  await expect(page.getByRole("link", { name: /Theme gallery & config/ })).toHaveAttribute(
+    "href",
+    "/docs/configure/themes/",
+  );
+  await expect(page.getByRole("link", { name: /How reviews work/ })).toHaveAttribute(
+    "href",
+    "/docs/workflows/working-trees-and-commits/",
+  );
+});
+
 test("the agent section shows a note screenshot beside the commands that make it", async ({
   page,
 }) => {

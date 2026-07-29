@@ -414,14 +414,12 @@ a:focus-visible {
   color: var(--acc);
 }
 
-.marketing .num {
-  color: var(--soft);
-  font-size: 11.5px;
-  letter-spacing: 0.1em;
+.marketing .grid-duo {
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .marketing .grid h3 {
-  margin: 9px 0 7px;
+  margin: 0 0 7px;
   font-size: 15.5px;
   letter-spacing: -0.01em;
 }
@@ -431,6 +429,66 @@ a:focus-visible {
   color: var(--hunk-body);
   font-size: 13.5px;
   line-height: 1.6;
+}
+
+/* Feature showcase: real TUI captures lead, copy rides alongside. */
+.marketing .show {
+  display: grid;
+  gap: 56px;
+  margin-bottom: 56px;
+}
+
+.marketing .show-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: 44px;
+  align-items: center;
+}
+
+/* Alternate media left/right so the long section keeps a rhythm. */
+.marketing .show-item:nth-child(even) .show-media {
+  order: 2;
+}
+
+.marketing .show-media {
+  overflow: hidden;
+  margin: 0;
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
+  background: #0c0e10;
+  box-shadow: 6px 6px 0 var(--ink);
+}
+
+.marketing .show-media img,
+.marketing .show-media video {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.marketing .show-copy h3 {
+  margin: 0 0 10px;
+  font-size: clamp(17px, 2.2vw, 21px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.marketing .show-copy p {
+  margin: 0 0 14px;
+  color: var(--hunk-body);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.marketing .show-copy .more {
+  color: var(--acc);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.marketing .show-copy .more:hover {
+  text-decoration: underline;
 }
 
 /* Community videos: paused-embed cards that link out, so no third-party player script loads.
@@ -752,10 +810,21 @@ a:focus-visible {
   .marketing .agent-shot {
     max-width: 560px;
   }
+
+  /* Media stacks above its copy; the alternating order flip resets. */
+  .marketing .show-item {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .marketing .show-item:nth-child(even) .show-media {
+    order: 0;
+  }
 }
 
 @media (max-width: 760px) {
   .marketing .grid,
+  .marketing .grid-duo,
   .marketing .vgrid {
     grid-template-columns: 1fr;
   }
