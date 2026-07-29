@@ -10,6 +10,8 @@
 interface ShowcaseVideo {
   kind: "video";
   base: string;
+  width: number;
+  height: number;
   label: string;
 }
 
@@ -28,9 +30,6 @@ interface ShowcaseFeature {
   linkText: string;
   media: ShowcaseVideo | ShowcaseImage;
 }
-
-const VIDEO_WIDTH = 2218;
-const VIDEO_HEIGHT = 1360;
 
 const showcase: ShowcaseFeature[] = [
   {
@@ -54,6 +53,8 @@ const showcase: ShowcaseFeature[] = [
     media: {
       kind: "video",
       base: "feature-mouse",
+      width: 1984,
+      height: 1200,
       label: "Mouse support in Hunk: clicking a sidebar file jumps the review stream to it, wheel scrolling moves through the diff, and hovering a changed row reveals the add-note control",
     },
   },
@@ -65,7 +66,9 @@ const showcase: ShowcaseFeature[] = [
     media: {
       kind: "video",
       base: "feature-layout",
-      label: "The same changeset flipping between Hunk's side-by-side split layout and its stacked layout",
+      width: 1816,
+      height: 1200,
+      label: "The same diff flipping between Hunk's side-by-side split layout and its stacked layout",
     },
   },
   {
@@ -76,6 +79,8 @@ const showcase: ShowcaseFeature[] = [
     media: {
       kind: "video",
       base: "feature-themes",
+      width: 1816,
+      height: 1200,
       label: "One split diff crossfading through Hunk themes including Midnight, Dracula, Catppuccin Mocha, Gruvbox, and GitHub Light",
     },
   },
@@ -86,6 +91,15 @@ const showcase: ShowcaseFeature[] = [
   {
     showcase.map(({ heading, body, href, linkText, media }) => (
       <article class="show-item">
+        <div class="show-copy">
+          <h3>{heading}</h3>
+          <div>
+            <p>{body}</p>
+            <a class="more" href={href}>
+              {linkText} →
+            </a>
+          </div>
+        </div>
         <figure class="show-media">
           {media.kind === "image" ? (
             <img
@@ -99,8 +113,8 @@ const showcase: ShowcaseFeature[] = [
             />
           ) : (
             <video
-              width={VIDEO_WIDTH}
-              height={VIDEO_HEIGHT}
+              width={media.width}
+              height={media.height}
               autoplay
               loop
               muted
@@ -113,13 +127,6 @@ const showcase: ShowcaseFeature[] = [
             </video>
           )}
         </figure>
-        <div class="show-copy">
-          <h3>{heading}</h3>
-          <p>{body}</p>
-          <a class="more" href={href}>
-            {linkText} →
-          </a>
-        </div>
       </article>
     ))
   }

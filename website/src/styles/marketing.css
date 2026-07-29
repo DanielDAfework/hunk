@@ -431,23 +431,46 @@ a:focus-visible {
   line-height: 1.6;
 }
 
-/* Feature showcase: real TUI captures lead, copy rides alongside. */
+/* Feature showcase: full-width TUI captures lead, a compact copy header sets
+   each one up. Terminal text needs physical size, so the media never shares
+   its row with copy. */
 .marketing .show {
   display: grid;
-  gap: 56px;
-  margin-bottom: 56px;
+  gap: 72px;
+  margin-bottom: 64px;
 }
 
-.marketing .show-item {
+.marketing .show-copy {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
-  gap: 44px;
-  align-items: center;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 6px 44px;
+  align-items: start;
+  margin-bottom: 20px;
 }
 
-/* Alternate media left/right so the long section keeps a rhythm. */
-.marketing .show-item:nth-child(even) .show-media {
-  order: 2;
+.marketing .show-copy h3 {
+  margin: 0;
+  font-size: clamp(19px, 2.6vw, 24px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.marketing .show-copy p {
+  margin: 0 0 10px;
+  color: var(--hunk-body);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.marketing .show-copy .more {
+  color: var(--acc);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.marketing .show-copy .more:hover {
+  text-decoration: underline;
 }
 
 .marketing .show-media {
@@ -466,29 +489,29 @@ a:focus-visible {
   height: auto;
 }
 
-.marketing .show-copy h3 {
-  margin: 0 0 10px;
-  font-size: clamp(17px, 2.2vw, 21px);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.25;
+/* Scroll-driven entrance: each capture rises and settles as it scrolls into
+   view. Progressive enhancement — browsers without scroll timelines and
+   readers preferring reduced motion get the static frame. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .marketing .show-media {
+      animation: show-media-rise linear both;
+      animation-timeline: view();
+      animation-range: entry 5% entry 55%;
+    }
+  }
 }
 
-.marketing .show-copy p {
-  margin: 0 0 14px;
-  color: var(--hunk-body);
-  font-size: 14px;
-  line-height: 1.65;
-}
+@keyframes show-media-rise {
+  from {
+    box-shadow: 2px 2px 0 var(--ink);
+    transform: scale(0.965) translateY(18px);
+  }
 
-.marketing .show-copy .more {
-  color: var(--acc);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.marketing .show-copy .more:hover {
-  text-decoration: underline;
+  to {
+    box-shadow: 6px 6px 0 var(--ink);
+    transform: scale(1) translateY(0);
+  }
 }
 
 /* Community videos: paused-embed cards that link out, so no third-party player script loads.
@@ -811,14 +834,9 @@ a:focus-visible {
     max-width: 560px;
   }
 
-  /* Media stacks above its copy; the alternating order flip resets. */
-  .marketing .show-item {
+  .marketing .show-copy {
     grid-template-columns: 1fr;
-    gap: 18px;
-  }
-
-  .marketing .show-item:nth-child(even) .show-media {
-    order: 0;
+    gap: 8px;
   }
 }
 

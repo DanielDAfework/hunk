@@ -293,10 +293,11 @@ async function captureStream() {
 
 /** Video: mouse support — click a sidebar file, wheel-scroll, hover the note badge. */
 async function captureMouse() {
+  // Narrow columns keep glyphs readable when the clip renders at page width.
   const { session, cleanup } = await launchHunkForCapture({
     args: ["patch", "examples/2-mini-app-refactor/change.patch"],
-    cols: 132,
-    rows: 34,
+    cols: 118,
+    rows: 30,
   });
   try {
     await waitForReview(session, /format\.ts/);
@@ -318,26 +319,26 @@ async function captureMouse() {
     }
 
     const story = new Storyboard(session);
-    await story.hold(900, { col: 66, row: 22 });
+    await story.hold(900, { col: 60, row: 20 });
 
     // Glide to the sidebar and click a file: the stream jumps to it.
-    await story.glide({ col: 66, row: 22 }, { col: 10, row: sidebarRow }, 900);
+    await story.glide({ col: 60, row: 20 }, { col: 10, row: sidebarRow }, 900);
     await story.hold(350);
     await story.click();
     await sleep(250);
     await story.hold(1_300);
 
     // Glide back over the code and wheel-scroll the review stream.
-    await story.glide({ col: 10, row: 7 }, { col: 70, row: 16 }, 800);
+    await story.glide({ col: 10, row: sidebarRow }, { col: 62, row: 14 }, 800);
     for (let i = 0; i < 5; i += 1) {
-      session.writeRaw(`\x1b[<65;71;17M`);
+      session.writeRaw(`\x1b[<65;63;15M`);
       await sleep(60);
       await story.hold(220);
     }
     await story.hold(700);
 
     // Hover a changed row until the add-note affordance appears.
-    await story.glide({ col: 70, row: 16 }, { col: 64, row: 12 }, 700);
+    await story.glide({ col: 62, row: 14 }, { col: 56, row: 11 }, 700);
     await sleep(250);
     await story.hold(1_600);
 
@@ -347,17 +348,17 @@ async function captureMouse() {
   }
 }
 
-/** Video: one changeset flipping between split and stack layouts. */
+/** Video: one diff flipping between split and stack layouts. */
 async function captureLayout() {
+  // No sidebar and a single pretty file: the layout change is the whole story,
+  // and fewer columns keep both split panes readable at page width.
   const { session, cleanup } = await launchHunkForCapture({
-    args: ["patch", "examples/2-mini-app-refactor/change.patch"],
-    cols: 132,
-    rows: 34,
+    args: ["diff", "examples/4-ui-polish/before.tsx", "examples/4-ui-polish/after.tsx"],
+    cols: 108,
+    rows: 30,
   });
   try {
-    await waitForReview(session, /format\.ts/);
-    await session.press("s");
-    await sleep(600);
+    await waitForReview(session, /after\.tsx/);
 
     const story = new Storyboard(session);
     await session.press("1");
@@ -403,8 +404,8 @@ async function captureThemes() {
         "--theme",
         theme,
       ],
-      cols: 132,
-      rows: 34,
+      cols: 108,
+      rows: 30,
     });
     try {
       await waitForReview(session, /after\.tsx|ui-polish|Diff/i);
