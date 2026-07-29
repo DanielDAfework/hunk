@@ -137,6 +137,7 @@ function DiffSectionComponent({
           selectedHunkIndex={selectedHunkIndex}
           theme={theme}
           visibleBodyBounds={visibleBodyBounds}
+          width={viewWidth}
         />
       ) : (
         <PierreDiffView

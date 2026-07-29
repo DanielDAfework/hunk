@@ -160,10 +160,14 @@ describe("registerSidebarView", () => {
 });
 
 describe("registerFileView", () => {
-  test("collects a host-rendered layout callback under the owning extension", () => {
+  test("collects a layout callback that may return bounded custom row components", () => {
     const registry = createEmptyExtensionRegistry();
     const issues: ExtensionLoadIssue[] = [];
-    const layout = () => null;
+    const component = () => null;
+    const layout = () => ({
+      rows: [{ id: "custom", spans: [{ text: "fallback" }], height: 2, component }],
+      hunks: [],
+    });
 
     runExtensionFactory({
       metadata: bundledMetadata("presentation"),

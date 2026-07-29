@@ -49,6 +49,7 @@ export type {
   ExtensionFileViewLayout,
   ExtensionFileViewLayoutContext,
   ExtensionFileViewRow,
+  ExtensionFileViewRowComponentProps,
   ExtensionFileViewSpan,
   ExtensionFileViewTextAttribute,
   ExtensionFileViewTone,
