@@ -3,9 +3,7 @@ title: Extension API
 description: Register themes, languages, transforms, commands, dialogs, and events through the extension API object.
 ---
 
-The extension factory receives one API object. Registration calls are only valid while the factory is running; Hunk seals the object afterwards so a deferred callback cannot mutate the registry mid-session.
-
-Two registration calls are large enough to have their own pages: [`registerVcsAdapter`](/docs/extend/vcs-adapters/) and [`registerSidebarView`](/docs/extend/custom-sidebars/). Everything else is here.
+The extension factory receives one API object. Registration calls are only valid while the factory is running; Hunk seals the object afterwards so a deferred callback cannot mutate the registry mid-session. This page indexes the whole object; the two largest registration calls are documented in depth on their own pages and summarized in place below.
 
 ## `hunk.apiVersion`
 
@@ -37,6 +35,18 @@ hunk.registerFileLanguage("bzl", "python");
 ```
 
 Later registrations win over earlier ones. Hunk's own `.mts` and `.cts` mappings cannot be overridden; attempts are skipped with a notice.
+
+## `hunk.registerVcsAdapter(adapter)`
+
+Contribute an additional version-control backend — the same call Hunk's own bundled Git, Jujutsu, and Sapling backends make. An adapter declares `detect`, its `operations` (`working-tree-diff`, `revision-show`, `stash-show`), and optionally detection priority, watch support, exact file sources, extra files, and rich user-fixable failures.
+
+Full contract: [VCS adapters](/docs/extend/vcs-adapters/).
+
+## `hunk.registerSidebarView(view)`
+
+Contribute a sidebar view — your own React component, rendered inside Hunk's OpenTUI tree beside (or in place of) the built-in file navigation. Views receive live review props, guarded navigation actions, the user's resolved keybindings, and a scrollbox ref contract for selection-following and windowing.
+
+Full contract: [Custom sidebars](/docs/extend/custom-sidebars/).
 
 ## `hunk.transformChangeset(fn)`
 
