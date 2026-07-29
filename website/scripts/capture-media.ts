@@ -357,8 +357,10 @@ async function captureAgent() {
       "--agent-context",
       "examples/3-agent-review-demo/agent-context.json",
     ],
-    cols: 118,
-    rows: 30,
+    // Tighter than the other clips on purpose: the note card is the story,
+    // and a small terminal renders it large even at the showcase column width.
+    cols: 88,
+    rows: 24,
   });
   try {
     await waitForReview(session, /normalize\.ts/);
@@ -367,12 +369,18 @@ async function captureAgent() {
 
     const story = new Storyboard(session);
     await story.hold(2_300);
+
+    // Jump to the next hunk, then step down until its note card — which
+    // renders below the hunk start — is fully inside the short viewport.
     await session.press("]");
     await sleep(400);
-    await story.hold(2_400);
-    await session.press("]");
-    await sleep(400);
-    await story.hold(2_400);
+    await story.hold(700);
+    for (let i = 0; i < 7; i += 1) {
+      await session.press("down");
+      await sleep(40);
+      await story.hold(140);
+    }
+    await story.hold(2_600);
 
     await story.writeVideos("feature-agent");
   } finally {
