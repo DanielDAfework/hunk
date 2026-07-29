@@ -21,7 +21,7 @@
  * Extensions can branch on `hunk.apiVersion` so a newer Hunk can keep loading
  * older extensions without guessing at their expectations.
  */
-export const HUNK_EXTENSION_API_VERSION = 2;
+export const HUNK_EXTENSION_API_VERSION = 3;
 export type HunkExtensionApiVersion = typeof HUNK_EXTENSION_API_VERSION;
 
 export type ExtensionNotifyType = "info" | "warning" | "error";
@@ -250,7 +250,10 @@ export interface ExtensionFileViewRowComponentProps {
 export interface ExtensionFileViewRow {
   /** A stable identifier within this layout result. */
   readonly id: string;
-  /** Symbolic host-rendered content, also used if a custom component fails. */
+  /**
+   * Symbolic host-rendered content, also used if a custom component fails.
+   * Component fallback is clipped to the same declared fixed height as the painter.
+   */
   readonly spans: readonly ExtensionFileViewSpan[];
   /**
    * Experimental fixed-height React/OpenTUI painter, clipped inside host-owned geometry.

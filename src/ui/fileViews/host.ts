@@ -1,5 +1,6 @@
 import type { DiffFile } from "../../core/types";
 import type {
+  ExtensionDiffFile,
   ExtensionFileChangeRange,
   ExtensionFileSide,
   ExtensionFileViewInput,
@@ -69,19 +70,33 @@ export function fileViewChanges(file: DiffFile): readonly ExtensionFileChangeRan
   );
 }
 
-/** Build the frozen, public input handed to one file-view layout function. */
+/** Immutable public file data derived once for matching and layout. */
+export interface FileViewInputSnapshot {
+  readonly file: ExtensionDiffFile;
+  readonly changes: readonly ExtensionFileChangeRange[];
+}
+
+/** Derive immutable file data shared by matching and one subsequent layout request. */
+export function createFileViewInputSnapshot(file: DiffFile): FileViewInputSnapshot {
+  return Object.freeze({
+    file: toReadOnlyFileViews([file])[0]!,
+    changes: fileViewChanges(file),
+  });
+}
+
+/** Build the frozen public input for one layout request from reusable immutable file data. */
 export function createFileViewInput(
   file: DiffFile,
   width: number,
   signal: AbortSignal,
+  snapshot: FileViewInputSnapshot = createFileViewInputSnapshot(file),
 ): ExtensionFileViewInput {
   const reads = new Map<ExtensionFileSide, Promise<string | null>>();
-  const view = toReadOnlyFileViews([file])[0]!;
   return Object.freeze({
-    file: view,
+    file: snapshot.file,
     width,
     signal,
-    changes: fileViewChanges(file),
+    changes: snapshot.changes,
     readDocument(side: ExtensionFileSide) {
       let read = reads.get(side);
       if (!read) {

@@ -4,7 +4,7 @@ import {
   createTestDiffFile,
   createTestSourceFetcher,
 } from "../../../test/helpers/diff-helpers";
-import { createFileViewInput, fileViewChanges } from "./host";
+import { createFileViewInput, createFileViewInputSnapshot, fileViewChanges } from "./host";
 
 describe("file-view host input", () => {
   test("exposes only deeply frozen added and removed ranges", () => {
@@ -23,6 +23,16 @@ describe("file-view host input", () => {
     expect(
       changes.every((change) => Object.isFrozen(change) && Object.isFrozen(change.range)),
     ).toBe(true);
+  });
+
+  test("reuses one immutable file-and-change snapshot for matching and layout", () => {
+    const diffFile = createTestDiffFile();
+    const snapshot = createFileViewInputSnapshot(diffFile);
+    const input = createFileViewInput(diffFile, 72, new AbortController().signal, snapshot);
+
+    expect(input.file).toBe(snapshot.file);
+    expect(input.changes).toBe(snapshot.changes);
+    expect(Object.isFrozen(snapshot)).toBe(true);
   });
 
   test("exposes one frozen input, deduplicates string reads, and binds cancellation", async () => {

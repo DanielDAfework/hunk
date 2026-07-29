@@ -34,9 +34,7 @@ function writeTempExtension(name: string, contents: string) {
 
 async function importTempExtension(path: string) {
   registerHostRuntimeModules([path]);
-  return (await import(pathToFileURL(path).href)) as {
-    default: Record<string, unknown>;
-  };
+  return (await import(pathToFileURL(path).href)) as { default: Record<string, unknown> };
 }
 
 describe("registerHostRuntimeModules", () => {

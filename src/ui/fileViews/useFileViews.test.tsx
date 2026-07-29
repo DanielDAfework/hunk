@@ -6,6 +6,7 @@ import type { RegisteredFileView } from "../../extensions/types";
 import { registeredFileViewKey } from "./state";
 import {
   FILE_VIEW_LAYOUT_CACHE_MAX_ENTRIES,
+  FILE_VIEW_LAYOUT_RESIZE_DEBOUNCE_MS,
   runFileViewLayoutRequest,
   useFileViewLayouts,
   type ResolvedFileViewLayout,
@@ -89,6 +90,72 @@ describe("file-view layout request lifetime", () => {
 });
 
 describe("file-view layout cache identity", () => {
+  test("retains exact unaffected files while suppressing another file's changed selection", async () => {
+    const secondFile = createTestDiffFile({
+      id: "second-request",
+      path: "second-request.ts",
+      before: "before\n",
+      after: "after\n",
+    });
+    const primary = createTestView(({ file: inputFile }) => ({
+      rows: [{ id: "row", spans: [{ text: inputFile.id }] }],
+      hunkRows: (inputFile.hunks ?? []).map(() => ({ startRow: 0, endRow: 0 })),
+    }));
+    const delayed = createTestView(() => new Promise(() => {}));
+    delayed.view.id = "delayed-view";
+    const primaryKey = registeredFileViewKey(primary);
+    const delayedKey = registeredFileViewKey(delayed);
+    const allFiles = [file, secondFile];
+    const views = [primary, delayed];
+    let selectDelayed = () => {};
+    let filterSecond = () => {};
+    let latest: ReadonlyMap<string, ResolvedFileViewLayout> = new Map();
+
+    function Harness() {
+      const [visibleFiles, setVisibleFiles] = useState(allFiles);
+      const [selections, setSelections] = useState<Record<string, string>>({
+        [file.id]: primaryKey,
+        [secondFile.id]: primaryKey,
+      });
+      selectDelayed = () =>
+        setSelections((current) => ({ ...current, [secondFile.id]: delayedKey }));
+      filterSecond = () => setVisibleFiles([file]);
+      latest = useFileViewLayouts({
+        files: visibleFiles,
+        selections,
+        views,
+        width: 80,
+        onIssue: ignoreIssue,
+      });
+      return null;
+    }
+
+    const setup = await testRender(createElement(Harness), { width: 10, height: 2 });
+    try {
+      for (let attempt = 0; attempt < 20 && latest.size !== 2; attempt += 1) {
+        await act(async () => {
+          await Promise.resolve();
+          await setup.renderOnce();
+        });
+      }
+      expect([...latest.keys()]).toEqual([file.id, secondFile.id]);
+
+      await act(async () => {
+        selectDelayed();
+        await setup.renderOnce();
+      });
+      expect([...latest.keys()]).toEqual([file.id]);
+
+      await act(async () => {
+        filterSecond();
+        await setup.renderOnce();
+      });
+      expect([...latest.keys()]).toEqual([file.id]);
+    } finally {
+      await act(async () => setup.renderer.destroy());
+    }
+  });
+
   test("synchronously hides a stale width generation before effects clean it up", async () => {
     const renderedWidths: [number, string][] = [];
     const view = createTestView(({ width }) => ({
@@ -129,8 +196,68 @@ describe("file-view layout cache identity", () => {
         await setup.renderOnce();
       });
       expect(renderedWidths).not.toContainEqual([40, "80"]);
+      await act(async () => {
+        await Bun.sleep(FILE_VIEW_LAYOUT_RESIZE_DEBOUNCE_MS + 10);
+        await setup.renderOnce();
+      });
       await settleAt("40");
       expect(renderedWidths).toContainEqual([40, "40"]);
+    } finally {
+      await act(async () => setup.renderer.destroy());
+    }
+  });
+
+  test("coalesces rapid width changes without exposing stale geometry", async () => {
+    const layoutWidths: number[] = [];
+    const view = createTestView(({ width }) => {
+      layoutWidths.push(width);
+      return {
+        rows: [{ id: "row", spans: [{ text: String(width) }] }],
+        hunkRows: file.metadata.hunks.map(() => ({ startRow: 0, endRow: 0 })),
+      };
+    });
+    const selections = { [file.id]: registeredFileViewKey(view) };
+    const views = [view];
+    let changeWidth = (_width: number) => {};
+    let latest: ReadonlyMap<string, ResolvedFileViewLayout> = new Map();
+
+    function Harness() {
+      const [width, setWidth] = useState(80);
+      changeWidth = setWidth;
+      latest = useFileViewLayouts({ files, selections, views, width, onIssue: ignoreIssue });
+      return null;
+    }
+
+    const setup = await testRender(createElement(Harness), { width: 10, height: 2 });
+    try {
+      for (let attempt = 0; attempt < 20 && latest.size === 0; attempt += 1) {
+        await act(async () => {
+          await Promise.resolve();
+          await setup.renderOnce();
+        });
+      }
+      expect(layoutWidths).toEqual([80]);
+
+      for (const width of [79, 78, 77]) {
+        await act(async () => {
+          changeWidth(width);
+          await setup.renderOnce();
+        });
+        expect(latest.size).toBe(0);
+      }
+      await act(async () => {
+        await Bun.sleep(FILE_VIEW_LAYOUT_RESIZE_DEBOUNCE_MS + 10);
+        await setup.renderOnce();
+      });
+      for (let attempt = 0; attempt < 20 && latest.size === 0; attempt += 1) {
+        await act(async () => {
+          await Promise.resolve();
+          await setup.renderOnce();
+        });
+      }
+
+      expect(layoutWidths).toEqual([80, 77]);
+      expect(latest.get(file.id)?.layout.rows[0]?.spans[0]?.text).toBe("77");
     } finally {
       await act(async () => setup.renderer.destroy());
     }
@@ -175,9 +302,17 @@ describe("file-view layout cache identity", () => {
         changeWidth(40);
         await setup.renderOnce();
       });
+      await act(async () => {
+        await Bun.sleep(FILE_VIEW_LAYOUT_RESIZE_DEBOUNCE_MS + 10);
+        await setup.renderOnce();
+      });
       await settleAt("40");
       await act(async () => {
         changeWidth(80);
+        await setup.renderOnce();
+      });
+      await act(async () => {
+        await Bun.sleep(FILE_VIEW_LAYOUT_RESIZE_DEBOUNCE_MS + 10);
         await setup.renderOnce();
       });
       await settleAt("80");
@@ -253,6 +388,129 @@ describe("file-view layout cache identity", () => {
       await settleAt(0);
       expect(layoutCalls.get(candidates[0]!.id)).toBe(2);
       expect(layoutCalls.get(candidates.at(-1)!.id)).toBe(1);
+    } finally {
+      await act(async () => setup.renderer.destroy());
+    }
+  });
+
+  test("deduplicates deterministic failures across widths but reports a replacement registration", async () => {
+    const issues: string[] = [];
+    let layoutCalls = 0;
+    const buildBrokenRegistration = () =>
+      createTestView(() => {
+        layoutCalls += 1;
+        throw new Error("deterministic failure");
+      });
+    const first = buildBrokenRegistration();
+    const selections = { [file.id]: registeredFileViewKey(first) };
+    const reportIssue = (message: string) => issues.push(message);
+    let resize = (_width: number) => {};
+    let reload = () => {};
+
+    function Harness() {
+      const [width, setWidth] = useState(80);
+      const [views, setViews] = useState<RegisteredFileView[]>([first]);
+      resize = setWidth;
+      reload = () => setViews([buildBrokenRegistration()]);
+      useFileViewLayouts({ files, selections, views, width, onIssue: reportIssue });
+      return null;
+    }
+
+    const setup = await testRender(createElement(Harness), { width: 10, height: 2 });
+    const settleCalls = async (expected: number, expectedIssues: number) => {
+      for (
+        let attempt = 0;
+        attempt < 20 && (layoutCalls < expected || issues.length < expectedIssues);
+        attempt += 1
+      ) {
+        await act(async () => {
+          await Promise.resolve();
+          await setup.renderOnce();
+        });
+      }
+      expect(layoutCalls).toBe(expected);
+      expect(issues).toHaveLength(expectedIssues);
+    };
+
+    try {
+      await settleCalls(1, 1);
+      expect(issues).toHaveLength(1);
+      for (const [index, width] of [79, 78, 77].entries()) {
+        await act(async () => {
+          resize(width);
+          await setup.renderOnce();
+        });
+        await act(async () => {
+          await Bun.sleep(FILE_VIEW_LAYOUT_RESIZE_DEBOUNCE_MS + 10);
+          await setup.renderOnce();
+        });
+        await settleCalls(index + 2, 1);
+      }
+      expect(issues).toHaveLength(1);
+
+      await act(async () => {
+        reload();
+        await setup.renderOnce();
+      });
+      await settleCalls(5, 2);
+      expect(issues).toHaveLength(2);
+    } finally {
+      await act(async () => setup.renderer.destroy());
+    }
+  });
+
+  test("synchronously suppresses a stale concrete registration", async () => {
+    const first = createTestView(() => ({
+      rows: [{ id: "first", spans: [{ text: "first" }] }],
+      hunkRows: file.metadata.hunks.map(() => ({ startRow: 0, endRow: 0 })),
+    }));
+    let resolveReplacement:
+      | ((layout: ReturnType<RegisteredFileView["view"]["layout"]>) => void)
+      | undefined;
+    const replacement = createTestView(
+      () =>
+        new Promise((resolve) => {
+          resolveReplacement = resolve;
+        }),
+    );
+    const selections = { [file.id]: registeredFileViewKey(first) };
+    let reload = () => {};
+    let latest: ReadonlyMap<string, ResolvedFileViewLayout> = new Map();
+
+    function Harness() {
+      const [views, setViews] = useState<RegisteredFileView[]>([first]);
+      reload = () => setViews([replacement]);
+      latest = useFileViewLayouts({ files, selections, views, width: 80, onIssue: ignoreIssue });
+      return null;
+    }
+
+    const setup = await testRender(createElement(Harness), { width: 10, height: 2 });
+    try {
+      for (let attempt = 0; attempt < 20 && latest.size === 0; attempt += 1) {
+        await act(async () => {
+          await Promise.resolve();
+          await setup.renderOnce();
+        });
+      }
+      expect(latest.get(file.id)?.layout.rows[0]?.id).toBe("first");
+
+      await act(async () => {
+        reload();
+        await setup.renderOnce();
+      });
+      expect(latest.size).toBe(0);
+
+      resolveReplacement?.({
+        rows: [{ id: "replacement", spans: [{ text: "replacement" }] }],
+        hunkRows: file.metadata.hunks.map(() => ({ startRow: 0, endRow: 0 })),
+      });
+      for (let attempt = 0; attempt < 20 && latest.size === 0; attempt += 1) {
+        await act(async () => {
+          await Promise.resolve();
+          await setup.renderOnce();
+        });
+      }
+      expect(latest.get(file.id)?.layout.rows[0]?.id).toBe("replacement");
     } finally {
       await act(async () => setup.renderer.destroy());
     }
