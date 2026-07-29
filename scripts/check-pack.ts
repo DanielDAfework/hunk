@@ -311,10 +311,7 @@ const { modes } = checkExtensionConsumerTypes({
   repoRoot,
   sources: [
     { name: "consumer.ts", text: CONSUMER_SOURCE },
-    ...docExamples.map((example) => ({
-      name: example.name,
-      text: example.text,
-    })),
+    ...docExamples.map((example) => ({ name: example.name, text: example.text })),
   ],
 });
 

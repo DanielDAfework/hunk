@@ -125,6 +125,8 @@ describe("PTY file views", () => {
       expect(custom).toContain("row 0 · click for detail");
       expect(custom).not.toContain("invalid span");
 
+      // This proves the example's current cooperative routing, not a host guarantee that custom
+      // rows will continue receiving pointer input through every future renderer integration.
       await session.click(/▶ Hunk 1/);
       custom = await session.waitForText(/lines 1–4 · @@ -1,4 \+1,4 @@/);
       expect(custom).not.toContain("row 0 · click for detail");

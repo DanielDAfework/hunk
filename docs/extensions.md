@@ -187,7 +187,7 @@ cannot mutate the registry mid-session.
 
 ### `hunk.apiVersion`
 
-The API generation this Hunk speaks (currently `2`). Branch on it if you want
+The API generation this Hunk speaks (currently `3`). Branch on it if you want
 one file to support several Hunk versions.
 
 ### `hunk.registerTheme(theme)`
@@ -712,9 +712,13 @@ resolves those primitives only while painting, so the host does not learn the
 extension's content format and measurement remains theme-independent. Every
 parsed hunk needs one in-bounds, inclusive `hunkRows` entry at the same array
 position as `input.file.hunks`. Invalid, oversized, cancelled, or throwing
-layouts are isolated with one warning and fall back to raw diff. An experimental
-custom row keeps symbolic fallback spans and declares its fixed painter
-atomically as `component: { height, render }`. Custom rows are non-focusable
+layouts are isolated with one warning per concrete extension registration and
+fall back to raw diff. Rapid width changes are coalesced, and Hunk never paints
+geometry measured for a stale width. An experimental custom row keeps symbolic
+fallback spans and declares its fixed painter
+atomically as `component: { height, render }`. If painting fails, the fallback
+spans are clipped to that same declared height rather than changing stream
+geometry. Custom rows are non-focusable
 paint surfaces: registered commands are their supported keyboard path. A
 cooperatively delivered, handled left-button mouse-up may act and stop
 propagation, while wheel, drag, and unhandled input remain host-owned. Hunk

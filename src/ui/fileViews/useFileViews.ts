@@ -1,7 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DiffFile } from "../../core/types";
 import type { RegisteredFileView } from "../../extensions/types";
-import { fileViewHunkCount, createFileViewInput } from "./host";
+import {
+  fileViewHunkCount,
+  createFileViewInput,
+  createFileViewInputSnapshot,
+  type FileViewInputSnapshot,
+} from "./host";
 import { validateFileViewLayout, type ValidatedFileViewLayout } from "./layout";
 import { registeredFileViewKey } from "./state";
 
@@ -9,9 +14,11 @@ import { registeredFileViewKey } from "./state";
 export const FILE_VIEW_LAYOUT_TIMEOUT_MS = 1_500;
 /** Keep extension preparation parallel but bounded across a large changeset. */
 export const FILE_VIEW_LAYOUT_CONCURRENCY = 4;
+/** Coalesce rapid width changes without ever painting geometry measured for a stale width. */
+export const FILE_VIEW_LAYOUT_RESIZE_DEBOUNCE_MS = 50;
 /** Retain only a bounded set of prepared trees across file, view, and resize churn. */
 export const FILE_VIEW_LAYOUT_CACHE_MAX_ENTRIES = 64;
-/** Bound warning dedupe metadata within one active input generation. */
+/** Bound warning dedupe metadata retained across input generations for this hook lifetime. */
 export const FILE_VIEW_LAYOUT_ISSUE_MAX_ENTRIES = 256;
 
 const EMPTY_RESOLVED_FILE_VIEW_LAYOUTS: ReadonlyMap<string, ResolvedFileViewLayout> = new Map();
@@ -32,12 +39,12 @@ interface CacheEntry {
   resolved: ResolvedFileViewLayout | null;
 }
 
-interface ResolvedState {
-  files?: readonly DiffFile[];
-  selections?: Readonly<Record<string, string>>;
-  views?: readonly RegisteredFileView[];
-  width?: number;
-  layouts: ReadonlyMap<string, ResolvedFileViewLayout>;
+interface ResolvedEntry {
+  file: DiffFile;
+  key: string;
+  registered: RegisteredFileView;
+  width: number;
+  resolved: ResolvedFileViewLayout;
 }
 
 /** Record a dedupe key while evicting the oldest retained key at the fixed limit. */
@@ -110,6 +117,7 @@ export async function runFileViewLayoutRequest(
   width: number,
   parentSignal: AbortSignal,
   timeoutMs = FILE_VIEW_LAYOUT_TIMEOUT_MS,
+  snapshot?: FileViewInputSnapshot,
 ): Promise<ValidatedFileViewLayout | null> {
   const { controller, detach } = createLayoutController(parentSignal);
   let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -129,7 +137,7 @@ export async function runFileViewLayoutRequest(
         once: true,
       });
     });
-    const input = createFileViewInput(file, width, controller.signal);
+    const input = createFileViewInput(file, width, controller.signal, snapshot);
     const candidate = await Promise.race([
       Promise.resolve().then(() => registered.view.layout(input)),
       deadline,
@@ -177,20 +185,32 @@ export function useFileViewLayouts({
   const registrationIdentities = useRef(new WeakMap<RegisteredFileView, number>());
   const nextRegistrationIdentity = useRef(1);
   const nextLayoutGeneration = useRef(1);
-  const [resolved, setResolved] = useState<ResolvedState>({
-    layouts: EMPTY_RESOLVED_FILE_VIEW_LAYOUTS,
-  });
+  const previousWidth = useRef<number | undefined>(undefined);
+  const reportedIssues = useRef(new Set<string>());
+  const [resolved, setResolved] = useState<ReadonlyMap<string, ResolvedEntry>>(new Map());
 
   useEffect(() => {
     const controller = new AbortController();
-    const next = new Map<string, ResolvedFileViewLayout>();
+    const next = new Map<string, ResolvedEntry>();
+    const widthChanged = previousWidth.current !== undefined && previousWidth.current !== width;
+    previousWidth.current = width;
     let active = true;
     let cursor = 0;
+    let startTimer: ReturnType<typeof setTimeout> | undefined;
     const byKey = new Map(views.map((view) => [registeredFileViewKey(view), view]));
-    const reportedIssues = new Set<string>();
 
-    const reportOnce = (key: string, message: string) => {
-      if (recordBoundedIssue(reportedIssues, key)) onIssue(message);
+    const registrationIdentityFor = (registered: RegisteredFileView) => {
+      let identity = registrationIdentities.current.get(registered);
+      if (identity === undefined) {
+        identity = nextRegistrationIdentity.current++;
+        registrationIdentities.current.set(registered, identity);
+      }
+      return identity;
+    };
+
+    const reportOnce = (registered: RegisteredFileView, key: string, message: string) => {
+      const identity = registrationIdentityFor(registered);
+      if (recordBoundedIssue(reportedIssues.current, `${identity}:${key}`)) onIssue(message);
     };
 
     const prepareFile = async (file: DiffFile) => {
@@ -204,16 +224,18 @@ export function useFileViewLayouts({
       // A valid registration-aware cache hit bypasses even matches(), whose extension code may be
       // expensive or stateful. A reload replaces the registration object and invalidates it.
       if (cached?.file === file && cached.registered === registered) {
-        if (cached.resolved) next.set(file.id, cached.resolved);
+        if (cached.resolved) {
+          next.set(file.id, { file, key, registered, width, resolved: cached.resolved });
+        }
         return;
       }
 
+      const snapshot = createFileViewInputSnapshot(file);
       try {
-        if (!registered.view.matches(createFileViewInput(file, width, controller.signal).file)) {
-          return;
-        }
+        if (!registered.view.matches(snapshot.file)) return;
       } catch {
         reportOnce(
+          registered,
           `${file.id}:${key}:matches`,
           `Extension ${registered.extensionId} file view "${registered.view.id}" failed matching ${file.path} • using raw diff`,
         );
@@ -226,17 +248,15 @@ export function useFileViewLayouts({
           file,
           width,
           controller.signal,
+          FILE_VIEW_LAYOUT_TIMEOUT_MS,
+          snapshot,
         );
         if (controller.signal.aborted || !active) return;
         if (validated === null) {
           cacheLayoutResult(cache.current, cacheKey, { file, registered, resolved: null });
           return;
         }
-        let registrationIdentity = registrationIdentities.current.get(registered);
-        if (registrationIdentity === undefined) {
-          registrationIdentity = nextRegistrationIdentity.current++;
-          registrationIdentities.current.set(registered, registrationIdentity);
-        }
+        const registrationIdentity = registrationIdentityFor(registered);
         const prepared: ResolvedFileViewLayout = {
           ...validated,
           key,
@@ -246,12 +266,13 @@ export function useFileViewLayouts({
           layoutGeneration: nextLayoutGeneration.current++,
         };
         cacheLayoutResult(cache.current, cacheKey, { file, registered, resolved: prepared });
-        next.set(file.id, prepared);
+        next.set(file.id, { file, key, registered, width, resolved: prepared });
       } catch (error) {
         if (controller.signal.aborted || !active) return;
         const detail = error instanceof Error ? error.message : String(error);
         const invalid = detail.startsWith("invalid layout: ");
         reportOnce(
+          registered,
           `${file.id}:${key}:${invalid ? detail : "layout"}`,
           invalid
             ? `Extension ${registered.extensionId} file view "${registered.view.id}" returned an ${detail} • using raw diff`
@@ -270,27 +291,45 @@ export function useFileViewLayouts({
       }
     };
 
-    void Promise.all(
-      Array.from({ length: Math.min(FILE_VIEW_LAYOUT_CONCURRENCY, files.length) }, worker),
-    ).then(() => {
-      if (active) setResolved({ files, selections, views, width, layouts: next });
-    });
+    const prepare = () => {
+      void Promise.all(
+        Array.from({ length: Math.min(FILE_VIEW_LAYOUT_CONCURRENCY, files.length) }, worker),
+      ).then(() => {
+        if (active) setResolved(next);
+      });
+    };
+
+    if (widthChanged) {
+      startTimer = setTimeout(prepare, FILE_VIEW_LAYOUT_RESIZE_DEBOUNCE_MS);
+    } else {
+      prepare();
+    }
 
     return () => {
       active = false;
+      if (startTimer) clearTimeout(startTimer);
       controller.abort();
     };
   }, [files, onIssue, selections, views, width]);
 
-  // Effects clean up after render. Decline the previous generation synchronously so its painters
-  // cannot register or paint once with new files, selections, registrations, or width.
-  if (
-    resolved.files !== files ||
-    resolved.selections !== selections ||
-    resolved.views !== views ||
-    resolved.width !== width
-  ) {
-    return EMPTY_RESOLVED_FILE_VIEW_LAYOUTS;
-  }
-  return resolved.layouts;
+  return useMemo(() => {
+    const current = new Map<string, ResolvedFileViewLayout>();
+    const byKey = new Map(views.map((view) => [registeredFileViewKey(view), view]));
+    for (const file of files) {
+      const key = selections[file.id];
+      const entry = resolved.get(file.id);
+      if (
+        key &&
+        entry?.file === file &&
+        entry.key === key &&
+        entry.registered === byKey.get(key) &&
+        entry.width === width
+      ) {
+        current.set(file.id, entry.resolved);
+      }
+    }
+    // Effects clean up after render. Exact per-file filtering synchronously declines stale geometry
+    // while preserving unaffected files across filtering and another file's selection change.
+    return current.size > 0 ? current : EMPTY_RESOLVED_FILE_VIEW_LAYOUTS;
+  }, [files, resolved, selections, views, width]);
 }

@@ -5,7 +5,7 @@ This worktree experiments with one constrained escape hatch in the symbolic file
 ## Contract
 
 - Layout still happens before paint and supplies stable row IDs plus one inclusive row range for every parsed hunk.
-- Every custom row must retain symbolic `spans`. They are rendered if the component fails, and symbolic-only layouts continue through the existing renderer unchanged.
+- Every custom row must retain symbolic `spans`. They are rendered if the component fails, clipped to the same declared fixed height as the component painter. Symbolic-only layouts continue through the existing renderer unchanged.
 - A component row declares height and renderer atomically as `component: { height, render }`. `render` must be a function, one row is limited to 256 terminal lines, and the measured height of all symbolic and component rows together is limited to 100,000 terminal lines. Existing row/span/text limits still apply. An invalid layout falls back to raw diff.
 - Hunk passes only `width`, fixed `height`, `selected`, and zero-based `rowIndex`. A per-row closure can capture arbitrary parsed or semantic data without adding an opaque payload to the host contract.
 - Hunk mounts `component.render` inside a fixed `component.height`/`minHeight`/`maxHeight`, `flexShrink: 0`, overflow-hidden wrapper. No post-mount measurement feeds back into geometry. Stable IDs, hunk bounds, selection, scrolling, and row windowing remain host-owned.

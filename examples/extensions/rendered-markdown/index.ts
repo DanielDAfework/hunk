@@ -181,19 +181,13 @@ function renderBlock(
   width: number,
 ): RenderedMarkdownRow[] {
   const rows = (lines: ExtensionFileViewSpan[][], fallback?: SpanPresentation) =>
-    lines.map((spans) => ({
-      spans: nonEmptySpans(spans, fallback),
-      sourceRange,
-    }));
+    lines.map((spans) => ({ spans: nonEmptySpans(spans, fallback), sourceRange }));
 
   switch (token.type) {
     case "space":
       return rows([[]]);
     case "heading": {
-      const heading = {
-        tone: "accent" as const,
-        attributes: ["bold" as const],
-      };
+      const heading = { tone: "accent" as const, attributes: ["bold" as const] };
       return rows(renderInlineTokens((token as Tokens.Heading).tokens, heading), heading);
     }
     case "paragraph":
@@ -208,12 +202,7 @@ function renderBlock(
       const output: RenderedMarkdownRow[] = [];
       if (fenced) {
         output.push({
-          spans: [
-            {
-              text: `┌─${code.lang ? ` ${code.lang.trim()}` : ""}`,
-              tone: "muted",
-            },
-          ],
+          spans: [{ text: `┌─${code.lang ? ` ${code.lang.trim()}` : ""}`, tone: "muted" }],
           sourceRange: [sourceRange[0], sourceRange[0]],
         });
       }
@@ -257,10 +246,7 @@ function renderBlock(
           output.push({
             sourceRange,
             spans: [
-              {
-                text: lineIndex === 0 ? marker : " ".repeat(marker.length),
-                tone: "muted",
-              },
+              { text: lineIndex === 0 ? marker : " ".repeat(marker.length), tone: "muted" },
               ...nonEmptySpans(spans),
             ],
           });
