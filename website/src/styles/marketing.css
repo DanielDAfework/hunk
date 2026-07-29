@@ -431,35 +431,34 @@ a:focus-visible {
   line-height: 1.6;
 }
 
-/* Feature showcase: full-width TUI captures lead, a compact copy header sets
-   each one up. Terminal text needs physical size, so the media never shares
-   its row with copy. */
+/* Feature showcase: explainer reads first on the left, the real TUI capture
+   proves it on the right. Every row shares one geometry — the media column
+   stays wide because terminal text needs physical size. */
 .marketing .show {
   display: grid;
-  gap: 72px;
+  gap: 56px;
   margin-bottom: 64px;
 }
 
-.marketing .show-copy {
+.marketing .show-item {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  gap: 6px 44px;
-  align-items: start;
-  margin-bottom: 20px;
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+  gap: 38px;
+  align-items: center;
 }
 
 .marketing .show-copy h3 {
-  margin: 0;
-  font-size: clamp(19px, 2.6vw, 24px);
+  margin: 0 0 10px;
+  font-size: clamp(17px, 2.2vw, 21px);
   font-weight: 700;
   letter-spacing: -0.02em;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 
 .marketing .show-copy p {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   color: var(--hunk-body);
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.65;
 }
 
@@ -834,9 +833,10 @@ a:focus-visible {
     max-width: 560px;
   }
 
-  .marketing .show-copy {
+  /* Copy stacks above its capture on narrow screens. */
+  .marketing .show-item {
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 16px;
   }
 }
 

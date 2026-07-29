@@ -93,12 +93,10 @@ const showcase: ShowcaseFeature[] = [
       <article class="show-item">
         <div class="show-copy">
           <h3>{heading}</h3>
-          <div>
-            <p>{body}</p>
-            <a class="more" href={href}>
-              {linkText} →
-            </a>
-          </div>
+          <p>{body}</p>
+          <a class="more" href={href}>
+            {linkText} →
+          </a>
         </div>
         <figure class="show-media">
           {media.kind === "image" ? (
