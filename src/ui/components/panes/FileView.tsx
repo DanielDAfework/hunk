@@ -1,7 +1,9 @@
 import { TextAttributes } from "@opentui/core";
-import { memo, useMemo } from "react";
+import { Component, memo, useMemo, type ReactNode } from "react";
 import type {
   ExtensionFileViewLayout,
+  ExtensionFileViewRow,
+  ExtensionFileViewRowComponentProps,
   ExtensionFileViewTextAttribute,
   ExtensionFileViewTone,
 } from "../../../extension-api/types";
@@ -57,19 +59,56 @@ export function isFileViewRowSelected(
   );
 }
 
-/** Render the host-owned symbolic rows of an alternate file view. */
+/** Paint one row through the original symbolic host-rendered path. */
+function SymbolicFileViewRow({ row, theme }: { row: ExtensionFileViewRow; theme: AppTheme }) {
+  return row.spans.map((span, spanIndex) => (
+    <text
+      key={`${row.id}:${spanIndex}`}
+      fg={fileViewToneColor(span.tone, theme)}
+      attributes={fileViewTextAttributes(span.attributes)}
+    >
+      {span.text}
+    </text>
+  ));
+}
+
+/** Contain custom render failures to one row and retain its symbolic fallback. */
+class FileViewRowErrorBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode; resetKey: unknown },
+  { failed: boolean }
+> {
+  override state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  override componentDidUpdate(previous: Readonly<{ resetKey: unknown }>) {
+    if (this.state.failed && previous.resetKey !== this.props.resetKey) {
+      this.setState({ failed: false });
+    }
+  }
+
+  override render() {
+    return this.state.failed ? this.props.fallback : this.props.children;
+  }
+}
+
+/** Render host-windowed symbolic and custom rows without surrendering outer geometry. */
 function FileViewComponent({
   layout,
   geometry,
   selectedHunkIndex,
   theme,
   visibleBodyBounds,
+  width,
 }: {
   layout: ExtensionFileViewLayout;
   geometry: DiffSectionGeometry;
   selectedHunkIndex: number;
   theme: AppTheme;
   visibleBodyBounds?: VisibleBodyBounds;
+  width: number;
 }) {
   const rowWindow = useMemo(() => {
     if (!visibleBodyBounds) {
@@ -105,25 +144,57 @@ function FileViewComponent({
       ) : null}
       {rowWindow.rows.map(({ row, index }) => {
         const selected = isFileViewRowSelected(layout, index, selectedHunkIndex);
+        const fixedHeight = row.component ? row.height : undefined;
+        const View = row.component as
+          | ((props: ExtensionFileViewRowComponentProps) => ReactNode)
+          | undefined;
+        const fallback = <SymbolicFileViewRow row={row} theme={theme} />;
         return (
           <box
             key={row.id}
             id={reviewRowId(`file-view:${row.id}`)}
             style={{
               width: "100%",
+              ...(fixedHeight === undefined
+                ? {}
+                : {
+                    height: fixedHeight,
+                    minHeight: fixedHeight,
+                    maxHeight: fixedHeight,
+                    flexShrink: 0,
+                    overflow: "hidden" as const,
+                  }),
               flexDirection: "row",
               backgroundColor: selected ? theme.selectedHunk : theme.panel,
             }}
           >
-            {row.spans.map((span, spanIndex) => (
-              <text
-                key={`${row.id}:${spanIndex}`}
-                fg={fileViewToneColor(span.tone, theme)}
-                attributes={fileViewTextAttributes(span.attributes)}
+            {View && fixedHeight !== undefined ? (
+              <FileViewRowErrorBoundary
+                key={`${row.id}:${width}:${fixedHeight}:${selected ? 1 : 0}:${index}`}
+                fallback={fallback}
+                resetKey={View}
               >
-                {span.text}
-              </text>
-            ))}
+                <box
+                  style={{
+                    width: "100%",
+                    height: fixedHeight,
+                    minHeight: fixedHeight,
+                    maxHeight: fixedHeight,
+                    flexShrink: 0,
+                    overflow: "hidden",
+                  }}
+                >
+                  <View
+                    width={Math.max(1, Math.floor(width))}
+                    height={fixedHeight}
+                    selected={selected}
+                    rowIndex={index}
+                  />
+                </box>
+              </FileViewRowErrorBoundary>
+            ) : (
+              fallback
+            )}
           </box>
         );
       })}

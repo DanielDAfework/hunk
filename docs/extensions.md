@@ -649,12 +649,15 @@ the component instead would lose it every time the pane closes and unmounts.
 ### `hunk.registerFileView(view)` (experimental)
 
 A file view is an alternate **host-rendered** presentation of one file in the
-same top-to-bottom review stream. It is not a React component: Hunk owns row
-measurement, scrolling/windowing, hunk navigation, and fallback to Pierre's raw
-diff. Raw is always the default; users select a matching view from **View** for
-the selected file. Alternate presentations are unavailable while inline review
-notes are visible, because raw diff is currently the only rendering path that
-can place those notes.
+same top-to-bottom review stream. It is not a whole-file React component: Hunk
+owns row measurement, scrolling/windowing, hunk navigation, and fallback to
+Pierre's raw diff. A constrained, experimental
+[fixed-height JSX row POC](file-view-jsx-poc.md) lets individual validated rows
+paint OpenTUI content without taking over that geometry. Raw is always the
+default; users select a matching view from **View** for the selected file.
+Alternate presentations are unavailable while inline review notes are visible,
+because raw diff is currently the only rendering path that can place those
+notes.
 
 The installable
 [`examples/extensions/rendered-markdown/`](../examples/extensions/rendered-markdown/)

@@ -271,11 +271,35 @@ export interface ExtensionFileViewSpan {
   attributes?: readonly ExtensionFileViewTextAttribute[];
 }
 
-/** A line in a host-owned, terminal-safe file-view layout. */
+/** Bounded paint-only props handed to a custom file-view row component. */
+export interface ExtensionFileViewRowComponentProps {
+  /** Available terminal columns inside the host-owned row wrapper. */
+  width: number;
+  /** Fixed terminal rows reserved by the host. */
+  height: number;
+  /** Whether this row falls inside the selected hunk bounds. */
+  selected: boolean;
+  /** Zero-based position in the validated file-view layout. */
+  rowIndex: number;
+}
+
+/**
+ * A custom row painter rendered inside host-owned geometry.
+ *
+ * This is a plain React function component that may return OpenTUI elements.
+ * Its return type stays opaque so this import-free module does not publish
+ * React types. Prefer a closure when the painter needs semantic layout data.
+ */
+/** A row in a host-owned, terminal-safe file-view layout. */
 export interface ExtensionFileViewRow {
   /** A stable identifier within this layout result. */
   id: string;
+  /** Symbolic host-rendered content, also used if a custom component fails. */
   spans: readonly ExtensionFileViewSpan[];
+  /** Fixed terminal height for a custom component row. Required with `component`. */
+  height?: number;
+  /** Optional React/OpenTUI painter clipped inside the declared fixed height. */
+  component?: (props: ExtensionFileViewRowComponentProps) => unknown;
 }
 
 /** One hunk's inclusive row extent in a file-view layout. */
@@ -1149,8 +1173,8 @@ export interface HunkExtensionAPI {
    * Register a host-rendered alternative presentation for matching files.
    *
    * The host owns row measurement, scrolling, windowing, selection, and note
-   * placement. A file view returns only symbolic text rows and hunk/source
-   * geometry; it never mounts arbitrary React content in the review stream.
+   * placement. Rows normally contain symbolic text; the experimental fixed-height
+   * row component contract may paint React/OpenTUI content inside clipped host geometry.
    */
   registerFileView(view: ExtensionFileView): void;
   /**

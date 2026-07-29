@@ -9,6 +9,8 @@ import { measureSanitizedTextWidth, wrapSanitizedTextByWidth } from "../lib/text
 export const FILE_VIEW_MAX_ROWS = 10_000;
 export const FILE_VIEW_MAX_SPANS = 40_000;
 export const FILE_VIEW_MAX_TEXT_LENGTH = 1_000_000;
+export const FILE_VIEW_MAX_COMPONENT_ROW_HEIGHT = 256;
+export const FILE_VIEW_MAX_COMPONENT_HEIGHT = 100_000;
 
 const FILE_VIEW_TONES = new Set([
   "text",
@@ -53,6 +55,7 @@ export function validateFileViewLayout(
   const ids = new Set<string>();
   let spanCount = 0;
   let textLength = 0;
+  let componentHeight = 0;
   const rowHeights: number[] = [];
   const usableWidth = Math.max(1, Math.floor(width));
 
@@ -64,6 +67,36 @@ export function validateFileViewLayout(
       return { valid: false, issue: `rows[${index}] repeats id "${row.id}"` };
     }
     ids.add(row.id);
+    const hasComponent = row.component !== undefined;
+    const hasHeight = row.height !== undefined;
+    if (hasComponent !== hasHeight) {
+      return {
+        valid: false,
+        issue: `rows[${index}] must declare component and height together`,
+      };
+    }
+    if (hasComponent) {
+      if (typeof row.component !== "function") {
+        return { valid: false, issue: `rows[${index}].component is not a function` };
+      }
+      if (
+        !Number.isInteger(row.height) ||
+        row.height! < 1 ||
+        row.height! > FILE_VIEW_MAX_COMPONENT_ROW_HEIGHT
+      ) {
+        return {
+          valid: false,
+          issue: `rows[${index}].height must be an integer from 1 to ${FILE_VIEW_MAX_COMPONENT_ROW_HEIGHT}`,
+        };
+      }
+      componentHeight += row.height!;
+      if (componentHeight > FILE_VIEW_MAX_COMPONENT_HEIGHT) {
+        return {
+          valid: false,
+          issue: `component rows exceed ${FILE_VIEW_MAX_COMPONENT_HEIGHT} terminal rows`,
+        };
+      }
+    }
     if (!Array.isArray(row.spans)) {
       return { valid: false, issue: `rows[${index}].spans is not an array` };
     }
@@ -99,8 +132,12 @@ export function validateFileViewLayout(
       }
       rowText += span.text;
     }
-    // Use the same terminal-safe text measurement/wrapping primitive as other rich text.
-    rowHeights.push(Math.max(1, wrapSanitizedTextByWidth(rowText, usableWidth).length));
+    // Component geometry is declared before mount; symbolic rows retain width-driven wrapping.
+    rowHeights.push(
+      hasComponent
+        ? row.height!
+        : Math.max(1, wrapSanitizedTextByWidth(rowText, usableWidth).length),
+    );
   }
 
   if (layout.hunks.length !== hunkCount) {
@@ -131,6 +168,9 @@ export function validateFileViewLayout(
 
 /** Return the terminal height for one symbolic row at a concrete content width. */
 export function measureFileViewRow(row: ExtensionFileViewRow, width: number) {
+  if (row.component && Number.isInteger(row.height) && row.height! > 0) {
+    return row.height!;
+  }
   const text = row.spans.map((span) => span.text).join("");
   // Preserve one empty symbolic row so extensions can express intentional vertical spacing.
   return Math.max(1, wrapSanitizedTextByWidth(text, Math.max(1, width)).length);
