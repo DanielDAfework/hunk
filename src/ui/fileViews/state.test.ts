@@ -5,17 +5,17 @@ describe("file-view selection state", () => {
   test("keeps valid per-file choices across reload while dropping stale ids and views", () => {
     expect(
       reconcileFileViewSelections(
-        { readme: "hunk:rendered-markdown", gone: "other:view", stale: "removed:view" },
+        { readme: "preview:rendered", gone: "other:view", stale: "removed:view" },
         ["readme", "stale"],
-        new Set(["hunk:rendered-markdown"]),
+        new Set(["preview:rendered"]),
       ),
-    ).toEqual({ readme: "hunk:rendered-markdown" });
+    ).toEqual({ readme: "preview:rendered" });
   });
 
   test("stores raw implicitly and avoids needless state changes", () => {
-    const active = selectFileView({}, "readme", "hunk:rendered-markdown");
-    expect(active).toEqual({ readme: "hunk:rendered-markdown" });
-    expect(selectFileView(active, "readme", "hunk:rendered-markdown")).toBe(active);
+    const active = selectFileView({}, "readme", "preview:rendered");
+    expect(active).toEqual({ readme: "preview:rendered" });
+    expect(selectFileView(active, "readme", "preview:rendered")).toBe(active);
     expect(selectFileView(active, "readme", null)).toEqual({});
   });
 });

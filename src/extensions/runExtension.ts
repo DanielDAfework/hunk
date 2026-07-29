@@ -389,9 +389,6 @@ export function createExtensionApi(
       if (typeof handler !== "function") {
         throw new Error("registerCommand requires a handler function.");
       }
-      if (command.showInMenu !== undefined && typeof command.showInMenu !== "boolean") {
-        throw new Error("registerCommand showInMenu must be a boolean when provided.");
-      }
 
       // Parse every chord at registration so a typo fails the author loudly
       // here, instead of registering a binding that silently never fires. An

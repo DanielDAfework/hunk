@@ -652,9 +652,15 @@ A file view is an alternate **host-rendered** presentation of one file in the
 same top-to-bottom review stream. It is not a React component: Hunk owns row
 measurement, scrolling/windowing, hunk navigation, and fallback to Pierre's raw
 diff. Raw is always the default; users select a matching view from **View** for
-the selected file. Hunk's bundled Markdown view also toggles with `F8`. Alternate
-presentations are unavailable while inline review notes are visible, because raw
-diff is currently the only rendering path that can place those notes.
+the selected file. Alternate presentations are unavailable while inline review
+notes are visible, because raw diff is currently the only rendering path that
+can place those notes.
+
+The installable
+[`examples/extensions/rendered-markdown/`](../examples/extensions/rendered-markdown/)
+uses this contract for a parsed Markdown preview. It is intentionally not bundled
+or loaded by default; copy the folder into `~/.config/hunk/extensions/`, install
+its dependency there, and its View entry and `F8` command become available.
 
 ```ts
 import type { HunkExtensionAPI } from "hunkdiff/extension";
@@ -753,13 +759,12 @@ and friends. See [docs/keybindings.md](keybindings.md) for the rules; the
 practical consequence is that a chord you declare may not be the chord your
 command ends up on.
 
-Commands are listed in the menu bar's **Extensions** menu under their `title`,
-showing whichever key they currently answer to. Set `showInMenu: false` for a
-keyboard-only convenience action when another host-owned control already exposes
-the operation. The menu appears only when at least one command is shown, entries
-are grouped by extension in load order, and running one from the menu is the
-same dispatch the key would have done — so a visible command with no `key`, or
-one whose chord was refused, is still reachable with the mouse.
+Every registered command is also listed in the menu bar's **Extensions** menu,
+under its `title`, showing whichever key it currently answers to. The menu
+appears only when something registered a command, entries are grouped by
+extension in load order, and running one from the menu is the same dispatch the
+key would have done — so a command with no `key`, or one whose chord was
+refused, is still reachable with the mouse.
 
 The handler fires when the key is pressed outside modal UI — dialogs, menus,
 and focused text inputs own their keys first, and pager mode does not dispatch
@@ -1019,12 +1024,16 @@ to the terminal, because the TUI owns the screen.
 
 ## A complete example
 
-For a larger user-installable extension, see
-[`examples/extensions/review-triage/`](../examples/extensions/review-triage/): a
-session-local hunk triage board that combines a sidebar, Extensions-menu
-commands, host-rendered dialogs, lifecycle listeners, and the extension event
-bus. Its API evaluation and follow-up opportunities are recorded in
-[Extension API field notes](extension-api-evaluation.md).
+The examples directory contains two user-installable folder extensions:
+
+- [`examples/extensions/review-triage/`](../examples/extensions/review-triage/)
+  is a session-local hunk triage board combining a sidebar, commands, dialogs,
+  lifecycle listeners, and the extension event bus. Its API evaluation and
+  follow-up opportunities are recorded in
+  [Extension API field notes](extension-api-evaluation.md).
+- [`examples/extensions/rendered-markdown/`](../examples/extensions/rendered-markdown/)
+  parses Markdown into generic host-owned file-view rows. Its README shows how
+  to run it from the checkout or copy it into the global extensions directory.
 
 Collapse lockfiles and generated output out of every review, and say how many
 files were hidden.

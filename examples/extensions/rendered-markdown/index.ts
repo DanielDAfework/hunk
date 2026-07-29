@@ -5,7 +5,7 @@ import type {
   ExtensionFileViewRow,
   ExtensionFileViewSpan,
   ExtensionFileViewTextAttribute,
-} from "../../../../extension-api/types";
+} from "hunkdiff/extension";
 
 const MAX_MARKDOWN_SOURCE_LENGTH = 200_000;
 
@@ -376,12 +376,11 @@ function renderedBounds(
 }
 
 /** Build a parsed, host-rendered Markdown preview from exact source text. */
-export const markdownFileViewExtension: ExtensionFactory = (hunk) => {
+const renderedMarkdownExtension: ExtensionFactory = (hunk) => {
   hunk.registerCommand(
     {
       id: "toggle-rendered-markdown",
       title: "Toggle rendered Markdown",
-      showInMenu: false,
       key: "f8",
     },
     ({ fileViews }) => fileViews.toggle("rendered-markdown"),
@@ -429,3 +428,5 @@ export const markdownFileViewExtension: ExtensionFactory = (hunk) => {
     },
   });
 };
+
+export default renderedMarkdownExtension;

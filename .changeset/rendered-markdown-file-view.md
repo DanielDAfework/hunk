@@ -2,4 +2,4 @@
 "hunkdiff": minor
 ---
 
-Add an experimental extension file-view contract and a bundled Markdown preview that parses headings, inline formatting, lists, quotes, tables, and fenced code. Raw diff remains the default and fallback, `F8` toggles the preview, and files with visible inline review notes stay on raw rendering.
+Add an experimental extension file-view contract plus an optional, user-installable Markdown preview example. File views use generic host-rendered rows with raw diff as the default and fallback; files with visible inline review notes stay on raw rendering.

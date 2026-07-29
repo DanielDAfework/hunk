@@ -5,6 +5,10 @@ import { join } from "node:path";
 import { createPtyHarness } from "./harness";
 
 const harness = createPtyHarness();
+const RENDERED_MARKDOWN_EXTENSION = join(
+  import.meta.dir,
+  "../../examples/extensions/rendered-markdown",
+);
 setDefaultTimeout(30_000);
 
 afterEach(() => {
@@ -36,10 +40,38 @@ function createMarkdownPairTest() {
 }
 
 describe("PTY file views", () => {
-  test("selects the bundled Markdown presentation from View and keeps hunk navigation live", async () => {
+  test("does not load the Markdown example unless the user installs it", async () => {
     const pair = createMarkdownPairTest();
     const session = await harness.launchHunk({
       args: ["diff", "--mode", "stack", pair.before, pair.after],
+      cwd: pair.directory,
+      cols: 140,
+      rows: 24,
+    });
+
+    try {
+      await session.waitForText(/before\.md/, { timeout: 20_000 });
+      await session.click(/View/);
+      const menu = await session.waitForText(/File presentation: Raw diff/);
+      expect(menu).not.toContain("File presentation: Rendered Markdown");
+    } finally {
+      session.close();
+      rmSync(pair.directory, { recursive: true, force: true });
+    }
+  });
+
+  test("loads the Markdown example and keeps hunk navigation live", async () => {
+    const pair = createMarkdownPairTest();
+    const session = await harness.launchHunk({
+      args: [
+        "diff",
+        "--extension",
+        RENDERED_MARKDOWN_EXTENSION,
+        "--mode",
+        "stack",
+        pair.before,
+        pair.after,
+      ],
       cwd: pair.directory,
       cols: 140,
       rows: 24,
@@ -76,6 +108,8 @@ describe("PTY file views", () => {
     const session = await harness.launchHunk({
       args: [
         "diff",
+        "--extension",
+        RENDERED_MARKDOWN_EXTENSION,
         "--mode",
         "stack",
         "--agent-context",

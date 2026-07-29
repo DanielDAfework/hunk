@@ -881,13 +881,6 @@ export interface ExtensionCommand {
   /** Human-readable name for command menus and keyboard help. */
   title: string;
   /**
-   * Whether to list this command in the Extensions menu. Defaults to true.
-   *
-   * Use false for a keyboard-only convenience action when another host-owned
-   * control already exposes the same operation.
-   */
-  showInMenu?: boolean;
-  /**
    * Default key chord, e.g. `"ctrl+m"`, `"F2"`, `"G"`, `"y"`, or an array of
    * chords to bind the command to every one of them.
    *

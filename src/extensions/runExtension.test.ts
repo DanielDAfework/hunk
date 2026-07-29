@@ -333,26 +333,6 @@ describe("registerCommand", () => {
     expect(emptyIssues[0]?.message).toContain("non-empty chord string or array");
   });
 
-  test("rejects a non-boolean showInMenu value", () => {
-    const registry = createEmptyExtensionRegistry();
-    const issues: ExtensionLoadIssue[] = [];
-
-    runExtensionFactory({
-      metadata: bundledMetadata("bad-menu-visibility"),
-      registry,
-      issues,
-      factory: (hunk) => {
-        hunk.registerCommand(
-          { id: "toggle", title: "Toggle", showInMenu: "no" as never },
-          () => {},
-        );
-      },
-    });
-
-    expect(registry.commands).toEqual([]);
-    expect(issues[0]?.message).toContain("showInMenu must be a boolean");
-  });
-
   test("rejects a command without a handler function", () => {
     const registry = createEmptyExtensionRegistry();
     const issues: ExtensionLoadIssue[] = [];

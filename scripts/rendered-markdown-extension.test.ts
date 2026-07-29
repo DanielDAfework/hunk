@@ -4,14 +4,14 @@ import type {
   ExtensionCommandHandler,
   ExtensionFileView,
   HunkExtensionAPI,
-} from "../../../../extension-api/types";
-import { markdownFileViewExtension } from "./markdown";
+} from "../src/extension-api/types";
+import renderedMarkdownExtension from "../examples/extensions/rendered-markdown";
 
 function registerMarkdownTestView() {
   let view: ExtensionFileView | undefined;
   let command: ExtensionCommand | undefined;
   let commandHandler: ExtensionCommandHandler | undefined;
-  markdownFileViewExtension({
+  renderedMarkdownExtension({
     registerCommand(candidate: ExtensionCommand, handler: ExtensionCommandHandler) {
       command = candidate;
       commandHandler = handler;
@@ -23,13 +23,12 @@ function registerMarkdownTestView() {
   return { view: view!, command: command!, commandHandler: commandHandler! };
 }
 
-describe("bundled rendered Markdown file view", () => {
+describe("rendered Markdown example extension", () => {
   test("uses only the public contract and renders Markdown syntax into symbolic rows", async () => {
     const { view, command, commandHandler } = registerMarkdownTestView();
     expect(command).toMatchObject({
       id: "toggle-rendered-markdown",
       key: "f8",
-      showInMenu: false,
     });
     const toggled: string[] = [];
     commandHandler({ fileViews: { toggle: (viewId: string) => toggled.push(viewId) } } as never);

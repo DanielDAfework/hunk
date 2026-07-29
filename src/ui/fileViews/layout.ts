@@ -132,7 +132,7 @@ export function validateFileViewLayout(
 /** Return the terminal height for one symbolic row at a concrete content width. */
 export function measureFileViewRow(row: ExtensionFileViewRow, width: number) {
   const text = row.spans.map((span) => span.text).join("");
-  // Preserve one empty line: visual Markdown blocks intentionally use empty rows for spacing.
+  // Preserve one empty symbolic row so extensions can express intentional vertical spacing.
   return Math.max(1, wrapSanitizedTextByWidth(text, Math.max(1, width)).length);
 }
 

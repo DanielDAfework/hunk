@@ -56,13 +56,13 @@ describe("file-view availability", () => {
   });
 
   test("masks unavailable selections without discarding stored choices", () => {
-    const selections = { readme: "hunk:rendered-markdown", other: "ext:view" };
+    const selections = { readme: "preview:rendered", other: "ext:view" };
     expect(
       availableFileViewSelections(
         selections,
         new Map([["readme", FILE_VIEW_NOTES_UNAVAILABLE_REASON]]),
       ),
     ).toEqual({ other: "ext:view" });
-    expect(selections).toEqual({ readme: "hunk:rendered-markdown", other: "ext:view" });
+    expect(selections).toEqual({ readme: "preview:rendered", other: "ext:view" });
   });
 });

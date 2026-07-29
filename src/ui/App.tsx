@@ -81,7 +81,6 @@ import { buildAppMenus } from "./lib/appMenus";
 import { buildExtensionAppCommands, extensionCommandKeyDefaults } from "./lib/extensionCommands";
 import { createExtensionDialogQueue } from "./lib/extensionDialogs";
 import { buildExtensionReviewSelection } from "./lib/extensionSelection";
-import { getBundledFileViewExtension } from "../extensions/default/ui/fileViews";
 import { useFileViewLayouts, registeredFileViewKey } from "./fileViews/useFileViews";
 import { availableFileViewSelections, fileViewUnavailableReason } from "./fileViews/availability";
 import { reconcileFileViewSelections, selectFileView } from "./fileViews/state";
@@ -345,13 +344,9 @@ export function App({
   const selectedFileId = selectedFile?.id ?? null;
   // File presentations are per-file, survive filtering, and are reconciled against a reload's
   // stable ids. Raw is implicit, so an empty state is the guaranteed default/fallback.
-  const bundledFileViewExtension = getBundledFileViewExtension();
   const sessionFileViews = useMemo(
-    () => [
-      ...bundledFileViewExtension.views,
-      ...(extensions ? resolveExtensionFileViews(extensions.registry).views : []),
-    ],
-    [bundledFileViewExtension, extensions],
+    () => (extensions ? resolveExtensionFileViews(extensions.registry).views : []),
+    [extensions],
   );
   const [fileViewSelections, setFileViewSelections] = useState<Record<string, string>>({});
   const fileViewSelectionsRef = useRef(fileViewSelections);
@@ -791,11 +786,8 @@ export function App({
   );
 
   const registeredExtensionCommands = useMemo(
-    () => [
-      ...bundledFileViewExtension.commands,
-      ...(extensions ? resolveExtensionCommands(extensions.registry).commands : []),
-    ],
-    [bundledFileViewExtension, extensions],
+    () => (extensions ? resolveExtensionCommands(extensions.registry).commands : []),
+    [extensions],
   );
   // The session keymap: every bindable command's defaults folded against the
   // user's `[keybindings]` table, once. Matchers, key labels, and extension
@@ -823,16 +815,6 @@ export function App({
       }),
     [registeredExtensionCommands, resolvedCommandKeys, runExtensionCommand],
   );
-  // Commands may opt out of the Extensions menu while remaining available to
-  // keyboard help and their configured shortcut.
-  const extensionMenuCommands = useMemo(() => {
-    const visibleCommandIds = new Set(
-      registeredExtensionCommands
-        .filter((registered) => registered.command.showInMenu !== false)
-        .map((registered) => `${registered.extensionId}.${registered.command.id}`),
-    );
-    return extensionAppCommands.commands.filter((command) => visibleCommandIds.has(command.id));
-  }, [extensionAppCommands.commands, registeredExtensionCommands]);
   // Sidebar views receive the dispatcher’s effective keys, including command
   // conflicts, rather than independently resolving their default bindings.
   const sidebarKeybindings = useMemo(() => {
@@ -1712,7 +1694,7 @@ export function App({
   // hints and the checkbox state have to stay live.
   const menus = buildAppMenus({
     commands: appCommands,
-    extensionCommands: extensionMenuCommands,
+    extensionCommands: extensionAppCommands.commands,
     fileViewEntries: selectedFileViewEntries,
     copyDecorations,
     layoutMode,

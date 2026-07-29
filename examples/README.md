@@ -18,6 +18,11 @@ Each folder tells a small review story and includes the exact command to run fro
 | `8-opentui-primitives` | composing Hunk's OpenTUI primitives    | `bun run examples/8-opentui-primitives/primitives-demo.tsx`                                                                                          |
 | `9-agent-markup-notes` | STML markup rendered inside notes      | `hunk patch examples/9-agent-markup-notes/change.patch --agent-context examples/9-agent-markup-notes/agent-context.json`                             |
 
+## Installable extension examples
+
+- [`extensions/review-triage/`](extensions/review-triage/) adds a session-local hunk triage sidebar.
+- [`extensions/rendered-markdown/`](extensions/rendered-markdown/) adds an optional parsed Markdown file presentation. It is not bundled with Hunk; its README shows how to try or install it.
+
 ## Notes
 
 - The patch-based examples include checked-in `change.patch` files, so you can open them without creating a temporary repo.
