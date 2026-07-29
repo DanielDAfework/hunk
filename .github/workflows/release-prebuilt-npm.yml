@@ -191,6 +191,9 @@ jobs:
       - stage-release
     if: github.event_name == 'push' || inputs.publish == true
     environment: npm
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -206,6 +209,9 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      - name: Use npm with trusted publishing support
+        run: npm install -g npm@11.17.0
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -218,14 +224,7 @@ jobs:
       - name: Show staged packages
         run: find dist/release/npm -maxdepth 3 -type f | sort
 
-      - name: Verify npm auth
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm whoami
-
       - name: Publish packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: bun run publish:prebuilt:npm -- --tag "${{ github.event_name == 'workflow_dispatch' && inputs.npm_tag || ((contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc')) && 'beta' || 'latest') }}"
 
   create-github-release:
