@@ -106,16 +106,22 @@ test("community video cards read as paused embeds, not marketing tiles", async (
   await expect(page.locator(".vblurb")).toHaveCount(0);
 });
 
-test("feature cards deep-link into the matching documentation page", async ({ page }) => {
+test("the more-features list quick-hits the long tail with docs links", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("link", { name: /Watch mode/ })).toHaveAttribute(
+  const list = page.locator(".mfeats");
+  await expect(list.locator("a")).toHaveCount(6);
+  await expect(list.getByRole("link", { name: /Watch mode/ })).toHaveAttribute(
     "href",
     "/docs/workflows/watch-mode/",
   );
-  await expect(page.getByRole("link", { name: /Review with your agent/ })).toHaveAttribute(
+  await expect(list.getByRole("link", { name: /Extensions/ })).toHaveAttribute(
     "href",
-    "/docs/agents/review-with-an-agent/",
+    "/docs/extend/extensions/",
+  );
+  await expect(list.getByRole("link", { name: /Jujutsu & Sapling/ })).toHaveAttribute(
+    "href",
+    "/docs/workflows/jujutsu-and-sapling/",
   );
 });
 

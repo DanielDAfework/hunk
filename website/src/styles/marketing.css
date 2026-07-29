@@ -325,56 +325,57 @@ a:focus-visible {
   margin: 0;
 }
 
-.marketing .grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0;
-  border-top: 1.5px solid var(--ink);
-  border-left: 1.5px solid var(--ink);
-}
-
-.marketing .feat {
-  display: block;
-  padding: 22px 20px;
-  border-right: 1.5px solid var(--ink);
-  border-bottom: 1.5px solid var(--ink);
+/* The long tail as a boxed quick-hit list: same frame language as the
+   showcase media, made of text instead of pixels. */
+.marketing .mfeats {
+  padding: 22px 26px 24px;
+  border: 1.5px solid var(--ink);
+  border-radius: 10px;
   background: var(--paper);
-  color: inherit;
-  transition: 0.12s;
+  box-shadow: 6px 6px 0 var(--ink);
 }
 
-.marketing .feat:hover {
-  background: var(--hunk-paper-hover);
-}
-
-.marketing .feat .more {
-  display: block;
-  margin-top: 12px;
+.marketing .mf-kicker {
+  margin: 0 0 14px;
   color: var(--soft);
   font-size: 12px;
-  transition: 0.12s;
+  letter-spacing: 0.08em;
 }
 
-.marketing .feat:hover .more,
-.marketing .feat:focus-visible .more {
+.marketing .mf-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 48px;
+}
+
+.marketing .mf-grid a {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 2px 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.marketing .mf-grid a::before {
+  content: "+";
   color: var(--acc);
+  font-weight: 700;
 }
 
-.marketing .grid-duo {
-  grid-template-columns: repeat(2, 1fr);
+.marketing .mf-grid b {
+  color: var(--ink);
+  font-weight: 700;
+  white-space: nowrap;
 }
 
-.marketing .grid h3 {
-  margin: 0 0 7px;
-  font-size: 15.5px;
-  letter-spacing: -0.01em;
+.marketing .mf-grid span {
+  color: var(--soft);
 }
 
-.marketing .grid p {
-  margin: 0;
-  color: var(--hunk-body);
-  font-size: 13.5px;
-  line-height: 1.6;
+.marketing .mf-grid a:hover b,
+.marketing .mf-grid a:focus-visible b {
+  color: var(--acc);
 }
 
 /* Feature showcase: explainer reads first on the left, the real TUI capture
@@ -740,8 +741,7 @@ a:focus-visible {
 }
 
 @media (max-width: 760px) {
-  .marketing .grid,
-  .marketing .grid-duo,
+  .marketing .mf-grid,
   .marketing .vgrid {
     grid-template-columns: 1fr;
   }

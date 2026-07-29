@@ -4,6 +4,7 @@ import BrandHeader from "../components/BrandHeader.astro";
 import CommunityVideos from "../components/marketing/CommunityVideos.astro";
 import CopyCommand from "../components/marketing/CopyCommand.astro";
 import FeatureShowcase from "../components/marketing/FeatureShowcase.astro";
+import MoreFeatures from "../components/marketing/MoreFeatures.astro";
 import PlatformIcons from "../components/marketing/PlatformIcons.astro";
 import ThemeShot from "../components/marketing/ThemeShot.astro";
 import "../styles/marketing.css";
@@ -12,24 +13,6 @@ const REPO = "https://github.com/modem-dev/hunk";
 const title = "hunk — review-first terminal diff viewer";
 const description =
   "Hunk is a review-first terminal diff viewer for agent-authored changesets. Multi-file review stream, inline AI annotations, watch mode, and Git/Jujutsu integration.";
-
-/**
- * Compact cards for the features that don't get a showcase block: watch mode
- * has no visual that beats trying it, and agent-driven review sessions are a
- * workflow story the docs tell better than a clip could.
- */
-const features = [
-  [
-    "Watch mode",
-    "Auto-reloads as the working tree changes. Keep it open while your agent edits in another pane.",
-    "/docs/workflows/watch-mode/",
-  ],
-  [
-    "Review with your agent",
-    "Agents drive review sessions through hunk session commands and the bundled skill — your agent walks the diff with you.",
-    "/docs/agents/review-with-an-agent/",
-  ],
-] as const;
 
 let stars: number | null = null;
 try {
@@ -138,19 +121,7 @@ const formattedStars =
             Don't just <span class="mark-del">read</span> code, <span class="mark">understand</span> it.
           </h2>
           <FeatureShowcase />
-          <div class="grid grid-duo">
-            {
-              features.map(([heading, body, href]) => (
-                <a class="feat" href={href}>
-                  <h3>{heading}</h3>
-                  <p>{body}</p>
-                  <span class="more" aria-hidden="true">
-                    Read the docs →
-                  </span>
-                </a>
-              ))
-            }
-          </div>
+          <MoreFeatures />
         </section>
 
         <section class="install" id="install">
