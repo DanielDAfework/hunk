@@ -21,7 +21,11 @@ Each folder tells a small review story and includes the exact command to run fro
 ## Installable extension examples
 
 - [`extensions/review-triage/`](extensions/review-triage/) adds a session-local hunk triage sidebar.
-- [`extensions/rendered-markdown/`](extensions/rendered-markdown/) adds an optional parsed Markdown file presentation. It is not bundled with Hunk; its README shows how to try or install it.
+- [`extensions/rendered-markdown/`](extensions/rendered-markdown/) adds an optional parsed Markdown file presentation.
+- [`extensions/jsx-file-view/`](extensions/jsx-file-view/) is the smallest hook-using fixed-row JSX proof of concept.
+- [`extensions/jsx-file-view-gallery/`](extensions/jsx-file-view-gallery/) runs three constrained-JSX presentations against checked-in TypeScript, CSS, and `package.json` diffs: an impact atlas, real color swatches, and highlighted dependency versions.
+
+Extension examples are not bundled with Hunk. Each README shows how to try or install its folder explicitly.
 
 ## Notes
 

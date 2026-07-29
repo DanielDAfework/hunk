@@ -10,6 +10,11 @@ const RENDERED_MARKDOWN_EXTENSION = join(
   "../../examples/extensions/rendered-markdown",
 );
 const JSX_FILE_VIEW_EXTENSION = join(import.meta.dir, "../../examples/extensions/jsx-file-view");
+const JSX_FILE_VIEW_GALLERY = join(
+  import.meta.dir,
+  "../../examples/extensions/jsx-file-view-gallery",
+);
+const JSX_MIXED_REVIEW_LAUNCHER = join(JSX_FILE_VIEW_GALLERY, "mixed-review/run.ts");
 setDefaultTimeout(30_000);
 
 afterEach(() => {
@@ -101,6 +106,117 @@ describe("PTY file views", () => {
     } finally {
       session.close();
       rmSync(pair.directory, { recursive: true, force: true });
+    }
+  });
+
+  for (const demo of [
+    {
+      name: "change atlas",
+      before: join(JSX_FILE_VIEW_GALLERY, "fixtures/change-atlas/before.ts"),
+      after: join(JSX_FILE_VIEW_GALLERY, "fixtures/change-atlas/after.ts"),
+      view: /File presentation: JSX demo: Change atlas/,
+      first: /▶ CHANGE 01/,
+      second: /▶ CHANGE 02/,
+      raw: /const percent = Math\.min/,
+    },
+    {
+      name: "CSS palette delta",
+      before: join(JSX_FILE_VIEW_GALLERY, "fixtures/css-palette/before.css"),
+      after: join(JSX_FILE_VIEW_GALLERY, "fixtures/css-palette/after.css"),
+      view: /File presentation: JSX demo: CSS palette delta/,
+      first: /▶ --accent/,
+      second: /▶ --card-highlight/,
+      raw: /--canvas: #090d18/,
+    },
+    {
+      name: "dependency delta",
+      before: join(JSX_FILE_VIEW_GALLERY, "fixtures/package-dependencies/before/package.json"),
+      after: join(JSX_FILE_VIEW_GALLERY, "fixtures/package-dependencies/after/package.json"),
+      view: /File presentation: JSX demo: Dependency delta/,
+      first: /▶ Package metadata hunk 1/,
+      second: /▶\s+@opentui\/core/,
+      raw: /"@opentui\/core": "0\.4\.3"/,
+    },
+  ]) {
+    test(`runs the checked-in JSX ${demo.name} against a real diff`, async () => {
+      const session = await harness.launchHunk({
+        args: [
+          "diff",
+          "--extension",
+          JSX_FILE_VIEW_GALLERY,
+          "--mode",
+          "stack",
+          demo.before,
+          demo.after,
+        ],
+        cwd: JSX_FILE_VIEW_GALLERY,
+        cols: 140,
+        rows: 24,
+      });
+
+      try {
+        await session.waitForText(/before\.|package\.json/, { timeout: 20_000 });
+        await harness.ensureKeyboardIsLive(session);
+        await session.click(/View/);
+        await session.waitForText(demo.view, { timeout: 20_000 });
+        await session.press("escape");
+        await session.press("f8");
+        await session.waitForText(demo.first, { timeout: 20_000 });
+        await session.press("]");
+        await session.waitForText(demo.second, { timeout: 20_000 });
+        await session.click(/View/);
+        await session.waitForText(/File presentation: Raw diff/, { timeout: 20_000 });
+        await session.click(/File presentation: Raw diff/);
+        await session.waitForText(demo.raw, { timeout: 20_000 });
+      } finally {
+        session.close();
+      }
+    });
+  }
+
+  test("retains three preview types between raw diffs in one scrollable review stream", async () => {
+    const session = await harness.launchShellCommand({
+      command: `${JSON.stringify(process.execPath)} run ${JSON.stringify(JSX_MIXED_REVIEW_LAUNCHER)}`,
+      cols: 220,
+      rows: 24,
+    });
+
+    try {
+      await session.waitForText(/README\.md/, { timeout: 20_000 });
+      await harness.ensureKeyboardIsLive(session);
+
+      await session.click(/package\.json/, { first: true });
+      await session.press("f8");
+      await session.waitForText(/Package metadata hunk 1/, { timeout: 20_000 });
+
+      await session.click(/invoice\.ts/, { first: true });
+      await session.press("f8");
+      await session.waitForText(/CHANGE 01/, { timeout: 20_000 });
+
+      await session.click(/theme\.css/, { first: true });
+      await session.press("f8");
+      await session.waitForText(/--accent/, { timeout: 20_000 });
+
+      await session.click(/package\.json/, { first: true });
+      await session.waitForText(/@opentui\/core/, { timeout: 20_000 });
+      await session.click(/README\.md/, { first: true });
+      await session.waitForText(/understanding release changes/, { timeout: 20_000 });
+      let reachedRetainedPreview = false;
+      for (let step = 0; step < 10 && !reachedRetainedPreview; step += 1) {
+        await session.scrollDown(8);
+        try {
+          await session.waitForText(/Package metadata hunk 1/, { timeout: 750 });
+          reachedRetainedPreview = true;
+        } catch {
+          // Continue through the intentionally tall raw README until the retained preview appears.
+        }
+      }
+      expect(reachedRetainedPreview).toBe(true);
+
+      await session.press("q");
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    } finally {
+      session.close();
     }
   });
 
