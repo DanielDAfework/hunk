@@ -20,4 +20,4 @@ This worktree experiments with one constrained escape hatch in the symbolic file
 - **Clipping is not a security boundary.** Host-served runtime modules may expose capabilities outside normal row composition, but file views make no promise that portals, renderer access, focus, or input hooks work. A malicious or careless extension can still affect its trusted process. The POC proves geometry preservation for cooperative components, not enforceable containment of arbitrary code.
 - Cooperative custom rows cannot replace the file section, control outer flex layout, request post-mount geometry changes, or bypass the host's raw fallback and resource validation through normal descendant rendering.
 
-See `examples/extensions/jsx-file-view/` for an opt-in hook-using, multi-hunk example.
+See `examples/extensions/jsx-file-view/` for the smallest opt-in hook-using example. The checked-in `examples/extensions/jsx-file-view-gallery/` adds three real-diff demos: a responsive TypeScript change atlas, exact-source CSS color swatches, and semantic `package.json` version highlights.

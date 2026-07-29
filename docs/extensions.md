@@ -723,7 +723,9 @@ paint surfaces: registered commands are their supported keyboard path. A
 cooperatively delivered, handled left-button mouse-up may act and stop
 propagation, while wheel, drag, and unhandled input remain host-owned. Hunk
 makes no portal, renderer, focus, or input-delivery guarantee; see the linked
-JSX POC for state lifetime, clipping, and error boundaries.
+JSX POC for state lifetime, clipping, and error boundaries. The opt-in
+[`jsx-file-view-gallery`](../examples/extensions/jsx-file-view-gallery/) runs
+fixed JSX rows against checked-in TypeScript, CSS, and package dependency diffs.
 
 A command handler can control the selected file's view through
 `ctx.fileViews.select("view-id")`, `toggle("view-id")`, and
