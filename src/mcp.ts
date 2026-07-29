@@ -183,8 +183,8 @@ export function buildServer(manager: SessionManager): McpServer {
   const queryShape = {
     job_id: z.string().describe("Job id from run()"),
     mode: z
-      .enum(["head", "tail", "slice", "grep", "full", "delta"])
-      .describe("How to read: head/tail (n lines), slice (line range), grep (regex search), full (entire output, budget-gated), delta (new lines since since_line)"),
+      .enum(["head", "tail", "slice", "grep", "full", "delta", "screen"])
+      .describe("How to read: head/tail (n lines), slice (line range), grep (regex search), full (entire output, budget-gated), delta (new lines since since_line), screen (rendered terminal viewport — TUI jobs only)"),
     lines: z.number().int().min(1).optional().describe("head/tail: number of lines"),
     start: z.number().int().min(1).optional().describe("slice: first line (1-indexed, inclusive)"),
     end: z.number().int().min(1).optional().describe("slice: last line (1-indexed, inclusive)"),
@@ -213,6 +213,9 @@ export function buildServer(manager: SessionManager): McpServer {
       try {
         const { job, session } = manager.getJob(args.job_id);
         const q = parseQuery(args);
+        if (q.mode === "screen") {
+          return jsonResult(await job.output.queryScreen(job.id, job.state));
+        }
         return jsonResult(job.output.query(job.id, job.state, q));
       } catch (e) {
         return errorResult(e);
@@ -314,7 +317,9 @@ export function parseQuery(args: {
       if (args.since_line === undefined)
         throw new QueryError(`mode "delta" requires "since_line" (use 0 for "from the beginning"; then pass back last_line from each response).`);
       return { mode: "delta", since_line: args.since_line };
+    case "screen":
+      return { mode: "screen" };
     default:
-      throw new QueryError(`unknown mode "${args.mode}". Valid: head, tail, slice, grep, full, delta.`);
+      throw new QueryError(`unknown mode "${args.mode}". Valid: head, tail, slice, grep, full, delta, screen.`);
   }
 }

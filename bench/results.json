@@ -3,9 +3,9 @@
     "scenario": "npm-install",
     "task": "did it succeed; list warnings",
     "exit_code": 0,
-    "raw_bytes": 877,
-    "naive_raw_tokens": 220,
-    "naive_stripped_tokens": 74,
+    "raw_bytes": 842,
+    "naive_raw_tokens": 211,
+    "naive_stripped_tokens": 73,
     "normalized_full_tokens": 59,
     "digest_tokens": 144,
     "query_tokens": 53,
@@ -31,72 +31,70 @@
       }
     },
     "notes": [
-      "[progress output collapsed: 50 line updates]"
+      "[progress output collapsed: 46 line updates]"
     ]
   },
   {
     "scenario": "pip-install",
     "task": "did it succeed; list warnings",
-    "exit_code": 0,
-    "raw_bytes": 5520,
-    "naive_raw_tokens": 1380,
-    "naive_stripped_tokens": 1119,
-    "normalized_full_tokens": 509,
-    "digest_tokens": 606,
-    "query_tokens": 54,
-    "digest_flow_tokens": 660,
-    "savings_vs_naive_raw": 2.1,
-    "savings_vs_naive_stripped": 1.7,
+    "exit_code": 2,
+    "raw_bytes": 7593,
+    "naive_raw_tokens": 1899,
+    "naive_stripped_tokens": 1859,
+    "normalized_full_tokens": 1832,
+    "digest_tokens": 622,
+    "query_tokens": 183,
+    "digest_flow_tokens": 805,
+    "savings_vs_naive_raw": 2.4,
+    "savings_vs_naive_stripped": 2.3,
     "queries": [
       "{\"mode\":\"grep\",\"pattern\":\"[Ww]arn|WARN|[Ee]rror\",\"context\":0,\"max_matches\":10}"
     ],
-    "task_answer_preview": " [total_matches=0]",
+    "task_answer_preview": "5:  File \"/tmp/agent-term-bench/venv/lib/python3.11/site-packages/pip/_vendor/urllib3/response.py\", line 438, in _error_catcher / -- / 25:TimeoutError: The read operation timed out [total_matches=6]",
     "digest_size_study": {
       "10+20": {
-        "tokens": 241,
+        "tokens": 622,
         "satisfies_task": false
       },
       "15+30": {
-        "tokens": 331,
+        "tokens": 883,
         "satisfies_task": false
       },
       "25+50": {
-        "tokens": 521,
+        "tokens": 1425,
         "satisfies_task": false
       }
     },
-    "notes": [
-      "[progress output collapsed: 12 line updates]"
-    ]
+    "notes": []
   },
   {
     "scenario": "tsc-200-errors",
     "task": "how many errors; show first 3",
     "exit_code": 2,
-    "raw_bytes": 43220,
-    "naive_raw_tokens": 10805,
+    "raw_bytes": 43221,
+    "naive_raw_tokens": 10806,
     "naive_stripped_tokens": 7303,
     "normalized_full_tokens": 7052,
-    "digest_tokens": 278,
+    "digest_tokens": 279,
     "query_tokens": 126,
-    "digest_flow_tokens": 404,
+    "digest_flow_tokens": 405,
     "savings_vs_naive_raw": 26.7,
-    "savings_vs_naive_stripped": 18.1,
+    "savings_vs_naive_stripped": 18,
     "queries": [
       "{\"mode\":\"grep\",\"pattern\":\"error TS\",\"context\":0,\"max_matches\":3}"
     ],
     "task_answer_preview": "1:errors.ts:1:7 - error TS2322: Type 'string' is not assignable to type 'number'. / -- / 6:errors.ts:2:7 - error TS2322: Type 'string' is not assignable to type 'number'. [total_matches=200]",
     "digest_size_study": {
       "10+20": {
-        "tokens": 278,
+        "tokens": 279,
         "satisfies_task": false
       },
       "15+30": {
-        "tokens": 392,
+        "tokens": 393,
         "satisfies_task": false
       },
       "25+50": {
-        "tokens": 620,
+        "tokens": 621,
         "satisfies_task": false
       }
     },
@@ -106,9 +104,9 @@
     "scenario": "git-log-10k",
     "task": "show the 15 most recent commits",
     "exit_code": 0,
-    "raw_bytes": 487885,
-    "naive_raw_tokens": 121972,
-    "naive_stripped_tokens": 121967,
+    "raw_bytes": 487856,
+    "naive_raw_tokens": 121964,
+    "naive_stripped_tokens": 121964,
     "normalized_full_tokens": 119464,
     "digest_tokens": 415,
     "query_tokens": 228,
@@ -139,8 +137,8 @@
     "scenario": "dev-server",
     "task": "did it bind to a port (job never exits)",
     "exit_code": null,
-    "raw_bytes": 756,
-    "naive_raw_tokens": 189,
+    "raw_bytes": 757,
+    "naive_raw_tokens": 190,
     "naive_stripped_tokens": 189,
     "normalized_full_tokens": 182,
     "digest_tokens": 259,
@@ -151,7 +149,7 @@
     "queries": [
       "{\"mode\":\"grep\",\"pattern\":\"Listening on\",\"context\":0,\"max_matches\":1}"
     ],
-    "task_answer_preview": "4:Listening on http://localhost:35597 [total_matches=1]",
+    "task_answer_preview": "4:Listening on http://localhost:41707 [total_matches=1]",
     "digest_size_study": {
       "10+20": {
         "tokens": 133,
@@ -176,8 +174,8 @@
     "scenario": "find-conf",
     "task": "locate resolv.conf among all *.conf files",
     "exit_code": 0,
-    "raw_bytes": 14700,
-    "naive_raw_tokens": 3675,
+    "raw_bytes": 14701,
+    "naive_raw_tokens": 3676,
     "naive_stripped_tokens": 3675,
     "normalized_full_tokens": 3589,
     "digest_tokens": 439,

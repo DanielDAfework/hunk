@@ -5,6 +5,7 @@
  */
 
 import { StreamNormalizer } from "./normalize";
+import { ScreenRenderer, ALT_SCREEN_ENTER_RE } from "./screen";
 import { estimateTokens, estimateTokensLines } from "./tokens";
 import type { OutputQuery, QueryResult, JobState } from "./types";
 
@@ -16,12 +17,61 @@ export class QueryError extends Error {}
 
 export class JobOutput {
   private normalizer = new StreamNormalizer();
+  /** Lazily created the first time the job enters the alternate screen. */
+  private renderer: ScreenRenderer | null = null;
+  private cols: number;
+  private rows: number;
   /** Byte offsets of this job's output inside the session raw log. */
   rawStart = 0;
   rawEnd = 0;
 
+  constructor(cols = 100, rows = 30) {
+    this.cols = cols;
+    this.rows = rows;
+  }
+
   feed(data: string): void {
     this.normalizer.feed(data);
+    // TUI detected: from here on, mirror the raw stream into a headless
+    // terminal so {mode:"screen"} can render the real viewport.
+    if (!this.renderer && ALT_SCREEN_ENTER_RE.test(data)) {
+      this.renderer = new ScreenRenderer(this.cols, this.rows);
+    }
+    this.renderer?.write(data);
+  }
+
+  get hasScreen(): boolean {
+    return this.renderer !== null;
+  }
+
+  /**
+   * Render the current terminal viewport (TUI jobs only). Async because
+   * xterm parses writes asynchronously and we must flush first.
+   */
+  async queryScreen(jobId: string, state: JobState): Promise<QueryResult> {
+    if (!this.renderer) {
+      throw new QueryError(
+        `job ${jobId} never entered the alternate screen, so there is no screen to render. ` +
+          `{mode:"screen"} is for full-screen TUI programs (less, vim, htop); ` +
+          `for ordinary scrollback output use tail, slice, or grep.`,
+      );
+    }
+    await this.renderer.flush();
+    const lines = this.renderer.renderLines();
+    const text = lines.join("\n");
+    const returned = estimateTokens(text);
+    return {
+      job_id: jobId,
+      state,
+      mode: "screen",
+      text,
+      total_lines: lines.length,
+      returned_estimated_tokens: returned,
+      remaining_estimated_tokens: 0,
+      notes: [
+        `[rendered ${this.renderer.cols}x${this.renderer.rows} terminal viewport via headless emulation; this is what a human sees right now]`,
+      ],
+    };
   }
 
   get bytes(): number {
@@ -45,12 +95,16 @@ export class JobOutput {
       head = lines.slice(0, DIGEST_HEAD_LINES);
       tail = lines.slice(-DIGEST_TAIL_LINES);
     }
+    const notes = [...snap.notes];
+    if (snap.tuiMode && this.renderer) {
+      notes.push('[read_output {mode:"screen"} returns the faithfully rendered current screen]');
+    }
     return {
       head,
       tail,
       lineCount: lines.length,
       tokens: estimateTokensLines(lines),
-      notes: snap.notes,
+      notes,
       tuiMode: snap.tuiMode,
     };
   }
@@ -159,6 +213,10 @@ export class JobOutput {
         }
         return finish(lines, { range: rangeOf(1, lines.length) });
       }
+      case "screen":
+        // Screen rendering must flush the async emulator; the tool layer
+        // routes it to queryScreen(). Reaching here is an internal misroute.
+        throw new QueryError(`screen mode is handled by queryScreen(); this is a daemon bug.`);
       case "delta": {
         if (q.since_line < 0) {
           throw new QueryError(`delta needs since_line >= 0 (0 means "from the beginning").`);

@@ -79,7 +79,11 @@ export class Session {
   private promptReady = false;
   private rawFd: number;
   private rawBytes = 0;
+  /** Byte position in the raw stream of the next unconsumed parser event. */
+  private parseCursor = 0;
   private quietMs: number;
+  private cols: number;
+  private rows: number;
   private pollTimer: ReturnType<typeof setInterval>;
   private detectorBusy = false;
   private waiters = new Set<() => void>();
@@ -90,6 +94,8 @@ export class Session {
     this.shell = opts.shell;
     this.cwd = opts.cwd;
     this.quietMs = opts.quietMs ?? 1500;
+    this.cols = opts.cols ?? 100;
+    this.rows = opts.rows ?? 30;
 
     const sessionDir = path.join(opts.runtimeDir, "sessions", this.id);
     fs.mkdirSync(sessionDir, { recursive: true });
@@ -99,16 +105,20 @@ export class Session {
     const launch = prepareShell(opts.shell, sessionDir);
     this.pty = spawn(launch.file, launch.args, {
       name: "xterm-256color",
-      cols: opts.cols ?? 100,
-      rows: opts.rows ?? 30,
+      cols: this.cols,
+      rows: this.rows,
       cwd: opts.cwd,
       env: {
         ...(process.env as Record<string, string>),
         ...launch.env,
         ...(opts.env ?? {}),
         AGENT_TERM: "1",
+        // bun-pty's `name` option does NOT set TERM (node-pty does); without
+        // this, a container's TERM=linux leaks in and terminfo without
+        // smcup/rmcup makes pagers skip the alternate screen entirely.
+        TERM: "xterm-256color",
         // Sane defaults for agent consumption: no pagers-in-pagers, stable width.
-        COLUMNS: String(opts.cols ?? 100),
+        COLUMNS: String(this.cols),
       },
     });
     this.pty.onData((d) => this.onData(d));
@@ -146,7 +156,7 @@ export class Session {
       queuedAt: Date.now(),
       startedAt: null,
       endedAt: null,
-      output: new JobOutput(),
+      output: new JobOutput(this.cols, this.rows),
       lastOutputAt: Date.now(),
       killRequested: null,
       notes: [],
@@ -294,11 +304,12 @@ export class Session {
     this.rawBytes += buf.length;
 
     for (const ev of this.parser.feed(chunk)) {
+      const evBytes = Buffer.byteLength(ev.kind === "data" ? ev.data : ev.raw, "utf8");
       if (ev.kind === "data") {
         const job = this.activeJob;
         if (job && !this.awaitingStart) {
           job.output.feed(ev.data);
-          job.output.rawEnd = this.rawBytes;
+          job.output.rawEnd = this.parseCursor + evBytes;
           job.lastOutputAt = Date.now();
           if (job.state === "awaiting-input") {
             // Output resumed on its own — the heuristic was wrong or the
@@ -310,6 +321,7 @@ export class Session {
           // Prompt paint / command echo / between-jobs background noise.
           this.orphanOutput.feed(ev.data);
         }
+        this.parseCursor += evBytes;
         continue;
       }
       const m = ev.marker;
@@ -319,7 +331,9 @@ export class Session {
           this.awaitingStart = false;
           job.state = "running";
           job.startedAt = Date.now();
-          job.output.rawStart = this.rawBytes;
+          // Output begins right after the C marker's own bytes.
+          job.output.rawStart = this.parseCursor + evBytes;
+          job.output.rawEnd = job.output.rawStart;
           job.lastOutputAt = Date.now();
         }
       } else if (m.type === "D") {
@@ -349,6 +363,7 @@ export class Session {
         this.promptReady = true;
         this.pump();
       }
+      this.parseCursor += evBytes;
     }
     // A marker can complete a job while another sits queued and no further
     // data arrives; make sure the queue advances.

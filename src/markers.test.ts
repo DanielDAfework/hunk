@@ -11,17 +11,17 @@ describe("Osc133Parser", () => {
     const evs = p.feed(`prompt$ ${C}output line\n${D(0)}${A}`);
     expect(evs).toEqual([
       { kind: "data", data: "prompt$ " },
-      { kind: "marker", marker: { type: "C" } },
+      { kind: "marker", marker: { type: "C" }, raw: C },
       { kind: "data", data: "output line\n" },
-      { kind: "marker", marker: { type: "D", exitCode: 0 } },
-      { kind: "marker", marker: { type: "A" } },
+      { kind: "marker", marker: { type: "D", exitCode: 0 }, raw: D(0) },
+      { kind: "marker", marker: { type: "A" }, raw: A },
     ]);
   });
 
   test("parses exit codes, including multi-digit", () => {
     const p = new Osc133Parser();
     const evs = p.feed(D(143));
-    expect(evs).toEqual([{ kind: "marker", marker: { type: "D", exitCode: 143 } }]);
+    expect(evs).toEqual([{ kind: "marker", marker: { type: "D", exitCode: 143 }, raw: D(143) }]);
   });
 
   test("marker split across chunks is reassembled", () => {
@@ -35,7 +35,7 @@ describe("Osc133Parser", () => {
         .filter((e) => e.kind === "data")
         .map((e) => (e as { data: string }).data)
         .join("");
-      expect(markers).toEqual([{ kind: "marker", marker: { type: "D", exitCode: 7 } }]);
+      expect(markers).toEqual([{ kind: "marker", marker: { type: "D", exitCode: 7 }, raw: D(7) }]);
       expect(data).toBe("beforeafter");
     }
     expect(p).toBeDefined();
@@ -45,7 +45,7 @@ describe("Osc133Parser", () => {
     const p = new Osc133Parser();
     const evs = p.feed("\x1b]133;A\x1b\\rest");
     expect(evs).toEqual([
-      { kind: "marker", marker: { type: "A" } },
+      { kind: "marker", marker: { type: "A" }, raw: "\x1b]133;A\x1b\\" },
       { kind: "data", data: "rest" },
     ]);
   });

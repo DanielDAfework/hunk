@@ -132,8 +132,8 @@ Three baselines per scenario:
 
 | scenario | task | naive_raw | naive_stripped | digest_flow | savings vs raw |
 | --- | --- | ---: | ---: | ---: | ---: |
-| npm install (cold cache, 143 pkgs) | succeeded? warnings? | 220 | 74 | 197 | **1.1x** |
-| pip install (numpy+requests, cold) | succeeded? warnings? | 1,380 | 1,119 | 660 | **2.1x** |
+| npm install (cold cache, 143 pkgs) | succeeded? warnings? | 211 | 73 | 197 | **1.1x** |
+| pip install (numpy+requests, cold) | succeeded? warnings? | 1,899 | 1,859 | 805 | **2.4x** |
 | tsc, 200 type errors | error count + first 3 | 10,805 | 7,303 | 404 | **26.7x** |
 | git log --oneline, 10k commits | 15 most recent commits | 121,972 | 121,967 | 643 | **189.7x** |
 | dev server (never exits) | did it bind to a port? | 189* | 189* | 311 | 0.6x* |
@@ -156,7 +156,7 @@ Raw data: `bench/results.json`; reproduce with `bun run bench`.
   collapse), but there is simply nothing big to save. (This benchmark also
   exposed that our normalizer initially treated only `\r` as a redraw;
   npm's `ESC[1G` column-reset idiom is now handled equivalently.)
-- **pip lands at 2.1x** for a different reason worth stating plainly: for
+- **pip lands at 2.4x** for a different reason worth stating plainly: for
   small-to-medium outputs (~500 normalized tokens), the digest's fixed
   30-line head/tail preview is a large fraction of the whole output, so the
   flow cost approaches the output cost. The digest's value in that regime is
@@ -258,10 +258,58 @@ next `since_line`.
 ### 3.4 Loose ends worth carrying forward
 
 - zsh integration is written but unverified (no zsh in the container).
-- The alt-screen "final frame" is a frame-boundary approximation, not a
-  terminal-emulation snapshot; `tui_mode: true` plus the raw log is the
-  contract.
+- For scrollback text, the normalizer's frame-boundary approximation stands;
+  for true screens, `read_output {mode:"screen"}` (added post-teardown, see
+  3.5) renders the viewport through a headless terminal emulator.
 - `attach` is a read-only tail of the raw log; a real mirror plane wants
   follow-mode with terminal size sync.
 - Token estimates are chars/4 everywhere; swapping in a real tokenizer only
   changes the constants, not the ratios.
+
+## Post-eval: competitive teardown vs Forge (July 2026)
+
+The Phase 1 survey under-counted the field. The closest competitor is
+**Forge** (`forge-terminal-mcp` v0.9.0, MIT, node-pty, ~23 tools): persistent
+PTY sessions, ring-buffer incremental reads with per-consumer cursors,
+headless-xterm `read_screen`, `wait_for` pattern/exit watching, event push
+via MCP logging, sub-agent orchestration (`spawn_claude` with worktrees and
+budgets), and a live web dashboard. Also nearby: pilotty (Rust PTY daemon
+for driving TUIs, screen snapshots, no MCP/job layer) and a long tail of
+exec-style shell servers.
+
+What the teardown established, tool by tool:
+
+- **Forge has no job model.** Its two completion mechanisms are `run_command`
+  — blocking, 5-minute cap, "returns all output", i.e. exactly the naive
+  baseline this benchmark measures against — and `wait_for` with a **regex
+  pattern** (its dev-server templates literally wait for the string
+  `"Ready"`), the fragile prompt-matching OSC 133 exists to replace. In a
+  persistent Forge terminal there is no way to ask "what was the exit code
+  of the command I just ran." The job abstraction (async handle, exact exit
+  code, scoped output, digest) remains this prototype's core differentiation
+  and it is architectural, not a missing feature.
+- **No awaiting-input detection anywhere in the field.** Forge agents must
+  notice silence themselves and guess with `read_screen`. The measured
+  blocked-read(2)/termios/pattern detector has no competitor.
+- **No token accounting in the field.** Forge's ring buffer (1 MB default)
+  *drops* wrapped output (`droppedBytes`); this prototype's raw log is
+  unbounded and lossless, and every read reports returned/remaining tokens
+  with budget-gated full reads.
+- **Where Forge is ahead, adopted or noted:** its `@xterm/headless` screen
+  rendering was the right call and has been adopted here as
+  `read_output {mode:"screen"}` (lazily instantiated when a job enters the
+  alternate screen; ~one dependency). Still theirs: event push
+  (`subscribe_events` over MCP logging beats polling), the orchestration
+  layer, and a real human-mirror dashboard where our `attach` is a stub.
+- Integrating the renderer surfaced two latent bugs worth recording:
+  bun-pty's `name` option does **not** set `TERM` (node-pty does), so the
+  container's `TERM=linux` leaked in and — lacking smcup/rmcup — silently
+  disabled the alternate screen for pagers; and job raw-log offsets were
+  stamped per-chunk instead of per-parser-event, overshooting `rawStart`.
+  Both fixed, both now covered by tests.
+
+Positioning conclusion: Forge built the infrastructure and polish on a
+stream-and-screen abstraction; this prototype built the interface semantics
+(jobs, exit codes, digests, budgets, awaiting-input) that no one in the field
+has. The two are complementary, and the semantics are the durable, portable
+part.

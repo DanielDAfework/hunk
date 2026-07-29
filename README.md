@@ -1,9 +1,17 @@
 # agent-term
 
-A prototype **agent-native terminal**: a PTY supervisor daemon exposed as an
-MCP server. Real PTYs underneath — programs behave exactly as they do for
-humans — but agents never touch the raw stream. They get sessions, async
-jobs with exit codes, and a token-budgeted queryable output store.
+**Give your agent a terminal it can't drown in.** agent-term is a PTY
+supervisor daemon exposed as an MCP server: every command becomes an async
+job with an exact exit code, output arrives as a ~30-line digest you query
+instead of a firehose you paste, and "this program is waiting for input" is
+a detected state instead of a hung session. Real PTYs underneath — programs
+behave exactly as they do for humans — but agents never touch the raw
+stream.
+
+Measured on real workloads: 27–190x fewer tokens than full-output capture on
+error-heavy builds and long logs, and a prompt detector at 1.00 precision /
+1.00 recall on 12 live cases (sudo-class passwords, git credentials, pagers,
+apt confirmations).
 
 See [FINDINGS.md](./FINDINGS.md) for the investigation, eval results, and
 answers to the design's open questions.
@@ -46,10 +54,13 @@ MCP client (agent)
   regex matching.
 - **Output store**: agents get a digest (exit code, duration, sizes,
   estimated tokens, first 10 + last 20 lines) and then query: head / tail /
-  slice / grep / full (budget-gated) / delta. Every response reports the
-  estimated tokens returned *and* remaining. Normalization strips ANSI,
-  collapses progress-bar redraws (final frame + count), flags alternate-screen
-  TUI output — and the raw byte stream is always on disk for recovery.
+  slice / grep / full (budget-gated) / delta / screen. Every response reports
+  the estimated tokens returned *and* remaining. Normalization strips ANSI,
+  collapses progress-bar redraws (final frame + count), flags
+  alternate-screen TUI output — and the raw byte stream is always on disk
+  for recovery. For full-screen programs, `{mode:"screen"}` renders the live
+  viewport through a headless terminal emulator (`@xterm/headless`), exactly
+  what a human would see.
 - **Awaiting-input**: quiet jobs are probed — is a foreground process blocked
   in `read(2)` on the tty? did termios switch to echo-off/raw? does the
   trailing line look like a prompt? Suspected prompts flip the job to
@@ -67,7 +78,7 @@ MCP client (agent)
 | `run(session_id, command)` | start an async job, returns `job_id` immediately |
 | `job_status(job_id)` | state + output digest |
 | `wait(job_id, timeout_ms, since_line?)` | block until exit/awaiting-input/timeout; optional output delta |
-| `read_output(job_id, mode, ...)` | head / tail / slice / grep / full / delta |
+| `read_output(job_id, mode, ...)` | head / tail / slice / grep / full / delta / screen |
 | `send_input(session_id, text, end_with_newline?)` | answer prompts |
 | `job_kill(job_id, signal?)` | signal the job's foreground process group |
 
@@ -103,6 +114,7 @@ src/
   session.ts           PTY session, job queue, lifecycle, raw log
   markers.ts           streaming OSC 133 parser
   normalize.ts         ANSI strip, CR/cursor-redraw collapse, TUI detection
+  screen.ts            headless-xterm viewport rendering for TUI jobs
   store.ts             per-job output store, digest + query modes
   detector.ts          awaiting-input heuristics
   procfs.ts            /proc + termios helpers for the detector
@@ -118,7 +130,7 @@ test/                  integration tests + detector eval
 - Prototype. bash is fully exercised; the zsh integration path is written but
   unverified (no zsh in the dev container).
 - Linux-specific detector internals (`/proc`, `stty`); the rest is portable.
-- The alternate-screen "final frame" is an approximation (frame boundaries at
-  clear/home), not a real terminal-emulation snapshot; the raw log is the
-  fidelity fallback.
+- In scrollback text, alt-screen content is a frame-boundary approximation;
+  use `read_output {mode:"screen"}` for a faithful emulator-rendered
+  viewport, or the raw log for bytes.
 - `attach` is read-only and poll-based by design (v1 stub).

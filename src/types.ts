@@ -47,7 +47,8 @@ export type OutputQuery =
   | { mode: "slice"; start: number; end: number }
   | { mode: "grep"; pattern: string; context?: number; max_matches?: number }
   | { mode: "full"; confirm_tokens: number }
-  | { mode: "delta"; since_line: number };
+  | { mode: "delta"; since_line: number }
+  | { mode: "screen" };
 
 /** Every read_output response carries token accounting for what was and wasn't returned. */
 export interface QueryResult {

@@ -129,6 +129,24 @@ describe("session + job lifecycle", () => {
     expect(d.notes.join(" ")).toContain("collapsed");
   });
 
+  test("TUI job: screen mode renders what a human sees in less", async () => {
+    const s = await manager.createSession({ name: "tui-screen", shell: "/bin/bash" });
+    const setup = manager.run(s.id, "seq 1 2000 | sed 's/^/row /' > screen-big.txt");
+    await s.wait(setup, 5000);
+    const job = manager.run(s.id, "less screen-big.txt");
+    await s.wait(job, 6000); // flips to awaiting-input (pager reading keys)
+    expect(job.state).toBe("awaiting-input");
+    const screen = await job.output.queryScreen(job.id, job.state);
+    // The rendered viewport shows the top of the file, positionally.
+    expect(screen.text.split("\n")[0]).toBe("row 1");
+    expect(screen.text).toContain("row 20");
+    // Quit the pager; job exits normally.
+    s.sendInput("q", false);
+    await s.wait(job, 6000);
+    expect(job.state).toBe("exited");
+    expect(s.digest(job).tui_mode).toBe(true);
+  });
+
   test("session_kill marks active jobs and refuses further runs", async () => {
     const s = await manager.createSession({ name: "doomed", shell: "/bin/bash" });
     const job = manager.run(s.id, "sleep 30");

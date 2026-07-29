@@ -21,7 +21,8 @@ export type Marker =
 
 export type ParseEvent =
   | { kind: "data"; data: string }
-  | { kind: "marker"; marker: Marker };
+  /** `raw` is the marker's exact byte text, so consumers can track stream offsets. */
+  | { kind: "marker"; marker: Marker; raw: string };
 
 const MARKER_RE = /\x1b\]133;([ABCD])(?:;([^\x07\x1b]*))?(?:\x07|\x1b\\)/;
 
@@ -55,9 +56,9 @@ export class Osc133Parser {
       if (letter === "D") {
         const arg = m[2];
         const code = arg !== undefined && /^\d+$/.test(arg) ? Number(arg) : null;
-        events.push({ kind: "marker", marker: { type: "D", exitCode: code } });
+        events.push({ kind: "marker", marker: { type: "D", exitCode: code }, raw: m[0] });
       } else {
-        events.push({ kind: "marker", marker: { type: letter } });
+        events.push({ kind: "marker", marker: { type: letter }, raw: m[0] });
       }
       buf = buf.slice(m.index + m[0].length);
     }
