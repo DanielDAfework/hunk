@@ -289,8 +289,8 @@ describe("PTY file views", () => {
     try {
       await session.waitForText(/before\.md/, { timeout: 20_000 });
       await session.press("f8");
-      const preview = await session.waitForText(/Review the new item\./);
-      expect(preview).toContain("• new item");
+      const preview = await session.waitForText(/• new item/);
+      expect(preview).toContain("Review the new item.");
       expect(preview).not.toContain("old item");
       await session.click(/View/);
       const menu = await session.waitForText(/\[x\] File presentation: Rendered Markdown/);
