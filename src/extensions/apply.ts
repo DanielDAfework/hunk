@@ -106,9 +106,24 @@ export function resolveExtensionVcsAdapters(
   return { adapters, issues };
 }
 
+/**
+ * Join one extension id and a local view id into the address every registered view is known by.
+ *
+ * Duplicate resolution, selection lookup, and command-facing id qualification must agree on this
+ * exactly, so the format lives here once rather than being re-templated per caller.
+ */
+export function qualifiedViewKey(extensionId: string, viewId: string) {
+  return `${extensionId}:${viewId}`;
+}
+
+/** Derive the `<extensionId>:<viewId>` key one registered view is addressed by. */
+export function registeredViewKey(registered: { extensionId: string; view: { id: string } }) {
+  return qualifiedViewKey(registered.extensionId, registered.view.id);
+}
+
 /** Derive the key one sidebar view is addressed by everywhere in the app. */
 export function sidebarViewKey(registered: RegisteredSidebarView) {
-  return `${registered.extensionId}:${registered.view.id}`;
+  return registeredViewKey(registered);
 }
 
 /** The sidebar views one session offers, plus the registrations skipped as duplicates. */
@@ -151,7 +166,7 @@ export function resolveExtensionSidebarViews(
 
 /** Derive the key one file view is addressed by everywhere in the app. */
 export function fileViewKey(registered: RegisteredFileView) {
-  return `${registered.extensionId}:${registered.view.id}`;
+  return registeredViewKey(registered);
 }
 
 /** The file views one session offers, plus registrations skipped as duplicates. */

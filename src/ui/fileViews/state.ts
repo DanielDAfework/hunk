@@ -1,3 +1,4 @@
+import { fileViewKey, qualifiedViewKey } from "../../extensions/apply";
 import type { ExtensionDiffFile } from "../../extension-api/types";
 import type { RegisteredFileView } from "../../extensions/types";
 
@@ -6,7 +7,8 @@ export type FileViewSelectionState = Readonly<Record<string, string>>;
 
 /** Resolve one registered view key as `<extensionId>:<viewId>`. */
 export function registeredFileViewKey(view: RegisteredFileView) {
-  return `${view.extensionId}:${view.view.id}`;
+  // Selection lookup and duplicate resolution must agree, so both derive the key from one policy.
+  return fileViewKey(view);
 }
 
 /** Resolve a bare local or qualified file-view id without reserving extension ids. */
@@ -15,7 +17,7 @@ export function resolveRegisteredFileView(
   extensionId: string,
   viewId: string,
 ) {
-  const key = viewId.includes(":") ? viewId : `${extensionId}:${viewId}`;
+  const key = viewId.includes(":") ? viewId : qualifiedViewKey(extensionId, viewId);
   return views.find((view) => registeredFileViewKey(view) === key);
 }
 
