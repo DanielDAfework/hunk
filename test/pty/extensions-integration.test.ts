@@ -373,9 +373,23 @@ describe("PTY extensions", () => {
 
       // The command is a real Extensions-menu item, not a private menu hook.
       // `Extensions` also appears in the temporary fixture path, so target its chrome position.
-      await session.clickAt(33, 0);
-      const menu = await session.waitForText(/Toggle review triage/, { timeout: 20_000 });
-      expect(menu).toMatch(/Toggle review triage\s+y/);
+      // Folder extension registration may finish after the first review frame, so retry the menu
+      // gesture until the command itself proves that the extension is ready.
+      let menu: string | null = null;
+      for (let attempt = 0; attempt < 5 && menu === null; attempt += 1) {
+        await session.clickAt(33, 0);
+        try {
+          menu = await harness.waitForSnapshot(
+            session,
+            (text) => text.includes("Toggle review triage"),
+            3_000,
+          );
+        } catch {
+          // A click may land before command registration or close an earlier empty menu; retry it.
+        }
+      }
+      expect(menu).not.toBeNull();
+      expect(menu!).toMatch(/Toggle review triage\s+y/);
       expect(menu).toMatch(/Mark selected hunk…\s+x/);
       expect(menu).toContain("Set review focus…");
       expect(menu).toContain("Clear triage decisions");
