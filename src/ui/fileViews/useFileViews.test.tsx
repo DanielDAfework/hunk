@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { testRender } from "@opentui/react/test-utils";
 import { act, createElement, useState } from "react";
-import { createTestDiffFile } from "../../../test/helpers/diff-helpers";
+import { createTestDiffFile, createTestSourceFetcher } from "../../../test/helpers/diff-helpers";
 import type { RegisteredFileView } from "../../extensions/types";
 import { registeredFileViewKey } from "./state";
 import {
@@ -46,6 +46,34 @@ describe("file-view layout request lifetime", () => {
       await runFileViewLayoutRequest(view, file, 80, new AbortController().signal, 50),
     ).toBeNull();
     expect(signal?.aborted).toBe(true);
+  });
+
+  test("reads only bound exact-source sides before accepting a layout", async () => {
+    const sourceFetcher = createTestSourceFetcher(async (side) =>
+      side === "new" ? "new\n" : "old\n",
+    );
+    const sourceFile = createTestDiffFile({
+      id: "bound",
+      path: "bound.ts",
+      before: "old\n",
+      after: "new\n",
+      sourceFetcher,
+    });
+    const view = createTestView(({ file: inputFile }) => ({
+      rows: [
+        {
+          id: "bound-row",
+          spans: [{ text: "bound" }],
+          sourceRanges: [{ side: "new", range: [1, 1] }],
+        },
+      ],
+      hunkRows: (inputFile.hunks ?? []).map(() => ({ startRow: 0, endRow: 0 })),
+    }));
+
+    await expect(
+      runFileViewLayoutRequest(view, sourceFile, 80, new AbortController().signal, 50),
+    ).resolves.toMatchObject({ layout: { rows: [{ id: "bound-row" }] } });
+    expect(sourceFetcher.calls).toEqual(["new"]);
   });
 
   test("aborts on timeout and ignores a late extension result", async () => {

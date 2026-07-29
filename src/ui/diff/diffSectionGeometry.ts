@@ -12,6 +12,7 @@ import {
   plannedReviewRowContributesToHunkBounds,
   type PlannedHunkBounds,
 } from "./plannedReviewRows";
+import type { PlannedFileViewRow } from "../fileViews/renderPlan";
 import type { PlannedReviewRow } from "./reviewRenderPlan";
 import { measureRenderedRowHeight } from "./renderRows";
 
@@ -33,6 +34,8 @@ export interface DiffSectionRowBounds extends VerticalBounds {
 export interface DiffSectionGeometry extends SectionGeometry<PlannedHunkBounds> {
   lineNumberDigits: number;
   plannedRows: PlannedReviewRow[];
+  /** Alternate-view rows consume the same measured bounds while raw copy remains unavailable. */
+  fileViewRows?: readonly PlannedFileViewRow[];
   rowBounds: DiffSectionRowBounds[];
   rowBoundsByKey: Map<string, DiffSectionRowBounds>;
   rowBoundsByStableKey: Map<string, DiffSectionRowBounds>;

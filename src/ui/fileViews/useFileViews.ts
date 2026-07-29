@@ -7,7 +7,11 @@ import {
   createFileViewInputSnapshot,
   type FileViewInputSnapshot,
 } from "./host";
-import { validateFileViewLayout, type ValidatedFileViewLayout } from "./layout";
+import {
+  validateFileViewLayout,
+  validateFileViewSourceRanges,
+  type ValidatedFileViewLayout,
+} from "./layout";
 import { registeredFileViewKey } from "./state";
 
 /** Bound asynchronous third-party layout work so raw diff never waits indefinitely. */
@@ -152,6 +156,23 @@ export async function runFileViewLayoutRequest(
     const checked = validateFileViewLayout(candidate, fileViewHunkCount(file), width);
     if (!checked.valid) {
       throw new Error(`invalid layout: ${checked.issue}`);
+    }
+    const requiredSides = new Set(
+      checked.value.layout.rows.flatMap((row) =>
+        (row.sourceRanges ?? []).map((sourceRange) => sourceRange.side),
+      ),
+    );
+    const documents = Object.fromEntries(
+      await Promise.all(
+        [...requiredSides].map(async (side) => [side, await input.readDocument(side)] as const),
+      ),
+    );
+    if (controller.signal.aborted || parentSignal.aborted) {
+      throw new Error("layout aborted");
+    }
+    const bindingIssue = validateFileViewSourceRanges(checked.value.layout, documents);
+    if (bindingIssue) {
+      throw new Error(`invalid layout: ${bindingIssue}`);
     }
     return checked.value;
   } finally {

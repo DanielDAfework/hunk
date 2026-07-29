@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { DiffFile } from "../../core/types";
 import {
   availableFileViewSelections,
-  FILE_VIEW_NOTES_UNAVAILABLE_REASON,
+  FILE_VIEW_DRAFT_UNAVAILABLE_REASON,
   fileViewUnavailableReason,
 } from "./availability";
 
@@ -21,38 +21,26 @@ function fileWithNote(source = "agent"): DiffFile {
 }
 
 describe("file-view availability", () => {
-  test("requires raw diff when a visible note or draft needs inline placement", () => {
-    expect(
-      fileViewUnavailableReason({
-        file: fileWithNote(),
-        hasDraftNote: false,
-        showAgentNotes: true,
-      }),
-    ).toBe(FILE_VIEW_NOTES_UNAVAILABLE_REASON);
+  test("leaves committed note placement to validated alternate-view bindings", () => {
+    for (const showAgentNotes of [false, true]) {
+      expect(
+        fileViewUnavailableReason({
+          file: fileWithNote(showAgentNotes ? "agent" : "user"),
+          hasDraftNote: false,
+          showAgentNotes,
+        }),
+      ).toBeNull();
+    }
+  });
+
+  test("requires raw diff while a draft note is being edited", () => {
     expect(
       fileViewUnavailableReason({
         file: { ...fileWithNote(), agent: null },
         hasDraftNote: true,
         showAgentNotes: false,
       }),
-    ).toBe(FILE_VIEW_NOTES_UNAVAILABLE_REASON);
-  });
-
-  test("allows hidden agent notes but not always-visible user notes", () => {
-    expect(
-      fileViewUnavailableReason({
-        file: fileWithNote(),
-        hasDraftNote: false,
-        showAgentNotes: false,
-      }),
-    ).toBeNull();
-    expect(
-      fileViewUnavailableReason({
-        file: fileWithNote("user"),
-        hasDraftNote: false,
-        showAgentNotes: false,
-      }),
-    ).toBe(FILE_VIEW_NOTES_UNAVAILABLE_REASON);
+    ).toBe(FILE_VIEW_DRAFT_UNAVAILABLE_REASON);
   });
 
   test("masks unavailable selections without discarding stored choices", () => {
@@ -60,7 +48,7 @@ describe("file-view availability", () => {
     expect(
       availableFileViewSelections(
         selections,
-        new Map([["readme", FILE_VIEW_NOTES_UNAVAILABLE_REASON]]),
+        new Map([["readme", FILE_VIEW_DRAFT_UNAVAILABLE_REASON]]),
       ),
     ).toEqual({ other: "ext:view" });
     expect(selections).toEqual({ readme: "preview:rendered", other: "ext:view" });

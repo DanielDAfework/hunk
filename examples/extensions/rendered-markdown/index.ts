@@ -403,12 +403,22 @@ const renderedMarkdownExtension: ExtensionFactory = (hunk) => {
 
       const renderedRows = renderMarkdown(source, input.width);
       if (renderedRows.length === 0) return null;
-      const rows: ExtensionFileViewRow[] = renderedRows.map((row, index) => ({
-        id: `rendered:${index}`,
-        spans: rowWasAdded(row, input.changes)
-          ? row.spans.map((span) => ({ ...span, tone: "added" as const }))
-          : row.spans,
-      }));
+      let lastBoundLine = 0;
+      const rows: ExtensionFileViewRow[] = renderedRows.map((row, index) => {
+        // Wrapped visual rows from one Markdown block share a source range. Bind the first row only
+        // so every source line has one unambiguous host-note anchor.
+        const sourceRange = row.sourceRange[0] > lastBoundLine ? row.sourceRange : undefined;
+        if (sourceRange) lastBoundLine = sourceRange[1];
+        return {
+          id: `rendered:${index}`,
+          spans: rowWasAdded(row, input.changes)
+            ? row.spans.map((span) => ({ ...span, tone: "added" as const }))
+            : row.spans,
+          ...(sourceRange === undefined
+            ? {}
+            : { sourceRanges: [{ side: "new" as const, range: sourceRange }] }),
+        };
+      });
       const hunkRows = (input.file.hunks ?? []).map((hunk) => {
         const changedRanges = input.changes.filter(
           (change) => change.hunkIndex === hunk.index && change.kind === "added",
@@ -423,7 +433,17 @@ const renderedMarkdownExtension: ExtensionFactory = (hunk) => {
         return { startRow, endRow };
       });
 
-      return { rows, hunkRows };
+      // A rendered row shared by adjacent hunk extents cannot own one note-navigation target.
+      const unambiguousRows = rows.map((row, rowIndex) => {
+        const ownerCount = hunkRows.filter(
+          (hunkRows) => rowIndex >= hunkRows.startRow && rowIndex <= hunkRows.endRow,
+        ).length;
+        if (ownerCount === 1 || row.sourceRanges === undefined) return row;
+        const { sourceRanges: _ambiguous, ...unboundRow } = row;
+        return unboundRow;
+      });
+
+      return { rows: unambiguousRows, hunkRows };
     },
   });
 };

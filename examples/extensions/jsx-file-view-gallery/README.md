@@ -52,9 +52,9 @@ Follow the short activation sequence in [`mixed-review/README.md`](./mixed-revie
 
 - Every painter stays inside a declared fixed-height row; geometry, scrolling, windowing, and hunk navigation remain host-owned.
 - Every row keeps useful symbolic spans for row-local error fallback, clipped to the same fixed rectangle.
-- Semantic data is captured in closures during `layout`; painters receive only bounded paint props.
+- Semantic data is captured in closures during `layout`; painters receive only bounded paint props and use Hunk's live paint-only semantic theme palette.
 - The demos intentionally have no pointer handlers. Registered commands are the supported interaction path.
 - Layouts return `null` when exact source is unavailable or no supported semantic row can be attributed. Mixed diffs may retain neutral summary rows for non-semantic hunks so navigation stays positional.
-- Inline review notes still force raw rendering until alternate views can provide validated source-to-row bindings.
+- Rows bind conservatively attributed exact-source ranges. Hunk renders a note inside the alternate view only when its preferred-side anchor resolves uniquely; otherwise the complete file falls back to raw diff.
 
 This gallery is experimental and is not loaded unless you explicitly pass or install its folder. See [`docs/file-view-jsx-poc.md`](../../../docs/file-view-jsx-poc.md) for the full contract.

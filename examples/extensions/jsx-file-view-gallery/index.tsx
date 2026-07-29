@@ -6,6 +6,7 @@ import type {
   ExtensionFileViewLayout,
   ExtensionFileViewRow,
   ExtensionFileViewRowComponentProps,
+  ExtensionFileViewSourceRange,
   ExtensionFactory,
 } from "hunkdiff/extension";
 
@@ -32,6 +33,21 @@ function changeSize(change: ExtensionFileChangeRange) {
   return change.range[1] - change.range[0] + 1;
 }
 
+/** Omit Pierre's `[0, 0]` sentinel for the nonexistent side of added/deleted files. */
+function hunkSourceRanges(hunk: {
+  oldRange?: readonly [number, number];
+  newRange?: readonly [number, number];
+}): ExtensionFileViewSourceRange[] {
+  return [
+    ...(hunk.oldRange && hunk.oldRange[0] >= 1
+      ? [{ side: "old" as const, range: hunk.oldRange }]
+      : []),
+    ...(hunk.newRange && hunk.newRange[0] >= 1
+      ? [{ side: "new" as const, range: hunk.newRange }]
+      : []),
+  ];
+}
+
 /** Keep painter-authored labels inside their fixed terminal rectangle. */
 function clipLabel(text: string, width: number) {
   if (width <= 1) return text.slice(0, Math.max(0, width));
@@ -51,7 +67,7 @@ function impactPainter(
   added: number,
   removed: number,
 ): RowPainter {
-  return function ImpactCard({ width, height, selected }) {
+  return function ImpactCard({ width, height, selected, theme }) {
     const meterWidth = Math.max(4, Math.min(16, Math.floor((width - 20) / 2)));
     const total = Math.max(1, added + removed);
     return (
@@ -59,15 +75,24 @@ function impactPainter(
         <box style={{ height: 1, flexDirection: "row" }}>
           <text
             content={`${selected ? "▶" : "◇"} CHANGE ${String(position + 1).padStart(2, "0")}`}
-            style={{ fg: selected ? "yellow" : "cyan" }}
+            style={{ fg: selected ? theme.accent : theme.accentMuted }}
           />
-          <text content={`   +${added} / -${removed}`} style={{ fg: "white" }} />
+          <text content={`   +${added} / -${removed}`} style={{ fg: theme.text }} />
         </box>
         <box style={{ height: 1, flexDirection: "row" }}>
-          <text content={`  + ${impactMeter(added, total, meterWidth)}`} style={{ fg: "green" }} />
-          <text content={`   - ${impactMeter(removed, total, meterWidth)}`} style={{ fg: "red" }} />
+          <text
+            content={`  + ${impactMeter(added, total, meterWidth)}`}
+            style={{ fg: theme.fileNew }}
+          />
+          <text
+            content={`   - ${impactMeter(removed, total, meterWidth)}`}
+            style={{ fg: theme.fileDeleted }}
+          />
         </box>
-        <text content={`  ${clipLabel(header, Math.max(1, width - 2))}`} style={{ fg: "gray" }} />
+        <text
+          content={`  ${clipLabel(header, Math.max(1, width - 2))}`}
+          style={{ fg: theme.muted }}
+        />
       </box>
     );
   };
@@ -96,6 +121,7 @@ export function createChangeAtlasLayout(
           tone: "accent",
         },
       ],
+      sourceRanges: hunkSourceRanges(hunk),
       component: {
         height: 3,
         render: impactPainter(position, hunk.header, added, removed),
@@ -111,14 +137,17 @@ export function createChangeAtlasLayout(
 
 /** Paint a neutral fixed-height placeholder for a hunk with no demo-specific semantic match. */
 function summaryPainter(title: string, detail: string): RowPainter {
-  return function SummaryCard({ width, height, selected }) {
+  return function SummaryCard({ width, height, selected, theme }) {
     return (
       <box style={{ width, height, flexDirection: "column" }}>
         <text
           content={`${selected ? "▶" : "◇"} ${clipLabel(title, Math.max(1, width - 2))}`}
-          style={{ fg: selected ? "yellow" : "cyan" }}
+          style={{ fg: selected ? theme.accent : theme.accentMuted }}
         />
-        <text content={`  ${clipLabel(detail, Math.max(1, width - 2))}`} style={{ fg: "gray" }} />
+        <text
+          content={`  ${clipLabel(detail, Math.max(1, width - 2))}`}
+          style={{ fg: theme.muted }}
+        />
       </box>
     );
   };
@@ -166,14 +195,14 @@ function palettePainter(
   oldValue: string | null,
   newValue: string | null,
 ): RowPainter {
-  return function PaletteSwatch({ width, height, selected }) {
+  return function PaletteSwatch({ width, height, selected, theme }) {
     const oldColor = oldValue ?? "#303030";
     const newColor = newValue ?? "#303030";
     return (
       <box style={{ width, height, flexDirection: "column" }}>
         <text
           content={`${selected ? "▶" : " "} ${clipLabel(name, Math.max(1, width - 2))}`}
-          style={{ fg: selected ? "yellow" : "cyan" }}
+          style={{ fg: selected ? theme.accent : theme.accentMuted }}
         />
         <box style={{ height: 1, flexDirection: "row" }}>
           <box style={{ width: 18, height: 1, backgroundColor: oldColor }}>
@@ -238,8 +267,10 @@ export async function createCssPaletteLayout(
     if (hasAmbiguousDuplicate) return null;
 
     for (const [tokenPosition, name] of names.entries()) {
-      const oldValue = oldChanged.find((token) => token.name === name)?.value ?? null;
-      const newValue = newChanged.find((token) => token.name === name)?.value ?? null;
+      const oldToken = oldChanged.find((token) => token.name === name);
+      const newToken = newChanged.find((token) => token.name === name);
+      const oldValue = oldToken?.value ?? null;
+      const newValue = newToken?.value ?? null;
       semanticRowCount += 1;
       rows.push({
         id: `palette:${position}:${tokenPosition}:${name}`,
@@ -249,6 +280,14 @@ export async function createCssPaletteLayout(
             tone: "syntax",
           },
         ],
+        sourceRanges: [
+          ...(oldToken
+            ? [{ side: "old" as const, range: [oldToken.line, oldToken.line] as const }]
+            : []),
+          ...(newToken
+            ? [{ side: "new" as const, range: [newToken.line, newToken.line] as const }]
+            : []),
+        ],
         component: { height: 2, render: palettePainter(name, oldValue, newValue) },
       });
     }
@@ -257,6 +296,7 @@ export async function createCssPaletteLayout(
       rows.push({
         id: `palette:${position}:summary`,
         spans: [{ text: `Hunk ${position + 1}: no changed hexadecimal variables`, tone: "muted" }],
+        sourceRanges: hunkSourceRanges(hunk),
         component: {
           height: 2,
           render: summaryPainter(`PALETTE HUNK ${position + 1}`, hunk.header),
@@ -368,16 +408,21 @@ export function versionChangeHighlights(oldValue: string | null, newValue: strin
 }
 
 /** Render one version with background only behind its semantically changed segment. */
-function highlightedVersion(parts: HighlightedVersion, backgroundColor: string): ReactNode {
+function highlightedVersion(
+  parts: HighlightedVersion,
+  changedColor: string,
+  mutedColor: string,
+  highlightBackground: string,
+): ReactNode {
   return (
     <>
-      <span fg="gray">{parts.before}</span>
+      <span fg={mutedColor}>{parts.before}</span>
       {parts.changed ? (
-        <span fg="black" bg={backgroundColor}>
+        <span fg={changedColor} bg={highlightBackground}>
           {parts.changed}
         </span>
       ) : null}
-      <span fg="gray">{parts.after}</span>
+      <span fg={mutedColor}>{parts.after}</span>
     </>
   );
 }
@@ -390,18 +435,18 @@ function dependencyPainter(
   newValue: string | null,
 ): RowPainter {
   const highlights = versionChangeHighlights(oldValue, newValue);
-  return function DependencyDelta({ width, height, selected }) {
+  return function DependencyDelta({ width, height, selected, theme }) {
     return (
       <box style={{ width, height, flexDirection: "column" }}>
         <text
           content={`${selected ? "▶" : " "} ${clipLabel(name, Math.max(1, width - group.length - 5))}  ${group}`}
-          style={{ fg: selected ? "yellow" : "cyan" }}
+          style={{ fg: selected ? theme.accent : theme.accentMuted }}
         />
         <text>
-          <span fg="gray"> </span>
-          {highlightedVersion(highlights.old, "red")}
-          <span fg="gray"> → </span>
-          {highlightedVersion(highlights.new, "green")}
+          <span fg={theme.muted}> </span>
+          {highlightedVersion(highlights.old, theme.fileDeleted, theme.muted, theme.panelAlt)}
+          <span fg={theme.muted}> → </span>
+          {highlightedVersion(highlights.new, theme.fileNew, theme.muted, theme.panelAlt)}
         </text>
       </box>
     );
@@ -455,10 +500,10 @@ export async function createDependencyLayout(
 
     for (const [tokenPosition, identity] of identities.entries()) {
       const [group, name] = identity.split("\0") as [DependencyGroup, string];
-      const oldValue =
-        oldChanged.find((token) => token.group === group && token.name === name)?.value ?? null;
-      const newValue =
-        newChanged.find((token) => token.group === group && token.name === name)?.value ?? null;
+      const oldToken = oldChanged.find((token) => token.group === group && token.name === name);
+      const newToken = newChanged.find((token) => token.group === group && token.name === name);
+      const oldValue = oldToken?.value ?? null;
+      const newValue = newToken?.value ?? null;
       semanticRowCount += 1;
       rows.push({
         id: `dependency:${position}:${tokenPosition}:${group}:${name}`,
@@ -467,6 +512,14 @@ export async function createDependencyLayout(
             text: `${name}: ${oldValue ?? "missing"} → ${newValue ?? "missing"} (${group})`,
             tone: newValue === null ? "removed" : oldValue === null ? "added" : "accent",
           },
+        ],
+        sourceRanges: [
+          ...(oldToken
+            ? [{ side: "old" as const, range: [oldToken.line, oldToken.line] as const }]
+            : []),
+          ...(newToken
+            ? [{ side: "new" as const, range: [newToken.line, newToken.line] as const }]
+            : []),
         ],
         component: {
           height: 2,
@@ -480,6 +533,7 @@ export async function createDependencyLayout(
       rows.push({
         id: `dependency:${position}:summary`,
         spans: [{ text: `${title}: ${hunk.header}`, tone: "muted" }],
+        sourceRanges: hunkSourceRanges(hunk),
         component: {
           height: 2,
           render: summaryPainter(title, hunk.header),

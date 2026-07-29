@@ -81,7 +81,9 @@ interface BuiltinCommandSpec {
 
 /** The callbacks the built-in command set drives; App supplies its own handlers. */
 export interface BuildAppCommandsOptions {
+  canApplyFilePresentationToAllMatching: boolean;
   canRefreshCurrentInput: boolean;
+  applyFilePresentationToAllMatching: () => void;
   focusFilter: () => void;
   moveToAnnotatedFile: (delta: number) => void;
   moveToAnnotatedHunk: (delta: number) => void;
@@ -274,6 +276,15 @@ function builtinCommandSpecs(options: BuildAppCommandsOptions): BuiltinCommandSp
       closesMenu: true,
     },
     {
+      id: "hunk.view.applyFilePresentationToAllMatching",
+      title: "Apply the current file presentation to all matching files",
+      scopes: REVIEW,
+      defaultKeys: [],
+      isEnabled: () => options.canApplyFilePresentationToAllMatching,
+      run: () => options.applyFilePresentationToAllMatching(),
+      closesMenu: true,
+    },
+    {
       id: "hunk.view.toggleSidebar",
       title: "Toggle sidebar",
       scopes: REVIEW_AND_PAGER,
@@ -461,7 +472,9 @@ export function buildAppCommands(options: BuildAppCommandsOptions): AppCommand[]
 const NOOP_COMMAND_OPTIONS: BuildAppCommandsOptions = (() => {
   const noop = () => {};
   return {
+    canApplyFilePresentationToAllMatching: false,
     canRefreshCurrentInput: true,
+    applyFilePresentationToAllMatching: noop,
     focusFilter: noop,
     moveToAnnotatedFile: noop,
     moveToAnnotatedHunk: noop,

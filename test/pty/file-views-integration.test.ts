@@ -22,7 +22,7 @@ afterEach(() => {
 });
 
 /** Create a direct-file Markdown diff so exact old/new source remains host-readable. */
-function createMarkdownPairTest() {
+function createMarkdownPairTest(noteRange: [number, number] = [3, 3]) {
   const directory = mkdtempSync(join(tmpdir(), "hunk-file-view-"));
   const before = join(directory, "before.md");
   const after = join(directory, "after.md");
@@ -36,7 +36,7 @@ function createMarkdownPairTest() {
       files: [
         {
           path: "after.md",
-          annotations: [{ newRange: [3, 3], summary: "Review the new item." }],
+          annotations: [{ newRange: noteRange, summary: "Review the new item." }],
         },
       ],
     }),
@@ -266,7 +266,7 @@ describe("PTY file views", () => {
     }
   });
 
-  test("keeps raw diff active and explains why when inline notes are visible", async () => {
+  test("renders a host-owned inline note inside its bound Markdown presentation", async () => {
     const pair = createMarkdownPairTest();
     const session = await harness.launchHunk({
       args: [
@@ -289,13 +289,50 @@ describe("PTY file views", () => {
     try {
       await session.waitForText(/before\.md/, { timeout: 20_000 });
       await session.press("f8");
-      await session.waitForText(
-        /File presentations are unavailable while inline review notes are visible/,
-      );
-      await session.waitForText(/old item/);
+      const preview = await session.waitForText(/Review the new item\./);
+      expect(preview).toContain("• new item");
+      expect(preview).not.toContain("old item");
       await session.click(/View/);
-      const menu = await session.waitForText(/\[x\] File presentation: Raw diff/);
-      expect(menu).not.toContain("File presentation: Rendered Markdown");
+      const menu = await session.waitForText(/\[x\] File presentation: Rendered Markdown/);
+      expect(menu).toContain("File presentation: Raw diff");
+    } finally {
+      session.close();
+      rmSync(pair.directory, { recursive: true, force: true });
+    }
+  });
+
+  test("falls back all-or-raw for an unbound note and restores the stored view when hidden", async () => {
+    const pair = createMarkdownPairTest([99, 99]);
+    const session = await harness.launchHunk({
+      args: [
+        "diff",
+        "--extension",
+        RENDERED_MARKDOWN_EXTENSION,
+        "--mode",
+        "stack",
+        "--agent-context",
+        pair.agentContext,
+        "--agent-notes",
+        pair.before,
+        pair.after,
+      ],
+      cwd: pair.directory,
+      cols: 140,
+      rows: 24,
+    });
+
+    try {
+      await session.waitForText(/before\.md/, { timeout: 20_000 });
+      await session.press("f8");
+      const raw = await session.waitForText(/old item/);
+      expect(raw).not.toContain("• new item");
+      await session.click(/View/);
+      await session.waitForText(/\[x\] File presentation: Rendered Markdown/);
+      await session.press("escape");
+
+      await session.press("a");
+      const restored = await session.waitForText(/• new item/);
+      expect(restored).not.toContain("old item");
     } finally {
       session.close();
       rmSync(pair.directory, { recursive: true, force: true });

@@ -62,6 +62,7 @@ import { VerticalScrollbar, type VerticalScrollbarHandle } from "../scrollbar/Ve
 import type { VisibleBodyBounds } from "../../diff/rowWindowing";
 import type { ResolvedFileViewLayout } from "../../fileViews/useFileViews";
 import { measureFileViewGeometry } from "../../fileViews/geometry";
+import { buildFileViewRenderPlan } from "../../fileViews/renderPlan";
 import { prefetchHighlightedDiff } from "../../diff/useHighlightedDiff";
 import {
   buildFileRenderWindow,
@@ -491,6 +492,26 @@ export function DiffPane({
     showAgentNotes,
   ]);
 
+  const fileViewRenderPlans = useMemo(() => {
+    const next = new Map<
+      string,
+      { fileView: ResolvedFileViewLayout; rows: ReturnType<typeof buildFileViewRenderPlan>["rows"] }
+    >();
+    for (const file of files) {
+      const fileView = fileViews.get(file.id);
+      if (!fileView) continue;
+      const plan = buildFileViewRenderPlan(
+        fileView.layout,
+        allAgentNotesByFile.get(file.id) ?? EMPTY_VISIBLE_AGENT_NOTES,
+      );
+      // Review data is never partially hidden: one unresolved note keeps this file on raw diff.
+      if (plan.unresolvedNoteIds.length === 0) {
+        next.set(file.id, { fileView, rows: plan.rows });
+      }
+    }
+    return next;
+  }, [allAgentNotesByFile, fileViews, files]);
+
   // Keep the full file-section path for wrapped lines, where exact wrapped heights depend on
   // mounting each section; nowrap reviews can window offscreen files behind exact spacers.
   const windowingEnabled = !wrapLines;
@@ -685,10 +706,14 @@ export function DiffPane({
   const baseSectionGeometry = useMemo(
     () =>
       files.map((file) => {
-        // App masks alternate layouts whenever host-owned note placement requires raw rendering.
-        const fileView = fileViews.get(file.id);
-        if (fileView) {
-          return measureFileViewGeometry(file, fileView);
+        const plannedFileView = fileViewRenderPlans.get(file.id);
+        if (plannedFileView) {
+          return measureFileViewGeometry(
+            file,
+            plannedFileView.fileView,
+            plannedFileView.rows,
+            diffContentWidth,
+          );
         }
         return measureDiffSectionGeometry(
           file,
@@ -706,10 +731,9 @@ export function DiffPane({
         );
       }),
     [
-      allAgentNotesByFile,
       diffContentWidth,
       expandedGapsByFileId,
-      fileViews,
+      fileViewRenderPlans,
       files,
       layout,
       reserveAddNoteColumn,
@@ -731,10 +755,11 @@ export function DiffPane({
   const sectionGeometry = useMemo(
     () =>
       files.map((file, index) => {
-        const notes = allAgentNotesByFile.get(file.id) ?? EMPTY_VISIBLE_AGENT_NOTES;
-        if (notes.length === 0) {
+        if (fileViewRenderPlans.has(file.id)) {
           return baseSectionGeometry[index]!;
         }
+        const notes = allAgentNotesByFile.get(file.id) ?? EMPTY_VISIBLE_AGENT_NOTES;
+        if (notes.length === 0) return baseSectionGeometry[index]!;
 
         return measureDiffSectionGeometry(
           file,
@@ -756,7 +781,7 @@ export function DiffPane({
       baseSectionGeometry,
       diffContentWidth,
       expandedGapsByFileId,
-      fileViews,
+      fileViewRenderPlans,
       files,
       layout,
       reserveAddNoteColumn,
@@ -1884,7 +1909,7 @@ export function DiffPane({
                       codeHorizontalOffset={codeHorizontalOffset}
                       expandedGapKeys={expandedGapsByFileId[file.id] ?? EMPTY_EXPANDED_GAP_KEYS}
                       file={file}
-                      fileView={fileViews.get(file.id)}
+                      fileView={fileViewRenderPlans.get(file.id)?.fileView}
                       headerLabelWidth={headerLabelWidth}
                       headerStatsWidth={headerStatsWidth}
                       layout={layout}

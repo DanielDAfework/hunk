@@ -64,7 +64,11 @@ describe("rendered Markdown example extension", () => {
         id: "rendered:0",
         spans: [{ text: "Hello", tone: "accent", attributes: ["bold"] }],
       },
-      { id: "rendered:1", spans: [{ text: "new item", tone: "added" }] },
+      {
+        id: "rendered:1",
+        spans: [{ text: "new item", tone: "added" }],
+        sourceRanges: [{ side: "new", range: [2, 2] }],
+      },
     ]);
     expect(layout?.hunkRows).toEqual([{ startRow: 1, endRow: 1 }]);
   });

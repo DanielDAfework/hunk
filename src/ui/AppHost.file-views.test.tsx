@@ -5,7 +5,7 @@ import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { testRender } from "@opentui/react/test-utils";
 import { act } from "react";
 import { createTestVcsAppBootstrap } from "../../test/helpers/app-bootstrap";
-import { createTestDiffFile } from "../../test/helpers/diff-helpers";
+import { createTestDiffFile, createTestSourceFetcher } from "../../test/helpers/diff-helpers";
 import { loadStartupExtensions } from "../extensions/startup";
 import { AppHost } from "./AppHost";
 
@@ -64,6 +64,38 @@ function createBrokenFileViewExtension() {
   return { extension, root };
 }
 
+/** Write a matching-files preview used to prove the host-owned bulk View action. */
+function createBulkFileViewExtension() {
+  const root = mkdtempSync(join(tmpdir(), "hunk-apphost-bulk-view-"));
+  tempDirs.push(root);
+  const extension = join(root, "bulk-view");
+  mkdirSync(extension, { recursive: true });
+  writeFileSync(
+    join(extension, "package.json"),
+    JSON.stringify({ name: "bulk-view", private: true, hunk: { extensions: ["./index.ts"] } }),
+  );
+  writeFileSync(
+    join(extension, "index.ts"),
+    `export default function (hunk) {
+  hunk.registerFileView({
+    id: "preview",
+    title: "Bulk preview",
+    matches: (file) => file.path.endsWith(".ts"),
+    layout: ({ file }) => ({
+      rows: [{ id: "preview", spans: [{ text: "PREVIEW " + file.path }] }],
+      hunkRows: (file.hunks ?? []).map(() => ({ startRow: 0, endRow: 0 })),
+    }),
+  });
+  hunk.registerCommand(
+    { id: "toggle-preview", title: "Toggle bulk preview", key: "f8" },
+    (ctx) => ctx.fileViews.toggle("preview"),
+  );
+}
+`,
+  );
+  return { extension, root };
+}
+
 /** Build the separated changes that exercise public summaries and cross-hunk selection. */
 function createTwoHunkFile() {
   const beforeLines = Array.from(
@@ -79,6 +111,9 @@ function createTwoHunkFile() {
     context: 3,
     id: "jsx-runtime-proof",
     path: "runtime-proof.ts",
+    sourceFetcher: createTestSourceFetcher(async (side) =>
+      side === "old" ? `${beforeLines.join("\n")}\n` : `${afterLines.join("\n")}\n`,
+    ),
   });
 }
 
@@ -145,6 +180,71 @@ describe("AppHost file views", () => {
       ]);
     } finally {
       console.error = originalConsoleError;
+      await act(async () => setup.renderer.destroy());
+    }
+  });
+
+  test("applies the active presentation changeset-wide, including filter-hidden matches", async () => {
+    const { extension, root } = createBulkFileViewExtension();
+    const extensions = await loadStartupExtensions({
+      cliExtensionPaths: [extension],
+      cwd: root,
+      env: { XDG_CONFIG_HOME: root } as NodeJS.ProcessEnv,
+      extensions: { enabled: true, extensionConfigs: {}, paths: [], repoPaths: [] },
+    });
+    expect(extensions.issues).toEqual([]);
+    const files = [
+      createTestDiffFile({ id: "alpha", path: "alpha.ts" }),
+      createTestDiffFile({ id: "beta", path: "beta.ts" }),
+      createTestDiffFile({ id: "notes", path: "notes.md" }),
+    ];
+    const bootstrap = createTestVcsAppBootstrap({
+      changesetId: "changeset:bulk-view",
+      files,
+      initialMode: "stack",
+      inputMode: "stack",
+      vcsOptions: { extensionPaths: [extension] },
+    });
+    bootstrap.extensions = extensions;
+    const setup = await testRender(<AppHost bootstrap={bootstrap} onQuit={() => {}} />, {
+      width: 120,
+      height: 24,
+    });
+
+    try {
+      await waitForFrame(setup, (frame) => frame.includes("alpha.ts"));
+      await act(async () => {
+        await setup.mockInput.pressTab();
+        await setup.mockInput.typeText("alpha");
+        await setup.mockInput.pressTab();
+        await setup.mockInput.pressKey("F8");
+      });
+      await waitForFrame(setup, (frame) => frame.includes("PREVIEW alpha.ts"));
+
+      await act(async () => setup.mockInput.pressKey("F10"));
+      await waitForFrame(setup, (frame) => frame.includes("Toggle files/filter focus"));
+      await act(async () => setup.mockInput.pressArrow("right"));
+      const menu = await waitForFrame(setup, (frame) =>
+        frame.includes("Apply “Bulk preview” to all matching files"),
+      );
+      const lines = menu.split("\n");
+      const targetY = lines.findIndex((line) =>
+        line.includes("Apply “Bulk preview” to all matching files"),
+      );
+      const targetX = lines[targetY]!.indexOf("Apply “Bulk preview”");
+      await act(async () => setup.mockMouse.click(targetX, targetY));
+
+      await act(async () => {
+        await setup.mockInput.pressTab();
+        await setup.mockInput.pressEscape();
+        await setup.mockInput.pressTab();
+      });
+      const expanded = await waitForFrame(
+        setup,
+        (frame) => frame.includes("PREVIEW alpha.ts") && frame.includes("PREVIEW beta.ts"),
+      );
+      expect(expanded).not.toContain("PREVIEW notes.md");
+    } finally {
       await act(async () => setup.renderer.destroy());
     }
   });

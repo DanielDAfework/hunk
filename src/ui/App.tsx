@@ -87,8 +87,10 @@ import { availableFileViewSelections, fileViewUnavailableReason } from "./fileVi
 import {
   reconcileFileViewSelections,
   registeredFileViewKey,
+  resolveBulkFileViewTarget,
   resolveRegisteredFileView,
   selectFileView,
+  selectFileViewForFiles,
 } from "./fileViews/state";
 import { createExtensionSidebarKeybindings, resolveCommandKeys } from "./lib/keymap";
 import {
@@ -1657,12 +1659,52 @@ export function App({
     setFocusArea("files");
   }, [review.cancelDraftNote]);
 
+  const reviewFileViewsForBulkSelection = useMemo(
+    () => toReadOnlyFileViews(reviewFiles),
+    [reviewFiles],
+  );
+  const selectedFileViewBulkTarget = useMemo(() => {
+    if (!selectedFile || fileViewUnavailableReasons.has(selectedFile.id)) return null;
+    const key = fileViewSelections[selectedFile.id];
+    if (!key) return null;
+    const registered = sessionFileViews.find((view) => registeredFileViewKey(view) === key);
+    if (!registered) return null;
+
+    const target = resolveBulkFileViewTarget({
+      current: fileViewSelections,
+      files: reviewFileViewsForBulkSelection,
+      registered,
+      selectedFileId: selectedFile.id,
+    });
+    return target
+      ? { key: target.key, matchingFileIds: target.fileIds, title: registered.view.title }
+      : null;
+  }, [
+    fileViewSelections,
+    fileViewUnavailableReasons,
+    reviewFileViewsForBulkSelection,
+    selectedFile,
+    sessionFileViews,
+  ]);
+  const applyFilePresentationToAllMatching = useCallback(() => {
+    if (!selectedFileViewBulkTarget) return;
+    setFileViewSelections((current) =>
+      selectFileViewForFiles(
+        current,
+        selectedFileViewBulkTarget.matchingFileIds,
+        selectedFileViewBulkTarget.key,
+      ),
+    );
+  }, [selectedFileViewBulkTarget]);
+
   // One dispatch table for every app-level shortcut: the built-in commands
   // over App's live callbacks, then extension commands, so built-ins always
   // win a key and extension order follows load order.
   const appCommands = [
     ...buildAppCommands({
+      canApplyFilePresentationToAllMatching: selectedFileViewBulkTarget !== null,
       canRefreshCurrentInput,
+      applyFilePresentationToAllMatching,
       focusFilter,
       moveToAnnotatedFile,
       moveToAnnotatedHunk,
@@ -1743,6 +1785,9 @@ export function App({
     commands: appCommands,
     extensionCommands: extensionAppCommands.commands,
     fileViewEntries: selectedFileViewEntries,
+    fileViewApplyAllLabel: selectedFileViewBulkTarget
+      ? `Apply “${selectedFileViewBulkTarget.title}” to all matching files`
+      : undefined,
     copyDecorations,
     layoutMode,
     renderSidebar,

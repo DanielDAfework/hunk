@@ -36,7 +36,9 @@ function createTestCommands(overrides: Partial<BuildAppCommandsOptions> = {}) {
     };
   const noop = () => {};
   const commands = buildAppCommands({
+    canApplyFilePresentationToAllMatching: false,
     canRefreshCurrentInput: true,
+    applyFilePresentationToAllMatching: record("applyFilePresentationToAllMatching"),
     focusFilter: noop,
     moveToAnnotatedFile: record("moveToAnnotatedFile"),
     moveToAnnotatedHunk: noop,
@@ -176,6 +178,31 @@ describe("buildAppMenus", () => {
       "moveToAnnotatedFile:1",
       "moveToAnnotatedFile:-1",
     ]);
+  });
+
+  test("dispatches the host-owned changeset-wide file-presentation action", () => {
+    const { commands, ran } = createTestCommands({
+      canApplyFilePresentationToAllMatching: true,
+    });
+    const menus = buildAppMenus({
+      commands,
+      ...MENU_STATE,
+      fileViewEntries: [
+        {
+          kind: "item",
+          label: "File presentation: Preview",
+          commandId: "hunk.view.filePresentation.preview",
+          action: () => {},
+        },
+      ],
+      fileViewApplyAllLabel: 'Apply "Preview" to all matching files',
+    });
+
+    const apply = entry(menus, "view", 'Apply "Preview" to all matching files');
+    expect(apply.commandId).toBe("hunk.view.applyFilePresentationToAllMatching");
+    expect(apply.hint).toBeUndefined();
+    apply.action();
+    expect(ran).toContain("applyFilePresentationToAllMatching");
   });
 
   test("Reload disappears when the current input cannot be reloaded", () => {

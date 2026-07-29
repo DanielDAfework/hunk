@@ -4,13 +4,13 @@ import type {
   ExtensionNotifyType,
   ExtensionSidebarActions,
   ExtensionSidebarKeybindings,
-  ExtensionSidebarTheme,
   ExtensionSidebarViewProps,
 } from "../../../extension-api/types";
 import { BuiltInSidebarView } from "../../../extensions/default/ui/sidebar";
 import type { ExtensionNotifySink, RegisteredSidebarView } from "../../../extensions/types";
 import type { DiffFile } from "../../../core/types";
 import type { AppTheme } from "../../themes";
+import { toExtensionPaintTheme } from "../../lib/extensionPaintTheme";
 
 /** Read an error's message without assuming extension components throw `Error` instances. */
 function describeError(error: unknown) {
@@ -67,31 +67,6 @@ class ExtensionSidebarErrorBoundary extends Component<
   override render() {
     return this.state.failed ? this.props.fallback : this.props.children;
   }
-}
-
-/** Project the active theme onto the public token slice custom sidebars render with. */
-function toSidebarTheme(theme: AppTheme): ExtensionSidebarTheme {
-  return {
-    appearance: theme.appearance,
-    background: theme.background,
-    panel: theme.panel,
-    panelAlt: theme.panelAlt,
-    border: theme.border,
-    accent: theme.accent,
-    accentMuted: theme.accentMuted,
-    text: theme.text,
-    muted: theme.muted,
-    selectedHunk: theme.selectedHunk,
-    badgeAdded: theme.badgeAdded,
-    badgeRemoved: theme.badgeRemoved,
-    badgeNeutral: theme.badgeNeutral,
-    fileNew: theme.fileNew,
-    fileDeleted: theme.fileDeleted,
-    fileRenamed: theme.fileRenamed,
-    fileModified: theme.fileModified,
-    fileUntracked: theme.fileUntracked,
-    noteBorder: theme.noteBorder,
-  };
 }
 
 /**
@@ -153,7 +128,7 @@ export function ExtensionSidebarPane({
   onRenderFailure?: () => void;
 }) {
   const { extensionId } = registered;
-  const publicTheme = useMemo(() => Object.freeze(toSidebarTheme(theme)), [theme]);
+  const publicTheme = useMemo(() => toExtensionPaintTheme(theme), [theme]);
 
   const actions = useMemo<ExtensionSidebarActions>(() => {
     /** Resolve a navigation target, or report one the review stream cannot show. */

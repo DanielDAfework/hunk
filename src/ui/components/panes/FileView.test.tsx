@@ -8,6 +8,7 @@ import type {
 } from "../../../extension-api/types";
 import { measureFileViewGeometry } from "../../fileViews/geometry";
 import { validateFileViewLayout } from "../../fileViews/layout";
+import { buildFileViewRenderPlan } from "../../fileViews/renderPlan";
 import type { ResolvedFileViewLayout } from "../../fileViews/useFileViews";
 import { reviewRowId } from "../../lib/ids";
 import { resolveTheme } from "../../themes";
@@ -87,6 +88,56 @@ describe("FileView custom rows", () => {
     }
   });
 
+  test("renders a host-owned note immediately before its bound alternate row", async () => {
+    const file = createTestDiffFile({ id: "noted", path: "noted.ts" });
+    const fileView = resolveTestLayout(
+      {
+        rows: [
+          {
+            id: "bound",
+            spans: [{ text: "BOUND PRESENTATION" }],
+            sourceRanges: [{ side: "new", range: [1, 2] }],
+          },
+        ],
+        hunkRows: [{ startRow: 0, endRow: 0 }],
+      },
+      60,
+    );
+    const plan = buildFileViewRenderPlan(fileView.layout, [
+      {
+        id: "note",
+        annotation: { id: "note", summary: "Review bound output", newRange: [1, 1] },
+      },
+    ]);
+    const geometry = measureFileViewGeometry(file, fileView, plan.rows, 60);
+    const setup = await testRender(
+      <FileView
+        file={file}
+        fileView={fileView}
+        geometry={geometry}
+        selectedHunkIndex={0}
+        theme={resolveTheme("github-dark-default", null)}
+        width={60}
+      />,
+      { width: 60, height: geometry.bodyHeight },
+    );
+
+    try {
+      await act(async () => setup.renderOnce());
+      const frame = setup.captureCharFrame();
+      expect(frame).toContain("Review bound output");
+      expect(frame).toContain("BOUND PRESENTATION");
+      expect(frame.indexOf("Review bound output")).toBeLessThan(
+        frame.indexOf("BOUND PRESENTATION"),
+      );
+      expect(
+        setup.renderer.root.findDescendantById(reviewRowId("inline-note:note:file-view:bound:0")),
+      ).not.toBeNull();
+    } finally {
+      await act(async () => setup.renderer.destroy());
+    }
+  });
+
   test("mounts hook-using components only inside the host row window with bounded props", async () => {
     const paintProps: ExtensionFileViewRowComponentProps[] = [];
     const customRow = (label: string) =>
@@ -148,7 +199,67 @@ describe("FileView custom rows", () => {
         height: 2,
         selected: true,
         rowIndex: 1,
+        theme: expect.objectContaining({ appearance: "dark", text: expect.any(String) }),
       });
+      expect(Object.isFrozen(paintProps.at(-1)?.theme)).toBe(true);
+    } finally {
+      await act(async () => setup.renderer.destroy());
+    }
+  });
+
+  test("repaints live semantic theme props without remounting or relayout", async () => {
+    let mountSequence = 0;
+    const paints: Array<{ appearance: string; text: string; token: number }> = [];
+    const themedLayout: ExtensionFileViewLayout = {
+      rows: [
+        {
+          id: "themed",
+          spans: [{ text: "fallback" }],
+          component: {
+            height: 1,
+            render: ({ theme }) => {
+              const [token] = useState(() => ++mountSequence);
+              paints.push({ appearance: theme.appearance, text: theme.text, token });
+              return <text content={`${theme.appearance} ${token}`} style={{ fg: theme.text }} />;
+            },
+          },
+        },
+      ],
+      hunkRows: [{ startRow: 0, endRow: 0 }],
+    };
+    const file = createTestDiffFile({ id: "themed", path: "themed.ts" });
+    const fileView = resolveTestLayout(themedLayout, 20);
+    const geometry = measureFileViewGeometry(file, fileView);
+    let switchTheme = () => {};
+
+    function Harness() {
+      const [themeId, setThemeId] = useState("github-dark-default");
+      switchTheme = () => setThemeId("github-light-default");
+      return (
+        <FileView
+          file={file}
+          fileView={fileView}
+          geometry={geometry}
+          selectedHunkIndex={0}
+          theme={resolveTheme(themeId, null)}
+          width={20}
+        />
+      );
+    }
+
+    const setup = await testRender(<Harness />, { width: 20, height: 2 });
+    try {
+      await act(async () => setup.renderOnce());
+      expect(paints.at(-1)).toMatchObject({ appearance: "dark", token: 1 });
+      const darkText = paints.at(-1)?.text;
+
+      await act(async () => {
+        switchTheme();
+        await setup.renderOnce();
+      });
+      expect(paints.at(-1)).toMatchObject({ appearance: "light", token: 1 });
+      expect(paints.at(-1)?.text).not.toBe(darkText);
+      expect(fileView.layoutGeneration).toBe(1);
     } finally {
       await act(async () => setup.renderer.destroy());
     }
@@ -241,6 +352,9 @@ describe("FileView custom rows", () => {
       rows: Array.from({ length: 1_000 }, (_, index) => ({
         id: `row-${index}`,
         spans: [{ text: `fallback ${index}` }],
+        ...(index === 500
+          ? { sourceRanges: [{ side: "new" as const, range: [500, 500] as const }] }
+          : {}),
         component: {
           height: 1,
           render: () => {
@@ -249,7 +363,7 @@ describe("FileView custom rows", () => {
           },
         },
       })),
-      hunkRows: [],
+      hunkRows: [{ startRow: 0, endRow: 999 }],
     };
     const file = createTestDiffFile({
       id: "large",
@@ -258,21 +372,33 @@ describe("FileView custom rows", () => {
       after: "b",
     });
     const fileView = resolveTestLayout(largeLayout, 20);
+    const plan = buildFileViewRenderPlan(fileView.layout, [
+      {
+        id: "windowed-note",
+        annotation: { summary: "WINDOWED NOTE", newRange: [500, 500] },
+      },
+    ]);
+    const geometry = measureFileViewGeometry(file, fileView, plan.rows, 20);
     const setup = await testRender(
       <FileView
         file={file}
         fileView={fileView}
-        geometry={measureFileViewGeometry(file, fileView)}
-        selectedHunkIndex={-1}
+        geometry={geometry}
+        selectedHunkIndex={0}
         theme={resolveTheme("github-dark-default", null)}
-        visibleBodyBounds={{ top: 500, height: 4 }}
+        visibleBodyBounds={{ top: 500, height: 8 }}
         width={20}
       />,
-      { width: 20, height: 6 },
+      { width: 20, height: 8 },
     );
 
     try {
       await act(async () => setup.renderOnce());
+      expect(
+        setup.renderer.root.findDescendantById(
+          reviewRowId("inline-note:windowed-note:file-view:row-500:0"),
+        ),
+      ).not.toBeNull();
       expect(new Set(mounted)).toEqual(new Set([500, 501, 502, 503]));
       expect(mounted).not.toContain(499);
       expect(mounted).not.toContain(504);

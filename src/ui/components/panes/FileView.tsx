@@ -11,7 +11,9 @@ import type { AppTheme } from "../../themes";
 import type { DiffSectionGeometry } from "../../diff/diffSectionGeometry";
 import { resolveVisibleRowIndexWindow, type VisibleBodyBounds } from "../../diff/rowWindowing";
 import { reviewRowId } from "../../lib/ids";
+import { toExtensionPaintTheme } from "../../lib/extensionPaintTheme";
 import type { ResolvedFileViewLayout } from "../../fileViews/useFileViews";
+import { AgentInlineNote } from "./AgentInlineNote";
 
 type FileViewTone = ExtensionFileViewSpan["tone"];
 type FileViewTextAttribute = NonNullable<ExtensionFileViewSpan["attributes"]>[number];
@@ -127,11 +129,21 @@ function FileViewComponent({
   onRowFailure?: (failure: FileViewRowFailure) => void;
 }) {
   const { layout } = fileView;
+  const publicTheme = useMemo(() => toExtensionPaintTheme(theme), [theme]);
+  const plannedRows =
+    geometry.fileViewRows ??
+    layout.rows.map((row, rowIndex) => ({
+      kind: "file-view-row" as const,
+      key: `file-view:${row.id}`,
+      stableKey: `file-view:${row.id}`,
+      row,
+      rowIndex,
+    }));
   const rowWindow = useMemo(() => {
     if (!visibleBodyBounds) {
       return {
         bottomSpacerHeight: 0,
-        endIndex: layout.rows.length,
+        endIndex: plannedRows.length,
         startIndex: 0,
         topSpacerHeight: 0,
       };
@@ -141,16 +153,40 @@ function FileViewComponent({
       rowBounds: geometry.rowBounds,
       visibleBodyBounds,
     });
-  }, [geometry.bodyHeight, geometry.rowBounds, layout.rows.length, visibleBodyBounds]);
+  }, [geometry.bodyHeight, geometry.rowBounds, plannedRows.length, visibleBodyBounds]);
 
-  const mountedRows = layout.rows.slice(rowWindow.startIndex, rowWindow.endIndex);
+  const mountedRows = plannedRows.slice(rowWindow.startIndex, rowWindow.endIndex);
   return (
     <box style={{ width: "100%", flexDirection: "column" }}>
       {rowWindow.topSpacerHeight > 0 ? (
         <box style={{ width: "100%", height: rowWindow.topSpacerHeight }} />
       ) : null}
-      {mountedRows.map((row, offset) => {
-        const index = rowWindow.startIndex + offset;
+      {mountedRows.map((plannedRow) => {
+        if (plannedRow.kind === "inline-note") {
+          return (
+            <box
+              key={plannedRow.key}
+              id={reviewRowId(plannedRow.key)}
+              style={{ width: "100%", flexDirection: "column" }}
+            >
+              <AgentInlineNote
+                annotation={plannedRow.annotation}
+                anchorSide={plannedRow.anchorSide}
+                file={file}
+                layout="stack"
+                noteCount={plannedRow.noteCount}
+                noteIndex={plannedRow.noteIndex}
+                draft={plannedRow.note.draft}
+                onClose={plannedRow.note.onRemove}
+                theme={theme}
+                width={width}
+              />
+            </box>
+          );
+        }
+
+        const row = plannedRow.row;
+        const index = plannedRow.rowIndex;
         const selected = isFileViewRowSelected(layout, index, selectedHunkIndex);
         const fixedHeight = row.component?.height;
         const View = row.component?.render as
@@ -209,6 +245,7 @@ function FileViewComponent({
                     height={fixedHeight}
                     selected={selected}
                     rowIndex={index}
+                    theme={publicTheme}
                   />
                 </box>
               </FileViewRowErrorBoundary>

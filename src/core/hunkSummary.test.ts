@@ -43,6 +43,46 @@ describe("summarizeHunk", () => {
     expect(validateFileViewLayout(jsxLayout, summaries.length, 80)).toMatchObject({ valid: true });
   });
 
+  test("JSX example omits nonexistent added/deleted source sides", () => {
+    const publicFile = createFileViewInput(
+      createTestDiffFile(),
+      80,
+      new AbortController().signal,
+    ).file;
+    const template = publicFile.hunks?.[0];
+    if (!template) throw new Error("Expected one parsed hunk");
+
+    for (const [missingSide, firstOldRange, firstNewRange, secondOldRange, secondNewRange] of [
+      ["old", [0, 0], [1, 1], [0, 0], [2, 2]],
+      ["new", [1, 1], [0, 0], [2, 2], [0, 0]],
+    ] as const) {
+      const layout = createJsxFileViewLayout({
+        ...publicFile,
+        hunks: [
+          {
+            ...template,
+            index: 0,
+            oldRange: [...firstOldRange] as [number, number],
+            newRange: [...firstNewRange] as [number, number],
+          },
+          {
+            ...template,
+            index: 1,
+            oldRange: [...secondOldRange] as [number, number],
+            newRange: [...secondNewRange] as [number, number],
+          },
+        ],
+      });
+      expect(layout).not.toBeNull();
+      expect(validateFileViewLayout(layout, 2, 80)).toMatchObject({ valid: true });
+      expect(
+        layout?.rows
+          .flatMap((row) => row.sourceRanges ?? [])
+          .some((range) => range.side === missingSide),
+      ).toBe(false);
+    }
+  });
+
   test("gives a synthesized hunk without line numbers no ranges instead of NaN spans", () => {
     // Transform validation only requires `hunkContent`, so this is the least
     // hunk an extension can legally put in front of the review UI.

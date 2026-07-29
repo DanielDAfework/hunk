@@ -25,6 +25,8 @@ import type {
   ExtensionChangeset,
   ExtensionFileViewRow,
   ExtensionFileViewRowComponentProps,
+  ExtensionFileViewSourceRange,
+  ExtensionPaintTheme,
   ExtensionReviewSelection,
   ExtensionVcsAdapter,
   ExtensionVcsDiffInput,
@@ -48,10 +50,16 @@ export default function (hunk: HunkExtensionAPI) {
   hunk.registerTheme(theme);
   hunk.registerFileLanguage(".zig", "zig");
 
-  const renderRow = (_props: ExtensionFileViewRowComponentProps) => null;
+  const renderRow = (props: ExtensionFileViewRowComponentProps) => {
+    const paintTheme: ExtensionPaintTheme = props.theme;
+    hunk.log(paintTheme.text);
+    return null;
+  };
+  const sourceRange: ExtensionFileViewSourceRange = { side: "new", range: [1, 1] };
   const componentRow: ExtensionFileViewRow = {
     id: "component",
     spans: [{ text: "fallback" }],
+    sourceRanges: [sourceRange],
     component: { height: 2, render: renderRow },
   };
   const invalidComponentRow: ExtensionFileViewRow = {

@@ -225,6 +225,13 @@ export interface ExtensionFileChangeRange {
   readonly range: readonly [number, number];
 }
 
+/** One exact-source range associated with a host-owned file-view row. */
+export interface ExtensionFileViewSourceRange {
+  readonly side: ExtensionFileSide;
+  /** Inclusive, one-based source line range. */
+  readonly range: readonly [number, number];
+}
+
 /** One symbolic run in a host-rendered file-view row. */
 export interface ExtensionFileViewSpan {
   readonly text: string;
@@ -244,6 +251,8 @@ export interface ExtensionFileViewRowComponentProps {
   readonly selected: boolean;
   /** Zero-based position in the validated file-view layout. */
   readonly rowIndex: number;
+  /** Live paint-only semantic colors; theme changes never invalidate layout geometry. */
+  readonly theme: ExtensionPaintTheme;
 }
 
 /** A row in a host-owned, terminal-safe file-view layout. */
@@ -255,6 +264,11 @@ export interface ExtensionFileViewRow {
    * Component fallback is clipped to the same declared fixed height as the painter.
    */
   readonly spans: readonly ExtensionFileViewSpan[];
+  /**
+   * Exact-source ranges this row presents. Hunk validates unambiguous, in-bounds mappings and
+   * uses them to place host-rendered inline notes; unresolved notes keep the whole file on raw diff.
+   */
+  readonly sourceRanges?: readonly ExtensionFileViewSourceRange[];
   /**
    * Experimental fixed-height React/OpenTUI painter, clipped inside host-owned geometry.
    * Height and render are one descriptor so a typed layout cannot declare either alone.
@@ -703,14 +717,14 @@ export interface ExtensionVcsAdapter {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Theme tokens a custom sidebar renders with.
+ * Theme tokens extension-owned React/OpenTUI painters render with.
  *
  * A curated slice of the active theme rather than the whole internal theme
  * model: every value is a hex color string (or the appearance flag), stable to
  * build UI against, and updated live when the user switches themes. Field
  * names match the `[themes.<id>]` config table where a concept exists there.
  */
-export interface ExtensionSidebarTheme {
+export interface ExtensionPaintTheme {
   appearance: "light" | "dark";
   background: string;
   panel: string;
@@ -733,6 +747,9 @@ export interface ExtensionSidebarTheme {
   /** Accent for agent-note affordances, like the note-count badge on a file row. */
   noteBorder: string;
 }
+
+/** Backward-compatible name for the shared extension painter theme. */
+export type ExtensionSidebarTheme = ExtensionPaintTheme;
 
 /**
  * Navigation a custom sidebar can trigger, exactly as the built-in one does.

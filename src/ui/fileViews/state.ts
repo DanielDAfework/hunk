@@ -1,3 +1,4 @@
+import type { ExtensionDiffFile } from "../../extension-api/types";
 import type { RegisteredFileView } from "../../extensions/types";
 
 /** Raw is implicit: only files explicitly switched away from raw have an entry. */
@@ -47,4 +48,47 @@ export function selectFileView(
   }
   if (current[fileId] === viewKey) return current;
   return { ...current, [fileId]: viewKey };
+}
+
+export interface BulkFileViewTarget {
+  readonly key: string;
+  readonly fileIds: readonly string[];
+}
+
+/** Resolve the changeset-wide matching set only while the selected file still uses and matches it. */
+export function resolveBulkFileViewTarget({
+  current,
+  files,
+  registered,
+  selectedFileId,
+}: {
+  current: FileViewSelectionState;
+  files: readonly ExtensionDiffFile[];
+  registered: RegisteredFileView;
+  selectedFileId: string;
+}): BulkFileViewTarget | null {
+  const key = registeredFileViewKey(registered);
+  if (current[selectedFileId] !== key) return null;
+  const fileIds: string[] = [];
+  for (const file of files) {
+    try {
+      if (registered.view.matches(file)) fileIds.push(file.id);
+    } catch {
+      // One cooperative matcher failure excludes only that file from the host-owned batch.
+    }
+  }
+  if (!fileIds.includes(selectedFileId)) return null;
+  return fileIds.some((fileId) => current[fileId] !== key) ? { key, fileIds } : null;
+}
+
+/** Apply one presentation to a host-resolved set of matching files without touching nonmatches. */
+export function selectFileViewForFiles(
+  current: FileViewSelectionState,
+  fileIds: readonly string[],
+  viewKey: string,
+): FileViewSelectionState {
+  if (fileIds.every((fileId) => current[fileId] === viewKey)) return current;
+  const next = { ...current };
+  for (const fileId of fileIds) next[fileId] = viewKey;
+  return next;
 }

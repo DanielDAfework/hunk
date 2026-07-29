@@ -1,23 +1,19 @@
 import type { DiffFile } from "../../core/types";
-import { alwaysShowReviewNote } from "../lib/agentAnnotations";
 
-export const FILE_VIEW_NOTES_UNAVAILABLE_REASON =
-  "File presentations are unavailable while inline review notes are visible • using raw diff";
+export const FILE_VIEW_DRAFT_UNAVAILABLE_REASON =
+  "File presentations are unavailable while drafting an inline review note • using raw diff";
 
-/** Explain the one host-owned condition that currently requires raw diff rendering. */
+/** Draft editing remains raw-only; committed notes are resolved from validated source bindings. */
 export function fileViewUnavailableReason({
-  file,
+  file: _file,
   hasDraftNote,
-  showAgentNotes,
+  showAgentNotes: _showAgentNotes,
 }: {
   file: DiffFile;
   hasDraftNote: boolean;
   showAgentNotes: boolean;
 }) {
-  const hasVisibleNote = (file.agent?.annotations ?? []).some(
-    (annotation) => showAgentNotes || alwaysShowReviewNote(annotation),
-  );
-  return hasDraftNote || hasVisibleNote ? FILE_VIEW_NOTES_UNAVAILABLE_REASON : null;
+  return hasDraftNote ? FILE_VIEW_DRAFT_UNAVAILABLE_REASON : null;
 }
 
 /** Mask stored choices only while a host constraint requires raw rendering. */

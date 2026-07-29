@@ -3,6 +3,7 @@ import type {
   ExtensionDiffFile,
   ExtensionFileViewLayout,
   ExtensionFileViewRowComponentProps,
+  ExtensionFileViewSourceRange,
   ExtensionFileViewSpan,
   ExtensionFactory,
 } from "hunkdiff/extension";
@@ -13,7 +14,7 @@ function hunkCard(
   detail: string,
   tone: ExtensionFileViewSpan["tone"],
 ): (props: ExtensionFileViewRowComponentProps) => ReactNode {
-  return function HunkCard({ width, height, selected, rowIndex }) {
+  return function HunkCard({ width, height, selected, rowIndex, theme }) {
     const [expanded, setExpanded] = useState(false);
     const marker = selected ? "▶" : " ";
     return (
@@ -28,12 +29,27 @@ function hunkCard(
       >
         <text
           content={`${marker} ${title}`}
-          style={{ fg: tone === "added" ? "green" : "yellow" }}
+          style={{ fg: tone === "added" ? theme.fileNew : theme.accent }}
         />
         <text content={`  ${expanded ? detail : `row ${rowIndex} · click for detail`}`} />
       </box>
     );
   };
+}
+
+/** Omit the `[0, 0]` range Pierre uses for an added/deleted file's nonexistent side. */
+function hunkSourceRanges(hunk: {
+  oldRange?: readonly [number, number];
+  newRange?: readonly [number, number];
+}): ExtensionFileViewSourceRange[] {
+  return [
+    ...(hunk.oldRange && hunk.oldRange[0] >= 1
+      ? [{ side: "old" as const, range: hunk.oldRange }]
+      : []),
+    ...(hunk.newRange && hunk.newRange[0] >= 1
+      ? [{ side: "new" as const, range: hunk.newRange }]
+      : []),
+  ];
 }
 
 /** Build the deterministic two-row-per-hunk layout used by the live TSX example. */
@@ -53,6 +69,7 @@ export function createJsxFileViewLayout(file: ExtensionDiffFile): ExtensionFileV
             tone: "accent" as const,
           },
         ],
+        sourceRanges: hunkSourceRanges(item),
         component: {
           height: 2,
           render: hunkCard(`Hunk ${item.index + 1}`, `${rangeLabel} · ${item.header}`, "added"),

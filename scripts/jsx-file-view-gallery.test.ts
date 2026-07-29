@@ -99,6 +99,22 @@ describe("JSX file-view gallery", () => {
     ]);
   });
 
+  test("omits nonexistent source sides for added and deleted files", () => {
+    for (const [before, after, expectedSide] of [
+      ["", "export const added = true;\n", "new"],
+      ["export const removed = true;\n", "", "old"],
+    ] as const) {
+      const input = sourceInput(before, after, expectedSide === "new" ? "added.ts" : "deleted.ts");
+      const layout = createChangeAtlasLayout(input);
+      const hunkCount = input.file.hunks?.length ?? 0;
+
+      expectValidDemoLayout(layout, hunkCount);
+      expect(
+        layout?.rows.flatMap((row) => row.sourceRanges ?? []).map((range) => range.side),
+      ).toEqual([expectedSide]);
+    }
+  });
+
   test("renders semantic old/new swatches from exact CSS documents", async () => {
     const { file, input, sourceFetcher } = fixtureInput(
       "css-palette",

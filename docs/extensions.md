@@ -655,9 +655,9 @@ Pierre's raw diff. A constrained, experimental
 [fixed-height JSX row POC](file-view-jsx-poc.md) lets individual validated rows
 paint OpenTUI content without taking over that geometry. Raw is always the
 default; users select a matching view from **View** for the selected file.
-Alternate presentations are unavailable while inline review notes are visible,
-because raw diff is currently the only rendering path that can place those
-notes.
+Rows may bind themselves to exact old/new source ranges so Hunk can insert its
+own inline review-note cards without giving the extension note contents or
+geometry.
 
 The installable
 [`examples/extensions/rendered-markdown/`](../examples/extensions/rendered-markdown/)
@@ -677,9 +677,11 @@ export default function (hunk: HunkExtensionAPI) {
       const document = await input.readDocument("new");
       if (!document || document.length > 100_000) return null;
 
-      const rows = document.split("\n").map((text, index) => ({
+      const sourceLines = (document.endsWith("\n") ? document.slice(0, -1) : document).split("\n");
+      const rows = sourceLines.map((text, index) => ({
         id: `line:${index + 1}`,
         spans: [{ text: text || " " }],
+        sourceRanges: [{ side: "new" as const, range: [index + 1, index + 1] as const }],
       }));
       if (rows.length === 0) return null;
 
@@ -711,14 +713,29 @@ terminal attributes (`bold`, `italic`, `underline`, `strikethrough`). Hunk
 resolves those primitives only while painting, so the host does not learn the
 extension's content format and measurement remains theme-independent. Every
 parsed hunk needs one in-bounds, inclusive `hunkRows` entry at the same array
-position as `input.file.hunks`. Invalid, oversized, cancelled, or throwing
-layouts are isolated with one warning per concrete extension registration and
-fall back to raw diff. Rapid width changes are coalesced, and Hunk never paints
+position as `input.file.hunks`.
+
+A row's optional `sourceRanges` contains inclusive, one-based exact-source
+bindings such as `{ side: "new", range: [12, 18] }`. Hunk reads only the bound
+source sides, verifies every range is in bounds, rejects overlapping ranges on
+the same side across rows, and requires each bound row to belong to exactly one
+`hunkRows` extent. One source line and one bound row therefore resolve to one
+presentation/hunk target. Inline notes anchor by their existing preferred-side start
+line and are inserted before the bound row. Placement is **all-or-raw** per
+file: if any visible note is range-less or unbound, Hunk temporarily renders
+the complete raw diff rather than guessing or dropping review data. The stored
+presentation selection returns when the note layer is hidden or the mapping
+becomes resolvable. Draft note editing remains raw-only.
+
+Invalid, oversized, cancelled, or throwing layouts are isolated with one
+warning per concrete extension registration and fall back to raw diff. Rapid width changes are coalesced, and Hunk never paints
 geometry measured for a stale width. An experimental custom row keeps symbolic
 fallback spans and declares its fixed painter
-atomically as `component: { height, render }`. If painting fails, the fallback
-spans are clipped to that same declared height rather than changing stream
-geometry. Custom rows are non-focusable
+atomically as `component: { height, render }`. Painter props include the same
+curated semantic `theme` palette as custom sidebars. It updates live at paint
+time without entering `layout` or changing deterministic geometry. If painting
+fails, the fallback spans are clipped to that same declared height rather than
+changing stream geometry. Custom rows are non-focusable
 paint surfaces: registered commands are their supported keyboard path. A
 cooperatively delivered, handled left-button mouse-up may act and stop
 propagation, while wheel, drag, and unhandled input remain host-owned. Hunk
@@ -731,7 +748,12 @@ A command handler can control the selected file's view through
 `ctx.fileViews.select("view-id")`, `toggle("view-id")`, and
 `isActive("view-id")`; pass `null` to `select` to restore raw rendering.
 Bare ids address the calling extension; use `"other-extension:view-id"` to
-address another registered view.
+address another registered view. The public command API remains current-file
+only. When the current file already uses an alternate presentation, **View →
+Apply “…” to all matching files** applies it to every file in the complete
+changeset that passes that view's `matches` function, including files hidden by
+the current filter. Nonmatches retain their existing choices, and host
+constraints such as an active draft may temporarily keep a selected file raw.
 
 ### `hunk.registerCommand(command, handler)`
 

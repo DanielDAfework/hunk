@@ -33,7 +33,9 @@ function createTestCommands(resolvedKeys?: ResolvedCommandKeys) {
       ran.push(args.length > 0 ? `${name}:${args.join(",")}` : name);
     };
   const options: BuildAppCommandsOptions = {
+    canApplyFilePresentationToAllMatching: false,
     canRefreshCurrentInput: true,
+    applyFilePresentationToAllMatching: record("applyFilePresentationToAllMatching"),
     focusFilter: record("focusFilter"),
     moveToAnnotatedFile: record("moveToAnnotatedFile"),
     moveToAnnotatedHunk: record("moveToAnnotatedHunk"),
@@ -203,6 +205,7 @@ describe("builtinCommandKeyDefaults", () => {
       "hunk.app.openAgentSkill",
       "hunk.review.nextAnnotatedFile",
       "hunk.review.previousAnnotatedFile",
+      "hunk.view.applyFilePresentationToAllMatching",
       "hunk.view.toggleCopyDecorations",
     ]);
   });
