@@ -168,6 +168,15 @@ class Storyboard {
    */
   async writeVideos(baseName: string) {
     const workDir = mkdtempSync(join(tmpdir(), `hunk-capture-${baseName}-`));
+    try {
+      await this.encodeTimeline(baseName, workDir);
+    } finally {
+      // A missing ffmpeg or failed encode must not strand retina frames in /tmp.
+      rmSync(workDir, { recursive: true, force: true });
+    }
+  }
+
+  private async encodeTimeline(baseName: string, workDir: string) {
     const statePaths = this.states.map((buffer, index) => {
       const statePath = join(workDir, `state-${index}.png`);
       writeFileSync(statePath, buffer);
@@ -255,7 +264,6 @@ class Storyboard {
       join(publicDir, `${baseName}.webm`),
     ]);
 
-    rmSync(workDir, { recursive: true, force: true });
     console.log(`${baseName}: ${this.frames.length} frames, ${this.states.length} states`);
   }
 }
@@ -430,8 +438,17 @@ const MONTAGE_THEMES = [
 
 /** Video: the same split diff crossfading across bundled themes. */
 async function captureThemes() {
-  const stills: string[] = [];
   const workDir = mkdtempSync(join(tmpdir(), "hunk-capture-themes-"));
+  try {
+    await captureThemeMontage(workDir);
+  } finally {
+    // A missing ffmpeg or failed encode must not strand retina stills in /tmp.
+    rmSync(workDir, { recursive: true, force: true });
+  }
+}
+
+async function captureThemeMontage(workDir: string) {
+  const stills: string[] = [];
 
   for (const theme of MONTAGE_THEMES) {
     const { session, cleanup } = await launchHunkForCapture({
@@ -518,7 +535,6 @@ async function captureThemes() {
     join(publicDir, "feature-themes.webm"),
   ]);
 
-  rmSync(workDir, { recursive: true, force: true });
   console.log("feature-themes videos written");
 }
 

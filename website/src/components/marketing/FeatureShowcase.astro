@@ -167,7 +167,6 @@ const showcase: (ShowcaseFeature | ShowcaseQuote)[] = [
               <video
                 width={item.media.width}
                 height={item.media.height}
-                autoplay
                 loop
                 muted
                 playsinline
@@ -186,7 +185,9 @@ const showcase: (ShowcaseFeature | ShowcaseQuote)[] = [
 </div>
 
 <script>
-  // Pause clips off-screen and under reduced motion; autoplay is the baseline.
+  // Playback is script-driven — no native autoplay — so a reduced-motion
+  // preference is honored from first paint, not after a visible flicker.
+  // Without JavaScript the clips stay on their preloaded first frame.
   const clips = Array.from(document.querySelectorAll<HTMLVideoElement>(".show-media video"));
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const visibleClips = new WeakSet<HTMLVideoElement>();
