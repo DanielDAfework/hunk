@@ -55,7 +55,6 @@ function createWrappedCjkDiffFile(fixtureId: string, lines: string[]): DiffFile 
 /** Build a wrapped split-view bootstrap around one deterministic Japanese Markdown file. */
 function createWrappedCjkBootstrap(fixtureId: string, lines: string[]): AppBootstrap {
   return {
-    reloadContext: { cwd: process.cwd() },
     input: {
       kind: "vcs",
       staged: false,
