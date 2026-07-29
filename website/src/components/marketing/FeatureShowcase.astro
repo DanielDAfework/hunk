@@ -24,6 +24,7 @@ interface ShowcaseImage {
 }
 
 interface ShowcaseFeature {
+  kind: "feature";
   heading: string;
   body: string;
   href: string;
@@ -31,8 +32,21 @@ interface ShowcaseFeature {
   media: ShowcaseVideo | ShowcaseImage;
 }
 
-const showcase: ShowcaseFeature[] = [
+/** A pull-quote breather between feature rows, linked to the original post. */
+interface ShowcaseQuote {
+  kind: "quote";
+  quote: string;
+  who: string;
+  href: string;
+}
+
+/**
+ * The tour interleaves quotes as beats between chapters: Mitchell's after the
+ * reviewing story (stream + agent notes), DHH's before the closing themes row.
+ */
+const showcase: (ShowcaseFeature | ShowcaseQuote)[] = [
   {
+    kind: "feature",
     heading: "One stream, every file.",
     body: "The whole changeset reads top to bottom in sidebar order — no flipping between single-file views. File counts at a glance, hunk jumps with [ and ], and the sidebar takes you straight to any file.",
     href: "/docs/workflows/working-trees-and-commits/",
@@ -46,6 +60,7 @@ const showcase: ShowcaseFeature[] = [
     },
   },
   {
+    kind: "feature",
     heading: "Your agent's reasoning, beside the code it explains.",
     body: "Agents leave notes in a sidecar; hunk renders each one inside the diff, right above the hunk it annotates — summary, rationale, and author. Step through hunks with [ and ] and the notes follow.",
     href: "/docs/agents/comments-and-annotations/",
@@ -59,6 +74,13 @@ const showcase: ShowcaseFeature[] = [
     },
   },
   {
+    kind: "quote",
+    quote: "Hunk is very good. It has replaced any other local diff viewer for me.",
+    who: "Mitchell Hashimoto, creator of Ghostty & Vagrant",
+    href: "https://x.com/mitchellh/status/2052128048288567617",
+  },
+  {
+    kind: "feature",
     heading: "Keys when you're fast, mouse when you're browsing.",
     body: "Click a file in the sidebar to jump, wheel-scroll the stream, hover a row to leave a note — or never leave the keyboard. Pipe patches straight in and hunk is your pager, too.",
     href: "/docs/start/keyboard-and-mouse/",
@@ -72,6 +94,7 @@ const showcase: ShowcaseFeature[] = [
     },
   },
   {
+    kind: "feature",
     heading: "Split or stack — or let auto decide.",
     body: "Side-by-side when your terminal is wide, stacked when it's narrow. Auto picks for you; press 1, 2, or 0 to override at any time, with wrapping and line numbers toggled live.",
     href: "/docs/configure/layout-and-display/",
@@ -85,6 +108,13 @@ const showcase: ShowcaseFeature[] = [
     },
   },
   {
+    kind: "quote",
+    quote: "Love hunk.",
+    who: "DHH, creator of Omarchy and Ruby on Rails",
+    href: "https://x.com/dhh/status/2062919431680852164",
+  },
+  {
+    kind: "feature",
     heading: "Real syntax highlighting. Dozens of themes.",
     body: "Understand structure, not just added and removed lines. Ships with its own looks plus the classics — Catppuccin, Dracula, Gruvbox, GitHub, and more — or roll your own in config.",
     href: "/docs/configure/themes/",
@@ -102,44 +132,56 @@ const showcase: ShowcaseFeature[] = [
 
 <div class="show">
   {
-    showcase.map(({ heading, body, href, linkText, media }) => (
-      <article class="show-item">
-        <div class="show-copy">
-          <h3>{heading}</h3>
-          <p>{body}</p>
-          <a class="more" href={href}>
-            {linkText} →
-          </a>
-        </div>
-        <figure class="show-media">
-          {media.kind === "image" ? (
-            <img
-              src={media.src}
-              width={media.width}
-              height={media.height}
-              alt={media.alt}
-              loading="lazy"
-              decoding="async"
-              draggable="false"
-            />
-          ) : (
-            <video
-              width={media.width}
-              height={media.height}
-              autoplay
-              loop
-              muted
-              playsinline
-              preload="metadata"
-              aria-label={media.label}
-            >
-              <source src={`/${media.base}.webm`} type="video/webm" />
-              <source src={`/${media.base}.mp4`} type="video/mp4" />
-            </video>
-          )}
+    showcase.map((item) =>
+      item.kind === "quote" ? (
+        <figure class="show-quote">
+          <span class="qmark" aria-hidden="true">“</span>
+          <blockquote>{item.quote}</blockquote>
+          <figcaption>
+            <a href={item.href} target="_blank" rel="noopener noreferrer">
+              {item.who}
+            </a>
+          </figcaption>
         </figure>
-      </article>
-    ))
+      ) : (
+        <article class="show-item">
+          <div class="show-copy">
+            <h3>{item.heading}</h3>
+            <p>{item.body}</p>
+            <a class="more" href={item.href}>
+              {item.linkText} →
+            </a>
+          </div>
+          <figure class="show-media">
+            {item.media.kind === "image" ? (
+              <img
+                src={item.media.src}
+                width={item.media.width}
+                height={item.media.height}
+                alt={item.media.alt}
+                loading="lazy"
+                decoding="async"
+                draggable="false"
+              />
+            ) : (
+              <video
+                width={item.media.width}
+                height={item.media.height}
+                autoplay
+                loop
+                muted
+                playsinline
+                preload="metadata"
+                aria-label={item.media.label}
+              >
+                <source src={`/${item.media.base}.webm`} type="video/webm" />
+                <source src={`/${item.media.base}.mp4`} type="video/mp4" />
+              </video>
+            )}
+          </figure>
+        </article>
+      ),
+    )
   }
 </div>
 

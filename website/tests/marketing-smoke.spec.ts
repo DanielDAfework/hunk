@@ -153,6 +153,15 @@ test("feature showcase leads with real TUI captures and deep-links each feature"
     "href",
     "/docs/workflows/working-trees-and-commits/",
   );
+
+  // The quotes interleave the tour as pull-quote breathers, linking out.
+  const quotes = page.locator(".show-quote");
+  await expect(quotes).toHaveCount(2);
+  await expect(quotes.first()).toContainText("replaced any other local diff viewer");
+  await expect(quotes.first().getByRole("link", { name: /Mitchell Hashimoto/ })).toHaveAttribute(
+    "href",
+    /x\.com\/mitchellh/,
+  );
 });
 
 test("marketing page has no serious automated accessibility violations", async ({ page }) => {

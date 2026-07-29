@@ -89,7 +89,7 @@ a:focus-visible {
 }
 
 .marketing .top nav a:hover,
-.marketing .says figcaption a:hover {
+.marketing .show-quote figcaption a:hover {
   color: var(--acc);
 }
 
@@ -285,65 +285,11 @@ a:focus-visible {
   color: var(--paper);
 }
 
-.marketing .says,
 .marketing .feats,
 .marketing .install {
   max-width: 960px;
   margin: 0 auto;
   padding: 0 36px 104px;
-}
-
-.marketing .says .quotes {
-  display: grid;
-  grid-template-rows: auto auto auto;
-  grid-template-columns: 1fr 1fr;
-}
-
-.marketing .says figure {
-  display: grid;
-  grid-row: span 3;
-  grid-template-rows: subgrid;
-  row-gap: 0;
-  margin: 0;
-}
-
-.marketing .says figure:first-child {
-  padding-right: 42px;
-}
-
-.marketing .says figure + figure {
-  padding-left: 42px;
-  border-left: 1.5px solid var(--rule);
-}
-
-.marketing .says .qmark {
-  margin: 6px 0 14px;
-  color: var(--acc);
-  font-size: 44px;
-  font-weight: 700;
-  line-height: 0.4;
-}
-
-.marketing .says blockquote {
-  margin: 0;
-  color: var(--ink);
-  font-size: clamp(15px, 1.5vw, 19px);
-  font-weight: 500;
-  line-height: 1.5;
-  letter-spacing: -0.01em;
-}
-
-.marketing .says figcaption {
-  margin-top: 16px;
-  color: var(--soft);
-  font-size: 11.5px;
-  line-height: 1.5;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.marketing .says figcaption::before {
-  content: "— ";
 }
 
 .marketing .feats h2,
@@ -486,6 +432,44 @@ a:focus-visible {
   display: block;
   width: 100%;
   height: auto;
+}
+
+/* Pull-quote interludes: centered breathers between feature rows. */
+.marketing .show-quote {
+  margin: 0;
+  padding: 14px 0 6px;
+  text-align: center;
+}
+
+.marketing .show-quote .qmark {
+  display: block;
+  margin-bottom: 14px;
+  color: var(--acc);
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 0.5;
+}
+
+.marketing .show-quote blockquote {
+  max-width: 40ch;
+  margin: 0 auto;
+  color: var(--ink);
+  font-size: clamp(18px, 2.4vw, 23px);
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+}
+
+.marketing .show-quote figcaption {
+  margin-top: 14px;
+  color: var(--soft);
+  font-size: 11.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.marketing .show-quote figcaption::before {
+  content: "— ";
 }
 
 /* Scroll-driven entrance: each capture rises and settles as it scrolls into
@@ -769,7 +753,6 @@ a:focus-visible {
 
   .marketing .intro,
   .marketing .paper,
-  .marketing .says,
   .marketing .feats,
   .marketing .band,
   .marketing .install,
@@ -783,27 +766,6 @@ a:focus-visible {
   .marketing .top nav {
     justify-content: flex-end;
     flex-wrap: wrap;
-  }
-
-  .marketing .says .quotes {
-    display: block;
-  }
-
-  .marketing .says figure {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .marketing .says figure:first-child {
-    padding-right: 0;
-    padding-bottom: 34px;
-  }
-
-  .marketing .says figure + figure {
-    padding-top: 34px;
-    padding-left: 0;
-    border-top: 1.5px solid var(--rule);
-    border-left: 0;
   }
 }
 

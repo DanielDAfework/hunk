@@ -31,19 +31,6 @@ const features = [
   ],
 ] as const;
 
-const quotes = [
-  {
-    who: "Mitchell Hashimoto, creator of Ghostty & Vagrant",
-    quote: "Hunk is very good. It has replaced any other local diff viewer for me.",
-    href: "https://x.com/mitchellh/status/2052128048288567617",
-  },
-  {
-    who: "DHH, creator of Omarchy and Ruby on Rails",
-    quote: "Love hunk.",
-    href: "https://x.com/dhh/status/2062919431680852164",
-  },
-] as const;
-
 let stars: number | null = null;
 try {
   const token = process.env.GITHUB_TOKEN;
@@ -135,22 +122,6 @@ const formattedStars =
 
         <section class="paper" aria-label="Hunk theme preview">
           <ThemeShot />
-        </section>
-
-        <section class="says" aria-label="What developers say about Hunk">
-          <div class="quotes">
-            {
-              quotes.map(({ who, quote, href }) => (
-                <figure>
-                  <span class="qmark" aria-hidden="true">“</span>
-                  <blockquote>{quote}</blockquote>
-                  <figcaption>
-                    <a href={href} target="_blank" rel="noopener noreferrer">{who}</a>
-                  </figcaption>
-                </figure>
-              ))
-            }
-          </div>
         </section>
 
         <section class="band videos" aria-labelledby="videos-title">
