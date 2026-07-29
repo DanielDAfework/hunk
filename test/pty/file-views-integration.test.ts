@@ -288,6 +288,7 @@ describe("PTY file views", () => {
 
     try {
       await session.waitForText(/before\.md/, { timeout: 20_000 });
+      await harness.ensureKeyboardIsLive(session);
       await session.press("f8");
       const preview = await session.waitForText(/• new item/);
       expect(preview).toContain("Review the new item.");
@@ -323,6 +324,7 @@ describe("PTY file views", () => {
 
     try {
       await session.waitForText(/before\.md/, { timeout: 20_000 });
+      await harness.ensureKeyboardIsLive(session);
       await session.press("f8");
       const raw = await session.waitForText(/old item/);
       expect(raw).not.toContain("• new item");
