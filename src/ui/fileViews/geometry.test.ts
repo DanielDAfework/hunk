@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createTestDiffFile } from "../../../test/helpers/diff-helpers";
 import type { ExtensionFileViewLayout } from "../../extension-api/types";
 import { measureFileViewGeometry } from "./geometry";
+import { validateFileViewLayout } from "./layout";
 
 describe("file-view geometry", () => {
   test("uses declared component heights while retaining stable row ids and hunk bounds", () => {
@@ -31,8 +32,11 @@ describe("file-view geometry", () => {
       ],
     };
 
-    const geometry = measureFileViewGeometry(file, layout, 80);
+    const checked = validateFileViewLayout(layout, 2, 80);
+    if (!checked.valid) throw new Error(checked.issue);
+    const geometry = measureFileViewGeometry(file, checked.value);
 
+    expect(geometry.rowBounds.map((row) => row.height)).toEqual([...checked.value.rowHeights]);
     expect(geometry.bodyHeight).toBe(6);
     expect(
       geometry.rowBounds.map(({ stableKey, top, height }) => ({

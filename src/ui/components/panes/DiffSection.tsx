@@ -10,7 +10,7 @@ import { diffSectionId } from "../../lib/ids";
 import { fitText } from "../../lib/text";
 import type { AppTheme } from "../../themes";
 import { DiffFileHeaderRow } from "./DiffFileHeaderRow";
-import { FileView } from "./FileView";
+import { FileView, type FileViewRowFailure } from "./FileView";
 import type { ResolvedFileViewLayout } from "../../fileViews/useFileViews";
 
 interface DiffSectionProps {
@@ -42,6 +42,7 @@ interface DiffSectionProps {
   hoverClearSignal?: number;
   onHover: () => void;
   onMouseScroll?: () => void;
+  onFileViewRowFailure?: (failure: FileViewRowFailure) => void;
   onActiveAddNoteAffordanceChange?: (affordance: ActiveAddNoteAffordance | null) => void;
   onStartUserNoteAtHunk?: (hunkIndex: number, target?: UserNoteLineTarget) => void;
   onSelect: () => void;
@@ -78,6 +79,7 @@ function DiffSectionComponent({
   hoverClearSignal = 0,
   onHover,
   onMouseScroll,
+  onFileViewRowFailure,
   onActiveAddNoteAffordanceChange,
   onStartUserNoteAtHunk,
   onSelect,
@@ -121,7 +123,8 @@ function DiffSectionComponent({
 
       {fileView ? (
         <FileView
-          layout={fileView.layout}
+          file={file}
+          fileView={fileView}
           geometry={
             sectionGeometry ?? {
               bodyHeight: 0,
@@ -138,6 +141,7 @@ function DiffSectionComponent({
           theme={theme}
           visibleBodyBounds={visibleBodyBounds}
           width={viewWidth}
+          onRowFailure={onFileViewRowFailure}
         />
       ) : (
         <PierreDiffView
@@ -202,6 +206,7 @@ export const DiffSection = memo(DiffSectionComponent, (previous, next) => {
     previous.hoverActive === next.hoverActive &&
     previous.hoverClearSignal === next.hoverClearSignal &&
     previous.onMouseScroll === next.onMouseScroll &&
+    previous.onFileViewRowFailure === next.onFileViewRowFailure &&
     previous.onActiveAddNoteAffordanceChange === next.onActiveAddNoteAffordanceChange &&
     previous.onStartUserNoteAtHunk === next.onStartUserNoteAtHunk &&
     previous.theme === next.theme &&

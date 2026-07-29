@@ -714,8 +714,12 @@ parsed hunk needs one in-bounds, inclusive `hunkRows` entry at the same array
 position as `input.file.hunks`. Invalid, oversized, cancelled, or throwing
 layouts are isolated with one warning and fall back to raw diff. An experimental
 custom row keeps symbolic fallback spans and declares its fixed painter
-atomically as `component: { height, render }`; see the linked JSX POC for its
-clipping and error boundaries.
+atomically as `component: { height, render }`. Custom rows are non-focusable
+paint surfaces: registered commands are their supported keyboard path. A
+cooperatively delivered, handled left-button mouse-up may act and stop
+propagation, while wheel, drag, and unhandled input remain host-owned. Hunk
+makes no portal, renderer, focus, or input-delivery guarantee; see the linked
+JSX POC for state lifetime, clipping, and error boundaries.
 
 A command handler can control the selected file's view through
 `ctx.fileViews.select("view-id")`, `toggle("view-id")`, and
