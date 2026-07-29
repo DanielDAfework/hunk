@@ -7,9 +7,29 @@ import type {
   ExtensionFileViewRowComponentProps,
 } from "../../../extension-api/types";
 import { measureFileViewGeometry } from "../../fileViews/geometry";
+import { validateFileViewLayout } from "../../fileViews/layout";
+import type { ResolvedFileViewLayout } from "../../fileViews/useFileViews";
 import { reviewRowId } from "../../lib/ids";
 import { resolveTheme } from "../../themes";
 import { FileView, isFileViewRowSelected } from "./FileView";
+
+/** Validate a test layout and add the host identity carried by accepted runtime layouts. */
+function resolveTestLayout(
+  layout: ExtensionFileViewLayout,
+  width: number,
+  generation = 1,
+): ResolvedFileViewLayout {
+  const checked = validateFileViewLayout(layout, layout.hunkRows.length, width);
+  if (!checked.valid) throw new Error(checked.issue);
+  return {
+    ...checked.value,
+    key: "test:view",
+    extensionId: "test",
+    viewId: "view",
+    registrationIdentity: 1,
+    layoutGeneration: generation,
+  };
+}
 
 const layout: ExtensionFileViewLayout = {
   rows: [
@@ -41,10 +61,12 @@ describe("FileView custom rows", () => {
       before: "a",
       after: "b",
     });
-    const geometry = measureFileViewGeometry(file, layout, 20);
+    const fileView = resolveTestLayout(layout, 20);
+    const geometry = measureFileViewGeometry(file, fileView);
     const setup = await testRender(
       <FileView
-        layout={layout}
+        file={file}
+        fileView={fileView}
         geometry={geometry}
         selectedHunkIndex={2}
         theme={resolveTheme("github-dark-default", null)}
@@ -98,10 +120,12 @@ describe("FileView custom rows", () => {
       before: "a",
       after: "b",
     });
-    const geometry = measureFileViewGeometry(file, customLayout, 20);
+    const fileView = resolveTestLayout(customLayout, 20);
+    const geometry = measureFileViewGeometry(file, fileView);
     const setup = await testRender(
       <FileView
-        layout={customLayout}
+        file={file}
+        fileView={fileView}
         geometry={geometry}
         selectedHunkIndex={0}
         theme={resolveTheme("github-dark-default", null)}
@@ -125,6 +149,133 @@ describe("FileView custom rows", () => {
         selected: true,
         rowIndex: 1,
       });
+    } finally {
+      await act(async () => setup.renderer.destroy());
+    }
+  });
+
+  test("retains ephemeral hook state across selection props but loses it on unmount and generation", async () => {
+    let mountSequence = 0;
+    const renders: Array<{ selected: boolean; token: number }> = [];
+    const statefulLayout: ExtensionFileViewLayout = {
+      rows: [
+        {
+          id: "stateful",
+          spans: [{ text: "fallback" }],
+          component: {
+            height: 1,
+            render: ({ selected }) => {
+              const [token] = useState(() => ++mountSequence);
+              renders.push({ selected, token });
+              return <text content={`state ${token}`} />;
+            },
+          },
+        },
+      ],
+      hunkRows: [{ startRow: 0, endRow: 0 }],
+    };
+    const file = createTestDiffFile({ id: "stateful", path: "state.ts", before: "a", after: "b" });
+    const initial = resolveTestLayout(statefulLayout, 20);
+    let selectHunk: (index: number) => void = () => {};
+    let showRow: (visible: boolean) => void = () => {};
+    let replaceGeneration: () => void = () => {};
+
+    function Harness() {
+      const [selectedHunkIndex, setSelectedHunkIndex] = useState(0);
+      const [visible, setVisible] = useState(true);
+      const [fileView, setFileView] = useState(initial);
+      selectHunk = setSelectedHunkIndex;
+      showRow = setVisible;
+      replaceGeneration = () =>
+        setFileView((current) => ({
+          ...current,
+          layoutGeneration: current.layoutGeneration + 1,
+        }));
+      return (
+        <FileView
+          file={file}
+          fileView={fileView}
+          geometry={measureFileViewGeometry(file, fileView)}
+          selectedHunkIndex={selectedHunkIndex}
+          theme={resolveTheme("github-dark-default", null)}
+          visibleBodyBounds={visible ? { top: 0, height: 1 } : { top: 1, height: 0 }}
+          width={20}
+        />
+      );
+    }
+
+    const setup = await testRender(<Harness />, { width: 20, height: 2 });
+    try {
+      await act(async () => setup.renderOnce());
+      expect(renders.at(-1)).toEqual({ selected: true, token: 1 });
+
+      await act(async () => {
+        selectHunk(-1);
+        await setup.renderOnce();
+      });
+      expect(renders.at(-1)).toEqual({ selected: false, token: 1 });
+
+      await act(async () => {
+        showRow(false);
+        await setup.renderOnce();
+      });
+      await act(async () => {
+        showRow(true);
+        await setup.renderOnce();
+      });
+      expect(renders.at(-1)?.token).toBe(2);
+
+      await act(async () => {
+        replaceGeneration();
+        await setup.renderOnce();
+      });
+      expect(renders.at(-1)?.token).toBe(3);
+    } finally {
+      await act(async () => setup.renderer.destroy());
+    }
+  });
+
+  test("mounts only visible painters from a 1,000-row component layout", async () => {
+    const mounted: number[] = [];
+    const largeLayout: ExtensionFileViewLayout = {
+      rows: Array.from({ length: 1_000 }, (_, index) => ({
+        id: `row-${index}`,
+        spans: [{ text: `fallback ${index}` }],
+        component: {
+          height: 1,
+          render: () => {
+            mounted.push(index);
+            return <text content={`paint ${index}`} />;
+          },
+        },
+      })),
+      hunkRows: [],
+    };
+    const file = createTestDiffFile({
+      id: "large",
+      path: "large.ts",
+      before: "a",
+      after: "b",
+    });
+    const fileView = resolveTestLayout(largeLayout, 20);
+    const setup = await testRender(
+      <FileView
+        file={file}
+        fileView={fileView}
+        geometry={measureFileViewGeometry(file, fileView)}
+        selectedHunkIndex={-1}
+        theme={resolveTheme("github-dark-default", null)}
+        visibleBodyBounds={{ top: 500, height: 4 }}
+        width={20}
+      />,
+      { width: 20, height: 6 },
+    );
+
+    try {
+      await act(async () => setup.renderOnce());
+      expect(new Set(mounted)).toEqual(new Set([500, 501, 502, 503]));
+      expect(mounted).not.toContain(499);
+      expect(mounted).not.toContain(504);
     } finally {
       await act(async () => setup.renderer.destroy());
     }
@@ -157,10 +308,12 @@ describe("FileView custom rows", () => {
       before: "a",
       after: "b",
     });
-    const geometry = measureFileViewGeometry(file, clippedLayout, 20);
+    const fileView = resolveTestLayout(clippedLayout, 20);
+    const geometry = measureFileViewGeometry(file, fileView);
     const setup = await testRender(
       <FileView
-        layout={clippedLayout}
+        file={file}
+        fileView={fileView}
         geometry={geometry}
         selectedHunkIndex={0}
         theme={resolveTheme("github-dark-default", null)}
@@ -210,13 +363,17 @@ describe("FileView custom rows", () => {
     });
     const originalConsoleError = console.error;
     console.error = () => {};
+    const failures: Array<{ message: string; rowId: string; layoutGeneration: number }> = [];
+    const fileView = resolveTestLayout(brokenLayout, 20, 7);
     const setup = await testRender(
       <FileView
-        layout={brokenLayout}
-        geometry={measureFileViewGeometry(file, brokenLayout, 20)}
+        file={file}
+        fileView={fileView}
+        geometry={measureFileViewGeometry(file, fileView)}
         selectedHunkIndex={0}
         theme={resolveTheme("github-dark-default", null)}
         width={20}
+        onRowFailure={(failure) => failures.push(failure)}
       />,
       { width: 20, height: 3 },
     );
@@ -224,6 +381,13 @@ describe("FileView custom rows", () => {
     try {
       await act(async () => setup.renderOnce());
       expect(setup.captureCharFrame()).toContain("SAFE FALLBACK");
+      expect(failures).toEqual([
+        expect.objectContaining({
+          message: "broken custom row",
+          rowId: "broken",
+          layoutGeneration: 7,
+        }),
+      ]);
     } finally {
       console.error = originalConsoleError;
       await act(async () => setup.renderer.destroy());

@@ -82,6 +82,7 @@ import { buildExtensionAppCommands, extensionCommandKeyDefaults } from "./lib/ex
 import { createExtensionDialogQueue } from "./lib/extensionDialogs";
 import { buildExtensionReviewSelection } from "./lib/extensionSelection";
 import { useFileViewLayouts } from "./fileViews/useFileViews";
+import type { FileViewRowFailure } from "./components/panes/FileView";
 import { availableFileViewSelections, fileViewUnavailableReason } from "./fileViews/availability";
 import {
   reconcileFileViewSelections,
@@ -105,6 +106,9 @@ import { openSelectedFileInEditor } from "./lib/openInEditor";
 import { resolveResponsiveLayout } from "./lib/responsive";
 import { resizeSidebarWidth } from "./lib/sidebar";
 import { availableThemes, resolveTheme, withTransparentSurfaces } from "./themes";
+
+/** Bound row-render warning metadata even if a large custom tree fails throughout scrolling. */
+const FILE_VIEW_RENDER_FAILURE_MAX_ENTRIES = 256;
 
 type FocusArea = "files" | "filter" | "note";
 type ActiveAddNoteTarget = ActiveAddNoteAffordance & { fileId: string };
@@ -960,6 +964,37 @@ export function App({
     layout: resolvedLayout,
     width: diffContentWidth,
   });
+  const reportedFileViewRowFailuresRef = useRef(
+    new Map<string, { fileId: string; layoutGeneration: number }>(),
+  );
+  /** Attribute synchronous row failures through the existing extension warning surface. */
+  const reportFileViewRowFailure = useCallback(
+    (failure: FileViewRowFailure) => {
+      const dedupeKey = [
+        failure.extensionId,
+        failure.viewId,
+        failure.fileId,
+        failure.rowId,
+        failure.layoutGeneration,
+        failure.message,
+      ].join("\u0000");
+      const reported = reportedFileViewRowFailuresRef.current;
+      if (reported.has(dedupeKey)) return;
+      reported.set(dedupeKey, {
+        fileId: failure.fileId,
+        layoutGeneration: failure.layoutGeneration,
+      });
+      if (reported.size > FILE_VIEW_RENDER_FAILURE_MAX_ENTRIES) {
+        const oldest = reported.keys().next().value;
+        if (oldest !== undefined) reported.delete(oldest);
+      }
+      extensions?.context.notify(
+        `Extension ${failure.extensionId} file view "${failure.viewId}" row "${failure.rowId}" failed rendering ${failure.filePath} • ${failure.message}`,
+        "warning",
+      );
+    },
+    [extensions],
+  );
   const fileViewLayouts = useFileViewLayouts({
     files: filteredFiles,
     selections: availableFileViewSelectionState,
@@ -967,6 +1002,18 @@ export function App({
     width: diffContentWidth,
     onIssue: showSessionNotice,
   });
+  useEffect(() => {
+    const activeGenerations = new Set(
+      Array.from(fileViewLayouts, ([fileId, layout]) =>
+        [fileId, layout.layoutGeneration].join("\u0000"),
+      ),
+    );
+    for (const [key, failure] of reportedFileViewRowFailuresRef.current) {
+      if (!activeGenerations.has([failure.fileId, failure.layoutGeneration].join("\u0000"))) {
+        reportedFileViewRowFailuresRef.current.delete(key);
+      }
+    }
+  }, [fileViewLayouts]);
 
   useHunkSessionBridge({
     addLiveComment: review.addLiveComment,
@@ -1987,6 +2034,7 @@ export function App({
             scrollCodeHorizontally(delta * FAST_CODE_HORIZONTAL_SCROLL_COLUMNS);
           }}
           onCopyFeedback={showTransientNotice}
+          onFileViewRowFailure={reportFileViewRowFailure}
           onSelectFile={jumpToFile}
           onToggleGap={review.toggleGap}
           onViewportCenteredHunkChange={(fileId, hunkIndex) =>

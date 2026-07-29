@@ -56,6 +56,7 @@ import {
 } from "../../lib/viewportAnchor";
 import type { AppTheme } from "../../themes";
 import { DiffSection } from "./DiffSection";
+import type { FileViewRowFailure } from "./FileView";
 import { DiffFileHeaderRow } from "./DiffFileHeaderRow";
 import { VerticalScrollbar, type VerticalScrollbarHandle } from "../scrollbar/VerticalScrollbar";
 import type { VisibleBodyBounds } from "../../diff/rowWindowing";
@@ -226,6 +227,7 @@ export function DiffPane({
   onFocusDraftNote,
   onCopyFeedback,
   onCopySelectionText,
+  onFileViewRowFailure,
   onScrollCodeHorizontally = () => {},
   onSelectFile,
   onToggleGap = NOOP_TOGGLE_GAP,
@@ -278,6 +280,7 @@ export function DiffPane({
   onFocusDraftNote?: () => void;
   onCopyFeedback?: (text: string) => void;
   onCopySelectionText?: (text: string) => void | boolean;
+  onFileViewRowFailure?: (failure: FileViewRowFailure) => void;
   onScrollCodeHorizontally?: (delta: number) => void;
   onSelectFile: (fileId: string) => void;
   onToggleGap?: (fileId: string, gapKey: string) => void;
@@ -685,7 +688,7 @@ export function DiffPane({
         // App masks alternate layouts whenever host-owned note placement requires raw rendering.
         const fileView = fileViews.get(file.id);
         if (fileView) {
-          return measureFileViewGeometry(file, fileView.layout, diffContentWidth);
+          return measureFileViewGeometry(file, fileView);
         }
         return measureDiffSectionGeometry(
           file,
@@ -1913,6 +1916,7 @@ export function DiffPane({
                       visibleBodyBounds={visibleBodyBoundsByFile.get(file.id)}
                       onHover={() => setHoveredFileForRowActions(file.id)}
                       onMouseScroll={clearAddNoteHoverForScroll}
+                      onFileViewRowFailure={onFileViewRowFailure}
                       onActiveAddNoteAffordanceChange={
                         onActiveAddNoteAffordanceChange
                           ? activeAddNoteAffordanceCallback(file.id)

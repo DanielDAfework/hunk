@@ -1,5 +1,6 @@
 import { TextAttributes } from "@opentui/core";
 import { Component, memo, useMemo, type ReactNode } from "react";
+import type { DiffFile } from "../../../core/types";
 import type {
   ExtensionFileViewLayout,
   ExtensionFileViewRow,
@@ -8,11 +9,22 @@ import type {
 } from "../../../extension-api/types";
 import type { AppTheme } from "../../themes";
 import type { DiffSectionGeometry } from "../../diff/diffSectionGeometry";
-import type { VisibleBodyBounds } from "../../diff/rowWindowing";
+import { resolveVisibleRowIndexWindow, type VisibleBodyBounds } from "../../diff/rowWindowing";
 import { reviewRowId } from "../../lib/ids";
+import type { ResolvedFileViewLayout } from "../../fileViews/useFileViews";
 
 type FileViewTone = ExtensionFileViewSpan["tone"];
 type FileViewTextAttribute = NonNullable<ExtensionFileViewSpan["attributes"]>[number];
+
+export interface FileViewRowFailure {
+  extensionId: string;
+  viewId: string;
+  fileId: string;
+  filePath: string;
+  rowId: string;
+  layoutGeneration: number;
+  message: string;
+}
 
 /** Resolve a generic file-view tone only at paint time, keeping layout theme-independent. */
 function fileViewToneColor(tone: FileViewTone, theme: AppTheme) {
@@ -74,9 +86,9 @@ function SymbolicFileViewRow({ row, theme }: { row: ExtensionFileViewRow; theme:
   ));
 }
 
-/** Contain custom render failures to one row and retain its symbolic fallback. */
+/** Contain synchronous render/lifecycle failures to one row and attribute them to the host. */
 class FileViewRowErrorBoundary extends Component<
-  { children: ReactNode; fallback: ReactNode; resetKey: unknown },
+  { children: ReactNode; fallback: ReactNode; onError: (error: unknown) => void },
   { failed: boolean }
 > {
   override state = { failed: false };
@@ -85,10 +97,8 @@ class FileViewRowErrorBoundary extends Component<
     return { failed: true };
   }
 
-  override componentDidUpdate(previous: Readonly<{ resetKey: unknown }>) {
-    if (this.state.failed && previous.resetKey !== this.props.resetKey) {
-      this.setState({ failed: false });
-    }
+  override componentDidCatch(error: unknown) {
+    this.props.onError(error);
   }
 
   override render() {
@@ -98,62 +108,61 @@ class FileViewRowErrorBoundary extends Component<
 
 /** Render host-windowed symbolic and custom rows without surrendering outer geometry. */
 function FileViewComponent({
-  layout,
+  file,
+  fileView,
   geometry,
   selectedHunkIndex,
   theme,
   visibleBodyBounds,
   width,
+  onRowFailure,
 }: {
-  layout: ExtensionFileViewLayout;
+  file: DiffFile;
+  fileView: ResolvedFileViewLayout;
   geometry: DiffSectionGeometry;
   selectedHunkIndex: number;
   theme: AppTheme;
   visibleBodyBounds?: VisibleBodyBounds;
   width: number;
+  onRowFailure?: (failure: FileViewRowFailure) => void;
 }) {
+  const { layout } = fileView;
   const rowWindow = useMemo(() => {
     if (!visibleBodyBounds) {
       return {
         bottomSpacerHeight: 0,
-        rows: layout.rows.map((row, index) => ({ row, index })),
+        endIndex: layout.rows.length,
+        startIndex: 0,
         topSpacerHeight: 0,
       };
     }
-    const top = Math.max(0, visibleBodyBounds.top);
-    const bottom = top + Math.max(0, visibleBodyBounds.height);
-    const rows = layout.rows.flatMap((row, index) => {
-      const bounds = geometry.rowBounds[index];
-      return bounds && bounds.top + bounds.height > top && bounds.top < bottom
-        ? [{ row, index }]
-        : [];
+    return resolveVisibleRowIndexWindow({
+      bodyHeight: geometry.bodyHeight,
+      rowBounds: geometry.rowBounds,
+      visibleBodyBounds,
     });
-    const first = rows[0] && geometry.rowBounds[rows[0].index];
-    const last = rows.at(-1) && geometry.rowBounds[rows.at(-1)!.index];
-    return {
-      bottomSpacerHeight: last
-        ? geometry.bodyHeight - (last.top + last.height)
-        : geometry.bodyHeight,
-      rows,
-      topSpacerHeight: first?.top ?? 0,
-    };
-  }, [geometry.bodyHeight, geometry.rowBounds, layout.rows, visibleBodyBounds]);
+  }, [geometry.bodyHeight, geometry.rowBounds, layout.rows.length, visibleBodyBounds]);
 
+  const mountedRows = layout.rows.slice(rowWindow.startIndex, rowWindow.endIndex);
   return (
     <box style={{ width: "100%", flexDirection: "column" }}>
       {rowWindow.topSpacerHeight > 0 ? (
         <box style={{ width: "100%", height: rowWindow.topSpacerHeight }} />
       ) : null}
-      {rowWindow.rows.map(({ row, index }) => {
+      {mountedRows.map((row, offset) => {
+        const index = rowWindow.startIndex + offset;
         const selected = isFileViewRowSelected(layout, index, selectedHunkIndex);
         const fixedHeight = row.component?.height;
         const View = row.component?.render as
           | ((props: ExtensionFileViewRowComponentProps) => ReactNode)
           | undefined;
         const fallback = <SymbolicFileViewRow row={row} theme={theme} />;
+        // Selection is deliberately absent: hook state survives ordinary selected-prop updates.
+        // Window unmount or any accepted layout/registration generation creates a fresh identity.
+        const paintIdentity = `${file.id}:${fileView.registrationIdentity}:${fileView.layoutGeneration}:${row.id}`;
         return (
           <box
-            key={row.id}
+            key={paintIdentity}
             id={reviewRowId(`file-view:${row.id}`)}
             style={{
               width: "100%",
@@ -172,9 +181,18 @@ function FileViewComponent({
           >
             {View && fixedHeight !== undefined ? (
               <FileViewRowErrorBoundary
-                key={`${row.id}:${width}:${fixedHeight}:${selected ? 1 : 0}:${index}`}
                 fallback={fallback}
-                resetKey={View}
+                onError={(error) =>
+                  onRowFailure?.({
+                    extensionId: fileView.extensionId,
+                    viewId: fileView.viewId,
+                    fileId: file.id,
+                    filePath: file.path,
+                    rowId: row.id,
+                    layoutGeneration: fileView.layoutGeneration,
+                    message: error instanceof Error ? error.message || error.name : String(error),
+                  })
+                }
               >
                 <box
                   style={{

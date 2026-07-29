@@ -1,4 +1,4 @@
-import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
@@ -25,6 +25,42 @@ function copyJsxFileViewExtension() {
   tempDirs.push(root);
   const extension = join(root, "jsx-runtime-proof");
   cpSync(JSX_FILE_VIEW_EXTENSION, extension, { recursive: true });
+  return { extension, root };
+}
+
+/** Write a real folder extension whose custom painter fails synchronously. */
+function createBrokenFileViewExtension() {
+  const root = mkdtempSync(join(tmpdir(), "hunk-apphost-broken-view-"));
+  tempDirs.push(root);
+  const extension = join(root, "broken-row");
+  mkdirSync(extension, { recursive: true });
+  writeFileSync(
+    join(extension, "package.json"),
+    JSON.stringify({ name: "broken-row", private: true, hunk: { extensions: ["./index.ts"] } }),
+  );
+  writeFileSync(
+    join(extension, "index.ts"),
+    `export default function (hunk) {
+  hunk.registerFileView({
+    id: "broken",
+    title: "Broken row",
+    matches: () => true,
+    layout: ({ file }) => ({
+      rows: [{
+        id: "broken-row",
+        spans: [{ text: "SAFE ROW FALLBACK" }],
+        component: { height: 1, render: () => { throw new Error("paint exploded"); } },
+      }],
+      hunkRows: (file.hunks ?? []).map(() => ({ startRow: 0, endRow: 0 })),
+    }),
+  });
+  hunk.registerCommand(
+    { id: "toggle-broken", title: "Toggle broken row", key: "f8" },
+    (ctx) => ctx.fileViews.toggle("broken"),
+  );
+}
+`,
+  );
   return { extension, root };
 }
 
@@ -63,6 +99,56 @@ async function waitForFrame(
 }
 
 describe("AppHost file views", () => {
+  test("attributes one synchronous row-render warning and keeps the symbolic fallback", async () => {
+    const { extension, root } = createBrokenFileViewExtension();
+    const extensions = await loadStartupExtensions({
+      cliExtensionPaths: [extension],
+      cwd: root,
+      env: { XDG_CONFIG_HOME: root } as NodeJS.ProcessEnv,
+      extensions: { enabled: true, extensionConfigs: {}, paths: [], repoPaths: [] },
+    });
+    expect(extensions.issues).toEqual([]);
+
+    const notices: string[] = [];
+    const notify = extensions.context.notify;
+    extensions.context.notify = (message, type) => {
+      notices.push(String(message));
+      notify(message, type);
+    };
+    const bootstrap = createTestVcsAppBootstrap({
+      changesetId: "changeset:broken-row",
+      files: [createTwoHunkFile()],
+      initialMode: "stack",
+      inputMode: "stack",
+      vcsOptions: { extensionPaths: [extension] },
+    });
+    bootstrap.extensions = extensions;
+
+    const originalConsoleError = console.error;
+    console.error = () => {};
+    const setup = await testRender(<AppHost bootstrap={bootstrap} onQuit={() => {}} />, {
+      width: 120,
+      height: 24,
+    });
+
+    try {
+      await waitForFrame(setup, (frame) => frame.includes("runtime-proof.ts"));
+      await act(async () => setup.mockInput.pressKey("F8"));
+      await waitForFrame(setup, (frame) => frame.includes("SAFE ROW FALLBACK"));
+      await waitForFrame(setup, () => notices.some((notice) => notice.includes("paint exploded")));
+      await act(async () => setup.renderOnce());
+
+      expect(notices.filter((notice) => notice.includes("paint exploded"))).toEqual([
+        expect.stringContaining(
+          'Extension broken-row file view "broken" row "broken-row" failed rendering runtime-proof.ts',
+        ),
+      ]);
+    } finally {
+      console.error = originalConsoleError;
+      await act(async () => setup.renderer.destroy());
+    }
+  });
+
   test("runs the real folder TSX view with row-safe summaries, navigation, and mouse-up state", async () => {
     const { extension, root } = copyJsxFileViewExtension();
     const extensions = await loadStartupExtensions({

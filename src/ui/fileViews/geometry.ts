@@ -1,31 +1,29 @@
 import type { DiffFile } from "../../core/types";
-import type { ExtensionFileViewLayout } from "../../extension-api/types";
 import { reviewRowId } from "../lib/ids";
 import type { PlannedHunkBounds } from "../diff/plannedReviewRows";
 import type { DiffSectionGeometry, DiffSectionRowBounds } from "../diff/diffSectionGeometry";
-import { measureFileViewRow } from "./layout";
+import type { ValidatedFileViewLayout } from "./layout";
 
 /** Build host-owned scroll and hunk geometry for a symbolic file-view layout. */
 export function measureFileViewGeometry(
   file: DiffFile,
-  layout: ExtensionFileViewLayout,
-  width: number,
+  resolved: ValidatedFileViewLayout,
 ): DiffSectionGeometry {
+  const { layout, rowHeights } = resolved;
   const rowBounds: DiffSectionRowBounds[] = [];
   const rowBoundsByKey = new Map<string, DiffSectionRowBounds>();
   const rowBoundsByStableKey = new Map<string, DiffSectionRowBounds>();
-  const rowTop: number[] = [];
   let bodyHeight = 0;
 
-  for (const row of layout.rows) {
-    rowTop.push(bodyHeight);
+  for (const [rowIndex, row] of layout.rows.entries()) {
     const key = `file-view:${row.id}`;
     const entry: DiffSectionRowBounds = {
       key,
       stableKey: key,
       stableKeys: [key],
       top: bodyHeight,
-      height: measureFileViewRow(row, width),
+      // Validation and geometry intentionally share one immutable measurement snapshot.
+      height: rowHeights[rowIndex]!,
     };
     rowBounds.push(entry);
     rowBoundsByKey.set(key, entry);

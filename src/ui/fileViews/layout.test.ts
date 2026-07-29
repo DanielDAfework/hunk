@@ -22,6 +22,64 @@ describe("file-view layout validation", () => {
     if (result.valid) expect(result.value.rowHeights).toEqual([3, 2]);
   });
 
+  test("returns a deeply immutable host snapshot detached from extension mutation", () => {
+    const firstRender = () => "first";
+    const secondRender = () => "second";
+    const attributes = ["bold"] as ("bold" | "italic")[];
+    const span: {
+      text: string;
+      tone: "accent" | "removed";
+      attributes: ("bold" | "italic")[];
+    } = { text: "original", tone: "accent", attributes };
+    const component = { height: 2, render: firstRender };
+    const row = { id: "original-row", spans: [span], component };
+    const hunk = { startRow: 0, endRow: 0 };
+    const source = { rows: [row], hunkRows: [hunk] };
+
+    const result = validateFileViewLayout(source, 1, 80);
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+
+    row.id = "mutated-row";
+    span.text = "mutated";
+    span.tone = "removed";
+    attributes[0] = "italic";
+    component.height = 9;
+    component.render = secondRender;
+    hunk.startRow = 99;
+    source.rows.length = 0;
+    source.hunkRows.length = 0;
+
+    expect(result.value).toEqual({
+      layout: {
+        rows: [
+          {
+            id: "original-row",
+            spans: [{ text: "original", tone: "accent", attributes: ["bold"] }],
+            component: { height: 2, render: firstRender },
+          },
+        ],
+        hunkRows: [{ startRow: 0, endRow: 0 }],
+      },
+      rowHeights: [2],
+    });
+    expect(
+      [
+        result.value,
+        result.value.layout,
+        result.value.layout.rows,
+        result.value.layout.rows[0],
+        result.value.layout.rows[0]?.spans,
+        result.value.layout.rows[0]?.spans[0],
+        result.value.layout.rows[0]?.spans[0]?.attributes,
+        result.value.layout.rows[0]?.component,
+        result.value.layout.hunkRows,
+        result.value.layout.hunkRows[0],
+        result.value.rowHeights,
+      ].every(Object.isFrozen),
+    ).toBe(true);
+  });
+
   test("accepts bounded custom row painters with an atomic fixed-height descriptor", () => {
     const render = () => null;
     const result = validateFileViewLayout(
@@ -105,7 +163,16 @@ describe("file-view layout validation", () => {
     }));
     expect(validateFileViewLayout({ rows, hunkRows: [] }, 0, 80)).toEqual({
       valid: false,
-      issue: "component rows exceed 100000 terminal rows",
+      issue: "layout exceeds 100000 terminal rows",
+    });
+
+    const symbolicRows = Array.from({ length: 10_000 }, (_, index) => ({
+      id: `symbolic-${index}`,
+      spans: [{ text: "xxxxxxxxxxx" }],
+    }));
+    expect(validateFileViewLayout({ rows: symbolicRows, hunkRows: [] }, 0, 1)).toEqual({
+      valid: false,
+      issue: "layout exceeds 100000 terminal rows",
     });
   });
 
