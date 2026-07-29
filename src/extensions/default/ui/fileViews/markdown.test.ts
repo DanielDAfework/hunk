@@ -24,11 +24,11 @@ function registerMarkdownTestView() {
 }
 
 describe("bundled rendered Markdown file view", () => {
-  test("uses only the public registration contract and returns symbolic annotated rows", async () => {
+  test("uses only the public contract and renders Markdown syntax into symbolic rows", async () => {
     const { view, command, commandHandler } = registerMarkdownTestView();
     expect(command).toMatchObject({
       id: "toggle-rendered-markdown",
-      key: "ctrl+g",
+      key: "f8",
       showInMenu: false,
     });
     const toggled: string[] = [];
@@ -58,11 +58,71 @@ describe("bundled rendered Markdown file view", () => {
     );
 
     expect(layout?.rows).toEqual([
-      { id: "new:1", spans: [{ text: "# Hello", style: "heading" }] },
-      { id: "new:2", spans: [{ text: "new item", style: "added" }] },
-      { id: "new:3", spans: [{ text: " ", style: "plain" }] },
+      {
+        id: "rendered:0",
+        spans: [{ text: "Hello", tone: "accent", attributes: ["bold"] }],
+      },
+      { id: "rendered:1", spans: [{ text: "new item", tone: "added" }] },
     ]);
     expect(layout?.hunks).toEqual([{ index: 0, startRow: 1, endRow: 1 }]);
+  });
+
+  test("renders lists, quotes, tables, inline emphasis, links, and fenced code", async () => {
+    const { view } = registerMarkdownTestView();
+    const layout = await view.layout(
+      {
+        file: {
+          id: "guide",
+          path: "guide.md",
+          patch: "",
+          stats: { additions: 0, deletions: 0 },
+          metadata: {},
+          agent: null,
+          hunks: [],
+        },
+        changes: [],
+        documents: {
+          read: async () => ({
+            availability: "exact" as const,
+            text: [
+              "# Guide",
+              "",
+              "Use **bold**, *emphasis*, and [docs](https://example.com).",
+              "",
+              "- first",
+              "- second",
+              "",
+              "> quoted",
+              "",
+              "| A | B |",
+              "|---|---|",
+              "| 1 | 2 |",
+              "",
+              "```ts",
+              "const answer = 42",
+              "```",
+              "",
+            ].join("\n"),
+          }),
+        },
+      },
+      { width: 80, signal: new AbortController().signal },
+    );
+
+    const text = layout?.rows.map((row) => row.spans.map((span) => span.text).join(""));
+    expect(text).toContain("Guide");
+    expect(text).not.toContain("# Guide");
+    expect(text).toContain("• first");
+    expect(text).toContain("│ quoted");
+    expect(text).toContain("A │ B");
+    expect(text).toContain("┌─ ts");
+    expect(text).toContain("│ const answer = 42");
+    expect(text).not.toContain("```ts");
+    const spans = layout?.rows.flatMap((row) => row.spans) ?? [];
+    expect(spans.map((span) => span.tone)).toEqual(expect.arrayContaining(["accent", "syntax"]));
+    expect(spans.flatMap((span) => span.attributes ?? [])).toEqual(
+      expect.arrayContaining(["bold", "italic", "underline"]),
+    );
   });
 
   test("falls back to raw diff for unavailable source or malformed fences", async () => {

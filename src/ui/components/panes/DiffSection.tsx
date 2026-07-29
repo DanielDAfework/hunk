@@ -134,6 +134,7 @@ function DiffSectionComponent({
               rowBoundsByStableKey: new Map(),
             }
           }
+          selectedHunkIndex={selectedHunkIndex}
           theme={theme}
           visibleBodyBounds={visibleBodyBounds}
         />

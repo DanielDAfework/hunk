@@ -10,6 +10,17 @@ export const FILE_VIEW_MAX_ROWS = 10_000;
 export const FILE_VIEW_MAX_SPANS = 40_000;
 export const FILE_VIEW_MAX_TEXT_LENGTH = 1_000_000;
 
+const FILE_VIEW_TONES = new Set([
+  "text",
+  "muted",
+  "accent",
+  "accent-muted",
+  "syntax",
+  "added",
+  "removed",
+]);
+const FILE_VIEW_TEXT_ATTRIBUTES = new Set(["bold", "italic", "underline", "strikethrough"]);
+
 export interface ValidatedFileViewLayout {
   layout: ExtensionFileViewLayout;
   /** Number of terminal rows each symbolic row occupies at the requested width. */
@@ -66,6 +77,19 @@ export function validateFileViewLayout(
       if (!span || typeof span.text !== "string" || span.text.includes("\n")) {
         return { valid: false, issue: `rows[${index}] contains an invalid span` };
       }
+      if (span.tone !== undefined && !FILE_VIEW_TONES.has(span.tone)) {
+        return { valid: false, issue: `rows[${index}] contains an invalid span tone` };
+      }
+      if (
+        span.attributes !== undefined &&
+        (!Array.isArray(span.attributes) ||
+          span.attributes.some(
+            (attribute: unknown) =>
+              typeof attribute !== "string" || !FILE_VIEW_TEXT_ATTRIBUTES.has(attribute),
+          ))
+      ) {
+        return { valid: false, issue: `rows[${index}] contains invalid span attributes` };
+      }
       textLength += span.text.length;
       if (textLength > FILE_VIEW_MAX_TEXT_LENGTH) {
         return {
@@ -100,23 +124,6 @@ export function validateFileViewLayout(
       return { valid: false, issue: `hunks[${position}] is not a unique in-bounds row range` };
     }
     hunkIndexes.add(hunk.index);
-  }
-
-  if (layout.sourceAnchors !== undefined) {
-    if (!Array.isArray(layout.sourceAnchors)) {
-      return { valid: false, issue: "sourceAnchors is not an array" };
-    }
-    for (const [index, anchor] of layout.sourceAnchors.entries()) {
-      if (
-        !anchor ||
-        (anchor.side !== "old" && anchor.side !== "new") ||
-        !Number.isInteger(anchor.line) ||
-        anchor.line < 1 ||
-        !isRowIndex(anchor.row, layout.rows.length)
-      ) {
-        return { valid: false, issue: `sourceAnchors[${index}] is invalid` };
-      }
-    }
   }
 
   return { valid: true, value: { layout, rowHeights } };

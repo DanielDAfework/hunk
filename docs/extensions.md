@@ -652,7 +652,9 @@ A file view is an alternate **host-rendered** presentation of one file in the
 same top-to-bottom review stream. It is not a React component: Hunk owns row
 measurement, scrolling/windowing, hunk navigation, and fallback to Pierre's raw
 diff. Raw is always the default; users select a matching view from **View** for
-the selected file. Hunk's bundled Markdown view also toggles with `Ctrl+G`.
+the selected file. Hunk's bundled Markdown view also toggles with `F8`. Alternate
+presentations are unavailable while inline review notes are visible, because raw
+diff is currently the only rendering path that can place those notes.
 
 ```ts
 import type { HunkExtensionAPI } from "hunkdiff/extension";
@@ -668,7 +670,7 @@ export default function (hunk: HunkExtensionAPI) {
 
       const rows = document.text.split("\n").map((text, index) => ({
         id: `line:${index + 1}`,
-        spans: [{ text: text || " ", style: "plain" as const }],
+        spans: [{ text: text || " ", tone: "text" as const }],
       }));
       if (rows.length === 0) return null;
 
@@ -678,11 +680,6 @@ export default function (hunk: HunkExtensionAPI) {
           index: hunk.index,
           startRow: Math.max(0, (hunk.newRange?.[0] ?? 1) - 1),
           endRow: Math.min(rows.length - 1, (hunk.newRange?.[1] ?? 1) - 1),
-        })),
-        sourceAnchors: rows.map((_, index) => ({
-          side: "new" as const,
-          line: index + 1,
-          row: index,
         })),
       };
     },
@@ -697,12 +694,13 @@ it resolves an exact document or `null` when that side is absent, unavailable,
 too large, or fails to load. Never treat `null` as an exception: return `null`
 from `layout` to keep raw diff active.
 
-Layouts use symbolic spans (`plain`, `muted`, `heading`, `quote`, `code`,
-`table`, `added`, `removed`) that Hunk colors only while rendering, so
-measurement is theme-independent. Every parsed hunk needs one in-bounds,
-inclusive row range. Source anchors are optional; without them Hunk uses the
-hunk range for placement. Invalid, oversized, cancelled, or throwing layouts
-are isolated with one warning and fall back to raw diff.
+Layouts use generic symbolic tones (`text`, `muted`, `accent`, `accent-muted`,
+`syntax`, `added`, `removed`) and optional terminal attributes (`bold`, `italic`,
+`underline`, `strikethrough`). Hunk resolves those primitives only while
+painting, so the host does not learn the extension's content format and
+measurement remains theme-independent. Every parsed hunk needs one in-bounds,
+inclusive row range. Invalid, oversized, cancelled, or throwing layouts are
+isolated with one warning and fall back to raw diff.
 
 A command handler can control the selected file's view through
 `ctx.fileViews.select("view-id")`, `toggle("view-id")`, and

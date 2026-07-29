@@ -251,21 +251,24 @@ export interface ExtensionFileChangeRange {
   kind: "added" | "removed" | "context";
 }
 
-/** A semantic style the host maps to its active terminal theme at render time. */
-export type ExtensionFileViewStyle =
-  | "plain"
+/** A generic semantic color the host maps to its active terminal theme at paint time. */
+export type ExtensionFileViewTone =
+  | "text"
   | "muted"
-  | "heading"
-  | "quote"
-  | "code"
-  | "table"
+  | "accent"
+  | "accent-muted"
+  | "syntax"
   | "added"
   | "removed";
 
-/** One symbolic colored run in a host-rendered file-view row. */
+/** Theme-independent terminal emphasis for one symbolic span. */
+export type ExtensionFileViewTextAttribute = "bold" | "italic" | "underline" | "strikethrough";
+
+/** One symbolic run in a host-rendered file-view row. */
 export interface ExtensionFileViewSpan {
   text: string;
-  style?: ExtensionFileViewStyle;
+  tone?: ExtensionFileViewTone;
+  attributes?: readonly ExtensionFileViewTextAttribute[];
 }
 
 /** A line in a host-owned, terminal-safe file-view layout. */
@@ -282,20 +285,11 @@ export interface ExtensionFileViewHunkBounds {
   endRow: number;
 }
 
-/** Map a source line to a rendered row for note placement and click selection. */
-export interface ExtensionFileViewSourceAnchor {
-  side: ExtensionFileSide;
-  line: number;
-  row: number;
-}
-
 /** The deterministic, symbolic layout returned by a file-view extension. */
 export interface ExtensionFileViewLayout {
   rows: readonly ExtensionFileViewRow[];
   /** Every parsed diff hunk must have one inclusive row extent. */
   hunks: readonly ExtensionFileViewHunkBounds[];
-  /** Optional source-to-row mappings; notes fall back to hunk placement without them. */
-  sourceAnchors?: readonly ExtensionFileViewSourceAnchor[];
 }
 
 /** Immutable input a file-view renderer receives for one file. */

@@ -6,11 +6,10 @@ describe("file-view layout validation", () => {
     const result = validateFileViewLayout(
       {
         rows: [
-          { id: "heading", spans: [{ text: "# title", style: "heading" }] },
+          { id: "heading", spans: [{ text: "# title", tone: "accent", attributes: ["bold"] }] },
           { id: "wide", spans: [{ text: "界界" }] },
         ],
         hunks: [{ index: 0, startRow: 0, endRow: 1 }],
-        sourceAnchors: [{ side: "new", line: 1, row: 0 }],
       },
       1,
       3,
@@ -33,7 +32,7 @@ describe("file-view layout validation", () => {
     expect(result).toEqual({ valid: false, issue: "layout has 1 hunk bounds for 2 hunks" });
   });
 
-  test("rejects duplicate row ids and invalid source anchors", () => {
+  test("rejects duplicate row ids and non-generic presentation values", () => {
     const duplicate = validateFileViewLayout(
       {
         rows: [
@@ -47,15 +46,15 @@ describe("file-view layout validation", () => {
     );
     expect(duplicate).toMatchObject({ valid: false, issue: 'rows[1] repeats id "same"' });
 
-    const anchor = validateFileViewLayout(
-      {
-        rows: [{ id: "one", spans: [{ text: "one" }] }],
-        hunks: [],
-        sourceAnchors: [{ side: "new", line: 0, row: 0 }],
-      },
-      0,
-      80,
-    );
-    expect(anchor).toMatchObject({ valid: false, issue: "sourceAnchors[0] is invalid" });
+    expect(
+      validateFileViewLayout(
+        {
+          rows: [{ id: "one", spans: [{ text: "one", tone: "heading" }] }],
+          hunks: [],
+        },
+        0,
+        80,
+      ),
+    ).toEqual({ valid: false, issue: "rows[0] contains an invalid span tone" });
   });
 });

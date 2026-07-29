@@ -682,9 +682,8 @@ export function DiffPane({
   const baseSectionGeometry = useMemo(
     () =>
       files.map((file) => {
-        // Inline notes have one shared raw-diff planning path today. Retain raw rendering for
-        // annotated files rather than letting an alternate layout silently lose notes.
-        const fileView = allAgentNotesByFile.has(file.id) ? undefined : fileViews.get(file.id);
+        // App masks alternate layouts whenever host-owned note placement requires raw rendering.
+        const fileView = fileViews.get(file.id);
         if (fileView) {
           return measureFileViewGeometry(file, fileView.layout, diffContentWidth);
         }
@@ -1882,9 +1881,7 @@ export function DiffPane({
                       codeHorizontalOffset={codeHorizontalOffset}
                       expandedGapKeys={expandedGapsByFileId[file.id] ?? EMPTY_EXPANDED_GAP_KEYS}
                       file={file}
-                      fileView={
-                        allAgentNotesByFile.has(file.id) ? undefined : fileViews.get(file.id)
-                      }
+                      fileView={fileViews.get(file.id)}
                       headerLabelWidth={headerLabelWidth}
                       headerStatsWidth={headerStatsWidth}
                       layout={layout}

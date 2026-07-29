@@ -83,6 +83,7 @@ import { createExtensionDialogQueue } from "./lib/extensionDialogs";
 import { buildExtensionReviewSelection } from "./lib/extensionSelection";
 import { getBundledFileViewExtension } from "../extensions/default/ui/fileViews";
 import { useFileViewLayouts, registeredFileViewKey } from "./fileViews/useFileViews";
+import { availableFileViewSelections, fileViewUnavailableReason } from "./fileViews/availability";
 import { reconcileFileViewSelections, selectFileView } from "./fileViews/state";
 import { createExtensionSidebarKeybindings, resolveCommandKeys } from "./lib/keymap";
 import {
@@ -357,6 +358,24 @@ export function App({
   fileViewSelectionsRef.current = fileViewSelections;
   const sessionFileViewsRef = useRef(sessionFileViews);
   sessionFileViewsRef.current = sessionFileViews;
+  const fileViewUnavailableReasons = useMemo(() => {
+    const reasons = new Map<string, string>();
+    for (const file of filteredFiles) {
+      const reason = fileViewUnavailableReason({
+        file,
+        hasDraftNote: review.draftNote?.fileId === file.id,
+        showAgentNotes,
+      });
+      if (reason) reasons.set(file.id, reason);
+    }
+    return reasons;
+  }, [filteredFiles, review.draftNote?.fileId, showAgentNotes]);
+  const fileViewUnavailableReasonsRef = useRef(fileViewUnavailableReasons);
+  fileViewUnavailableReasonsRef.current = fileViewUnavailableReasons;
+  const availableFileViewSelectionState = useMemo(
+    () => availableFileViewSelections(fileViewSelections, fileViewUnavailableReasons),
+    [fileViewSelections, fileViewUnavailableReasons],
+  );
   useEffect(() => {
     const viewKeys = new Set(sessionFileViews.map(registeredFileViewKey));
     setFileViewSelections((current) =>
@@ -552,34 +571,33 @@ export function App({
       const select = (viewId: string) => {
         const fileId = selectedId();
         if (!fileId) {
-          extensions?.context.notify(
+          showSessionNotice(
             `Extension ${extensionId} cannot select a file view without a selected file`,
-            "warning",
           );
+          return;
+        }
+        const unavailableReason = fileViewUnavailableReasonsRef.current.get(fileId);
+        if (viewId !== "raw" && unavailableReason) {
+          showSessionNotice(unavailableReason);
           return;
         }
         const registered = resolve(viewId);
         if (viewId !== "raw" && !registered) {
-          extensions?.context.notify(
-            `Extension ${extensionId} targeted unknown file view "${viewId}"`,
-            "warning",
-          );
+          showSessionNotice(`Extension ${extensionId} targeted unknown file view "${viewId}"`);
           return;
         }
         if (registered) {
           const selected = getExtensionSelection().file;
           try {
             if (!selected || !registered.view.matches(selected)) {
-              extensions?.context.notify(
+              showSessionNotice(
                 `File view "${viewId}" does not match the selected file • using raw diff`,
-                "warning",
               );
               return;
             }
           } catch {
-            extensions?.context.notify(
+            showSessionNotice(
               `Extension ${registered.extensionId} file view "${registered.view.id}" failed matching the selected file`,
-              "warning",
             );
             return;
           }
@@ -593,6 +611,10 @@ export function App({
         toggle(viewId: string) {
           const registered = resolve(viewId);
           const fileId = selectedId();
+          if (fileId && fileViewUnavailableReasonsRef.current.has(fileId)) {
+            select(viewId);
+            return;
+          }
           if (
             fileId &&
             registered &&
@@ -608,13 +630,14 @@ export function App({
           const fileId = selectedId();
           return Boolean(
             fileId &&
+            !fileViewUnavailableReasonsRef.current.has(fileId) &&
             registered &&
             fileViewSelectionsRef.current[fileId] === registeredFileViewKey(registered),
           );
         },
       };
     },
-    [extensions, getExtensionSelection],
+    [getExtensionSelection, showSessionNotice],
   );
 
   /**
@@ -957,7 +980,7 @@ export function App({
   });
   const fileViewLayouts = useFileViewLayouts({
     files: filteredFiles,
-    selections: fileViewSelections,
+    selections: availableFileViewSelectionState,
     views: sessionFileViews,
     width: diffContentWidth,
     onIssue: showSessionNotice,
@@ -1644,7 +1667,8 @@ export function App({
     if (!selectedFile) return [];
     const publicFile = getExtensionFileViews().find((file) => file.id === selectedFile.id);
     if (!publicFile) return [];
-    const active = fileViewSelections[selectedFile.id];
+    const unavailableReason = fileViewUnavailableReasons.get(selectedFile.id);
+    const active = unavailableReason ? undefined : fileViewSelections[selectedFile.id];
     const entries = [
       {
         kind: "item" as const,
@@ -1655,6 +1679,7 @@ export function App({
           setFileViewSelections((current) => selectFileView(current, selectedFile.id, null)),
       },
     ];
+    if (unavailableReason) return entries;
     for (const registered of sessionFileViews) {
       try {
         if (!registered.view.matches(publicFile)) continue;
@@ -1672,7 +1697,13 @@ export function App({
       });
     }
     return entries;
-  }, [fileViewSelections, getExtensionFileViews, selectedFile, sessionFileViews]);
+  }, [
+    fileViewSelections,
+    fileViewUnavailableReasons,
+    getExtensionFileViews,
+    selectedFile,
+    sessionFileViews,
+  ]);
 
   // Menus name commands rather than repeating them: every item's key hint and
   // action come from the table above, so a remapped shortcut shows its new key
