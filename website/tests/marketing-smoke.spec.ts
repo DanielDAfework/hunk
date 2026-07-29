@@ -113,9 +113,9 @@ test("feature cards deep-link into the matching documentation page", async ({ pa
     "href",
     "/docs/workflows/watch-mode/",
   );
-  await expect(page.getByRole("link", { name: /Inline agent annotations/ })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: /Review with your agent/ })).toHaveAttribute(
     "href",
-    "/docs/agents/comments-and-annotations/",
+    "/docs/agents/review-with-an-agent/",
   );
 });
 
@@ -127,12 +127,16 @@ test("feature showcase leads with real TUI captures and deep-links each feature"
   // The review-stream still plus one clip per interactive feature.
   await expect(page.locator(".show-media img")).toHaveAttribute("src", "/feature-stream.webp");
   const clips = page.locator(".show-media video");
-  await expect(clips).toHaveCount(3);
-  for (const base of ["feature-mouse", "feature-layout", "feature-themes"]) {
+  await expect(clips).toHaveCount(4);
+  for (const base of ["feature-agent", "feature-mouse", "feature-layout", "feature-themes"]) {
     const clip = page.locator(`.show-media video:has(source[src='/${base}.webm'])`);
     await expect(clip.locator(`source[src='/${base}.mp4']`)).toHaveCount(1);
   }
 
+  await expect(page.getByRole("link", { name: /Agent annotations, in depth/ })).toHaveAttribute(
+    "href",
+    "/docs/agents/comments-and-annotations/",
+  );
   await expect(page.getByRole("link", { name: /Keyboard & mouse reference/ })).toHaveAttribute(
     "href",
     "/docs/start/keyboard-and-mouse/",
@@ -148,19 +152,6 @@ test("feature showcase leads with real TUI captures and deep-links each feature"
   await expect(page.getByRole("link", { name: /How reviews work/ })).toHaveAttribute(
     "href",
     "/docs/workflows/working-trees-and-commits/",
-  );
-});
-
-test("the agent section shows a note screenshot beside the commands that make it", async ({
-  page,
-}) => {
-  await page.goto("/");
-
-  await expect(page.getByRole("heading", { name: /Your agent reviews with you/ })).toBeVisible();
-  await expect(page.locator(".agent-shot img")).toHaveAttribute("src", "/agent-note-zoom.webp");
-  await expect(page.getByRole("link", { name: /How agent review works/ })).toHaveAttribute(
-    "href",
-    "/docs/agents/review-with-an-agent/",
   );
 });
 

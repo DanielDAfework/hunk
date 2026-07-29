@@ -1,5 +1,4 @@
 ---
-import AgentFlow from "../components/marketing/AgentFlow.astro";
 import BrandFooter from "../components/BrandFooter.astro";
 import BrandHeader from "../components/BrandHeader.astro";
 import CommunityVideos from "../components/marketing/CommunityVideos.astro";
@@ -16,8 +15,8 @@ const description =
 
 /**
  * Compact cards for the features that don't get a showcase block: watch mode
- * has no visual that beats trying it, and agent annotations get the full
- * "# for agents" section right below.
+ * has no visual that beats trying it, and agent-driven review sessions are a
+ * workflow story the docs tell better than a clip could.
  */
 const features = [
   [
@@ -26,9 +25,9 @@ const features = [
     "/docs/workflows/watch-mode/",
   ],
   [
-    "Inline agent annotations",
-    "AI reasoning renders beside the code it describes — context lives in the diff, not another tab.",
-    "/docs/agents/comments-and-annotations/",
+    "Review with your agent",
+    "Agents drive review sessions through hunk session commands and the bundled skill — your agent walks the diff with you.",
+    "/docs/agents/review-with-an-agent/",
   ],
 ] as const;
 
@@ -181,14 +180,6 @@ const formattedStars =
               ))
             }
           </div>
-        </section>
-
-        <section class="band agents" aria-labelledby="agents-title">
-          <div class="band-head">
-            <p class="kicker"># for agents</p>
-            <h2 id="agents-title">Your agent reviews with you, not instead of you.</h2>
-          </div>
-          <AgentFlow />
         </section>
 
         <section class="install" id="install">

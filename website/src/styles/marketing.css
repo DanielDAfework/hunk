@@ -644,83 +644,6 @@ a:focus-visible {
   font-size: 12.5px;
 }
 
-/* Agent section: the screenshot carries it, the commands just say who runs what. */
-.marketing .agent-cols {
-  display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr);
-  align-items: center;
-  gap: 40px;
-}
-
-.marketing .agent-flow dl {
-  margin: 0;
-  border-top: 1.5px solid var(--rule);
-}
-
-.marketing .agent-flow dl > div {
-  padding: 14px 0;
-  border-bottom: 1.5px solid var(--rule);
-}
-
-.marketing .agent-flow dt {
-  color: var(--soft);
-  font-size: 11.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.marketing .agent-flow dd {
-  margin: 8px 0 0;
-}
-
-.marketing .agent-flow code {
-  display: block;
-  overflow-wrap: anywhere;
-  font-family: var(--mono);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.marketing .agent-flow code::before {
-  color: var(--acc);
-  content: "$ ";
-}
-
-.marketing .pills {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 16px 0 0;
-}
-
-.marketing .pills a {
-  padding: 5px 11px;
-  border: 1.5px solid var(--ink);
-  border-radius: 6px;
-  background: var(--paper);
-  font-size: 12px;
-  transition: 0.12s;
-}
-
-.marketing .pills a:hover {
-  border-color: var(--acc);
-  background: var(--acc);
-  color: var(--paper);
-}
-
-.marketing .agent-shot {
-  margin: 0;
-}
-
-.marketing .agent-shot img {
-  display: block;
-  width: 100%;
-  height: auto;
-  border: 1.5px solid var(--ink);
-  border-radius: 10px;
-  box-shadow: 4px 4px 0 var(--ink);
-}
-
 /* Closing call to action: one line, then the way in. */
 .marketing .last {
   max-width: 960px;
@@ -825,14 +748,6 @@ a:focus-visible {
 }
 
 @media (max-width: 980px) {
-  .marketing .agent-cols {
-    grid-template-columns: 1fr;
-  }
-
-  .marketing .agent-shot {
-    max-width: 560px;
-  }
-
   /* Copy stacks above its capture on narrow screens. */
   .marketing .show-item {
     grid-template-columns: 1fr;

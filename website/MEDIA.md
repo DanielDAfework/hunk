@@ -6,7 +6,7 @@
 
 ```bash
 bun run website/scripts/capture-media.ts            # everything
-bun run website/scripts/capture-media.ts mouse      # one asset: stream|mouse|layout|themes
+bun run website/scripts/capture-media.ts mouse      # one asset: stream|agent|mouse|layout|themes
 ```
 
 Video assets need an ffmpeg with libx264 and libvpx-vp9 on PATH (or pointed at via `FFMPEG=`). Like the other rituals in this file it is optional and Unix-oriented; website builds and tests never run it.
@@ -24,14 +24,6 @@ Image refresh is an optional, Unix-oriented maintainer task; website builds and 
 magick source.png -resize '1400x>' -strip -quality 82 public/docs/images/review-stream.webp
 magick source.png -resize '960x>' -strip -quality 82 public/docs/images/agent-comments.webp
 ```
-
-`public/agent-note-zoom.webp` is a zoomed crop of `public/shot-graphite.webp`, framed so the agent note and the lines it annotates are legible at landing-page size. Recrop it from the full-resolution theme shot rather than upscaling this file:
-
-```bash
-magick shot-graphite.webp -crop 924x486+1276+318 +repage -strip -quality 82 public/agent-note-zoom.webp
-```
-
-The note in that capture renders as "Agent note" because the annotation carries no `author`; a sidecar that names its agent would title the card with that name instead.
 
 `public/og.png` is the shared 1200×630 social card for the landing page and documentation. Keep it aligned with the site metadata and paper/green theme.
 

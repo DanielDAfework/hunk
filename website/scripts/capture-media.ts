@@ -9,7 +9,7 @@
  * refresh rituals in website/MEDIA.md; website builds and tests never run it.
  *
  * Usage, from the repository root:
- *   bun run website/scripts/capture-media.ts [stream|mouse|layout|themes]...
+ *   bun run website/scripts/capture-media.ts [stream|agent|mouse|layout|themes]...
  *
  * With no arguments every asset is rebuilt. Video assets need an ffmpeg with
  * libx264 + libvpx-vp9; point FFMPEG at one if it is not on PATH.
@@ -348,6 +348,38 @@ async function captureMouse() {
   }
 }
 
+/** Video: agent notes rendered inline, following [ / ] hunk navigation. */
+async function captureAgent() {
+  const { session, cleanup } = await launchHunkForCapture({
+    args: [
+      "patch",
+      "examples/3-agent-review-demo/change.patch",
+      "--agent-context",
+      "examples/3-agent-review-demo/agent-context.json",
+    ],
+    cols: 118,
+    rows: 30,
+  });
+  try {
+    await waitForReview(session, /normalize\.ts/);
+    await session.press("a");
+    await sleep(500);
+
+    const story = new Storyboard(session);
+    await story.hold(2_300);
+    await session.press("]");
+    await sleep(400);
+    await story.hold(2_400);
+    await session.press("]");
+    await sleep(400);
+    await story.hold(2_400);
+
+    await story.writeVideos("feature-agent");
+  } finally {
+    cleanup();
+  }
+}
+
 /** Video: one diff flipping between split and stack layouts. */
 async function captureLayout() {
   // No sidebar and a single pretty file: the layout change is the whole story,
@@ -484,6 +516,7 @@ async function captureThemes() {
 
 const ASSETS: Record<string, () => Promise<void>> = {
   stream: captureStream,
+  agent: captureAgent,
   mouse: captureMouse,
   layout: captureLayout,
   themes: captureThemes,
