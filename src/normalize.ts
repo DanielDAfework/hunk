@@ -35,6 +35,10 @@ export interface NormalizedSnapshot {
 
 const ESC = "\x1b";
 const BEL = "\x07";
+const CAN = "\x18";
+const SUB = "\x1a";
+/** CSI parameter strings longer than this are consumed but ignored. */
+const MAX_CSI_PARAMS = 64;
 
 /** Overwritten frames matching this are preserved instead of collapsed. */
 const INTERESTING_FRAME_RE = /\b(error|warn(ing)?|fail(ed|ure)?|fatal|timeout|refused|denied)s?\b/i;
@@ -47,11 +51,17 @@ export class StreamNormalizer {
   private current = "";
   /** Set when a bare CR was seen; the next printable char overwrites the line. */
   private crPending = false;
-  /** Partial escape sequence carried across chunk boundaries. */
-  private pendingEsc = "";
   private altScreen = false;
   /** Index into `lines` where the current TUI frame starts. */
   private frameStart = 0;
+
+  // Escape-parser state (persists across chunks; O(1) memory).
+  private escMode: "text" | "esc" | "csi" | "string" | "charset" = "text";
+  private csiParams = "";
+  private csiOverflow = false;
+  /** string mode: OSC may end on BEL; DCS/APC/PM/SOS only on ST. */
+  private stringIsOsc = false;
+  private stringEscPending = false;
 
   bytes = 0;
   tuiMode = false;
@@ -62,27 +72,92 @@ export class StreamNormalizer {
 
   feed(chunk: string): void {
     this.bytes += Buffer.byteLength(chunk, "utf8");
-    let buf = this.pendingEsc + chunk;
-    this.pendingEsc = "";
+    const buf = chunk;
     let i = 0;
 
     while (i < buf.length) {
       const ch = buf[i]!;
+      const code = buf.charCodeAt(i);
+
+      // ---- escape-sequence state machine (VT500-style, survives chunk
+      // boundaries with O(1) memory; hardened against tmux's regress/
+      // input-malformed.sh cases: CAN/SUB aborts, megabyte OSC/APC/DCS
+      // payloads, over-long CSI parameter strings). ----
+
+      if (this.escMode === "esc") {
+        if (ch === "[") {
+          this.escMode = "csi";
+          this.csiParams = "";
+          this.csiOverflow = false;
+        } else if (ch === "]") {
+          this.escMode = "string";
+          this.stringIsOsc = true;
+          this.stringEscPending = false;
+        } else if (ch === "P" || ch === "_" || ch === "^" || ch === "X") {
+          // DCS / APC / PM / SOS: consume-and-discard until ST. Treating
+          // these as 2-char escapes would leak their payload as text.
+          this.escMode = "string";
+          this.stringIsOsc = false;
+          this.stringEscPending = false;
+        } else if (ch === "(" || ch === ")" || ch === "#" || ch === "%") {
+          this.escMode = "charset";
+        } else if (ch === ESC) {
+          // ESC restarts the escape; stay in this state.
+        } else {
+          // Any other 2-char sequence (ESC 7/8/M/=/>/c...): done, drop.
+          this.escMode = "text";
+        }
+        i += 1;
+        continue;
+      }
+      if (this.escMode === "csi") {
+        if (code >= 0x40 && code <= 0x7e) {
+          if (!this.csiOverflow) this.handleCsi(this.csiParams, ch);
+          this.escMode = "text";
+        } else if (ch === CAN || ch === SUB) {
+          this.escMode = "text"; // aborted sequence: drop, keep what follows
+        } else if (ch === ESC) {
+          this.escMode = "esc"; // aborted by a new escape
+        } else if (this.csiParams.length >= MAX_CSI_PARAMS) {
+          this.csiOverflow = true; // keep consuming, stop storing
+        } else {
+          this.csiParams += ch;
+        }
+        i += 1;
+        continue;
+      }
+      if (this.escMode === "string") {
+        if (this.stringEscPending) {
+          this.stringEscPending = false;
+          if (ch === "\\") {
+            this.escMode = "text"; // ST terminator
+            i += 1;
+            continue;
+          }
+          // ESC + something else aborts the string; reprocess as an escape.
+          this.escMode = "esc";
+          continue; // do not advance: current char is handled in esc mode
+        }
+        if (ch === ESC) {
+          this.stringEscPending = true;
+        } else if (ch === BEL && this.stringIsOsc) {
+          this.escMode = "text";
+        } else if (ch === CAN || ch === SUB) {
+          this.escMode = "text";
+        }
+        // Everything else is payload: discarded without buffering.
+        i += 1;
+        continue;
+      }
+      if (this.escMode === "charset") {
+        this.escMode = "text";
+        i += 1;
+        continue;
+      }
 
       if (ch === ESC) {
-        const consumed = this.consumeEscape(buf, i);
-        if (consumed === -1) {
-          // Partial escape at chunk end: hold it (bounded — a garbage ESC
-          // that never terminates gets flushed as data).
-          const tail = buf.slice(i);
-          if (tail.length <= 512) {
-            this.pendingEsc = tail;
-            return;
-          }
-          i += 1; // give up on this ESC, emit nothing for it
-          continue;
-        }
-        i += consumed;
+        this.escMode = "esc";
+        i += 1;
         continue;
       }
 
@@ -128,48 +203,6 @@ export class StreamNormalizer {
       this.current += ch;
       i += 1;
     }
-  }
-
-  /**
-   * Consume one escape sequence starting at buf[start] (an ESC).
-   * Returns chars consumed, or -1 if the sequence is incomplete (chunk split).
-   */
-  private consumeEscape(buf: string, start: number): number {
-    const next = buf[start + 1];
-    if (next === undefined) return -1;
-
-    if (next === "[") {
-      // CSI: ESC [ params... final (0x40–0x7E)
-      let j = start + 2;
-      while (j < buf.length) {
-        const c = buf.charCodeAt(j);
-        if (c >= 0x40 && c <= 0x7e) {
-          this.handleCsi(buf.slice(start + 2, j), buf[j]!);
-          return j - start + 1;
-        }
-        j += 1;
-      }
-      return -1;
-    }
-    if (next === "]") {
-      // OSC: ESC ] ... (BEL | ESC \)
-      let j = start + 2;
-      while (j < buf.length) {
-        if (buf[j] === BEL) return j - start + 1;
-        if (buf[j] === ESC) {
-          if (buf[j + 1] === "\\") return j - start + 2;
-          if (buf[j + 1] === undefined) return -1;
-        }
-        j += 1;
-      }
-      return -1;
-    }
-    if (next === "(" || next === ")" || next === "#" || next === "%") {
-      // Charset / line-attr sequences: ESC ( B etc — 3 chars.
-      return buf[start + 2] === undefined ? -1 : 3;
-    }
-    // Two-char sequences: ESC =, ESC >, ESC M, ESC 7/8, and the ST tail.
-    return 2;
   }
 
   /** Interpret the CSI sequences that affect our line model; drop the rest. */

@@ -348,6 +348,33 @@ solve — and which parts they deliberately punt:
   tmux."** — i.e., outsource exactly this daemon's job to a human-shaped
   multiplexer the agent must screen-scrape.
 
+### Resiliency hardening mined from tmux's regression suite
+
+tmux's `regress/input-malformed.sh` encodes 25 years of hostile-stream
+lessons, and porting its applicable cases immediately exposed three real
+bugs in the normalizer's original lookahead-style escape parsing:
+
+1. **No CAN/SUB abort.** `ESC[` + params + `CAN` + `OK` must abort the
+   sequence and keep "OK"; the old parser scanned for a final byte and ate
+   the "O" as one. (tmux: `csi-param-discard`, `csi-interm-discard`.)
+2. **String-sequence payload leak.** DCS/APC/PM/SOS (`ESC P/_/^/X`) were
+   treated as 2-char escapes, so a megabyte APC payload — tmux tests exactly
+   1.1 MB — would pour into the queryable text as garbage. (tmux:
+   `apc-discard`, `malformed-dcs`.)
+3. **Giant-OSC leak.** The old parser buffered unterminated escapes with a
+   512-byte cap and gave up beyond it, leaking huge OSC payloads. (tmux:
+   `osc-discard`.)
+
+The fix is the same shape tmux itself uses: a persistent VT500-style state
+machine (text/esc/csi/string/charset) that survives chunk boundaries with
+O(1) memory, discards string payloads without buffering, honors CAN/SUB
+aborts and ESC-restarts, and caps CSI parameter storage while still
+consuming to the final byte. `src/normalize.resilience.test.ts` ports the
+tmux cases by name (`tmux:osc-discard` etc.) and adds the property tmux's
+incremental parser implies: for a set of adversarial streams, every possible
+chunk-split point — plus 40 seeded-random fragment streams — must produce
+byte-identical normalized output.
+
 So the harness state of the art already covers the biggest chunk of the
 value (bounded output) with tail-truncation + temp file, which shrinks the
 headline savings but doesn't erase them (~17x remains on the error-heavy
