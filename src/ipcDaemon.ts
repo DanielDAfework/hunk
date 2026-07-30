@@ -79,11 +79,68 @@ export async function handleIpc(
       session.killJob(job, String(p.signal ?? "SIGTERM"));
       return { ok: true, state: job.state };
     }
+    // ---- hybrid exec-first surface (post-A/B salvage design): bash in, ----
+    // ---- structured state out, one round-trip. --------------------------
+    case "exec": {
+      // Persistent session per key (auto-created): bash composition works AND
+      // cwd/env persist across calls — which a spawn-per-command shim lacks.
+      const key = String(p.key ?? "hybrid");
+      let session;
+      try {
+        session = manager.getSession(key);
+      } catch {
+        session = await manager.createSession({ name: key, cwd: p.cwd ? String(p.cwd) : undefined });
+      }
+      const job = manager.run(session.id, String(p.command));
+      await session.wait(job, Number(p.timeout_ms ?? 30_000));
+      return execView(manager, job.id);
+    }
+    case "reply": {
+      // Answer whatever the session's current job is waiting on, then wait again.
+      const session = manager.getSession(String(p.key ?? "hybrid"));
+      const active = [...session.jobs].reverse().find(
+        (j) => j.state === "running" || j.state === "awaiting-input",
+      );
+      if (!active) {
+        throw new Error(`no active job in session "${session.name}" to reply to.`);
+      }
+      session.sendInput(String(p.text), p.end_with_newline !== false);
+      await session.wait(active, Number(p.timeout_ms ?? 30_000));
+      return execView(manager, active.id);
+    }
+    case "poll": {
+      // Only-new-output polling; the cursor lives server-side per job.
+      const { job, session } = manager.getJob(String(p.job));
+      await session.wait(job, Number(p.timeout_ms ?? 2_000));
+      const cursor = pollCursors.get(job.id) ?? 0;
+      const delta = job.output.query(job.id, job.state, { mode: "delta", since_line: cursor });
+      pollCursors.set(job.id, delta.last_line ?? cursor);
+      return { ...execView(manager, job.id), lines: delta.text ? delta.text.split("\n") : [] };
+    }
     default:
       throw new Error(
-        `unknown method "${req.method}". Valid: session_create, session_list, session_kill, run, status, wait, read, input, job_kill.`,
+        `unknown method "${req.method}". Valid: session_create, session_list, session_kill, run, status, wait, read, input, job_kill, exec, reply, poll.`,
       );
   }
+}
+
+/** Cursors for `poll` (only-new-output reads), keyed by job id. */
+const pollCursors = new Map<string, number>();
+
+/** The hybrid surface's one response shape: full normalized lines + job state. */
+function execView(manager: SessionManager, jobId: string) {
+  const { job, session } = manager.getJob(jobId);
+  const snap = job.output.snapshot();
+  const digest = session.digest(job);
+  return {
+    job_id: job.id,
+    state: job.state,
+    exit_code: job.exitCode,
+    duration_ms: digest.duration_ms,
+    lines: snap.lines,
+    notes: digest.notes,
+    awaiting_reason: digest.awaiting_reason ?? null,
+  };
 }
 
 if (import.meta.main) {

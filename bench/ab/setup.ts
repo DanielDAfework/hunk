@@ -20,7 +20,9 @@ const ROOT = "/tmp/ab-arena";
 const REPO = path.resolve(import.meta.dir, "../..");
 const SOCK = "/tmp/ab-at.sock";
 
-fs.rmSync(ROOT, { recursive: true, force: true });
+/** --keep: add missing arm instances without wiping existing runs' logs. */
+const KEEP = process.argv.includes("--keep");
+if (!KEEP) fs.rmSync(ROOT, { recursive: true, force: true });
 for (const d of ["logs", "gt"]) fs.mkdirSync(path.join(ROOT, d), { recursive: true });
 
 const DEVSERVER = `// dev-server fixture: binds an OS-assigned port, logs forever, never exits.
@@ -78,30 +80,44 @@ function tsprojInto(dir: string): void {
   fs.writeFileSync(path.join(dir, "errors.ts"), src);
 }
 
-function writeTool(arenaDir: string, id: string, arm: "control" | "term"): void {
+function writeTool(arenaDir: string, id: string, arm: "control" | "term" | "hybrid"): void {
   const bin = path.join(arenaDir, "bin");
   fs.mkdirSync(bin, { recursive: true });
   const log = path.join(ROOT, "logs", `${id}-${arm}.jsonl`);
   const gt = path.join(ROOT, "gt", `${id}-${arm}-port.txt`);
-  const body =
-    arm === "control"
-      ? `#!/bin/sh
+  let body: string;
+  if (arm === "control") {
+    body = `#!/bin/sh
 export AB_LOG=${log}
 export AB_GT=${gt}
 exec bun run ${REPO}/bench/ab/sh-run.ts "$@"
-`
-      : `#!/bin/sh
+`;
+  } else if (arm === "term") {
+    body = `#!/bin/sh
 export AB_LOG=${log}
 export AB_GT=${gt}
 export AGENT_TERM_SOCK=${SOCK}
 exec bun run ${REPO}/src/at.ts "$@"
 `;
+  } else {
+    body = `#!/bin/sh
+export AB_LOG=${log}
+export AB_GT=${gt}
+export AGENT_TERM_SOCK=${SOCK}
+export AGENT_TERM_KEY=${id}-hybrid
+export AGENT_TERM_CWD=${arenaDir}
+exec bun run ${REPO}/src/sh.ts "$@"
+`;
+  }
   fs.writeFileSync(path.join(bin, "tool"), body, { mode: 0o755 });
 }
 
+const ARMS = (process.argv.includes("--hybrid-only")
+  ? ["hybrid"]
+  : ["control", "term", "hybrid"]) as Array<"control" | "term" | "hybrid">;
 const TASKS = ["t1", "t2", "t3", "t4"] as const;
 for (const id of TASKS) {
-  for (const arm of ["control", "term"] as const) {
+  for (const arm of ARMS) {
     const dir = path.join(ROOT, `${id}-${arm}`);
     fs.mkdirSync(dir, { recursive: true });
     writeTool(dir, id, arm);

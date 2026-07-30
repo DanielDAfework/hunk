@@ -56,6 +56,30 @@ term arm on success while spending within 20% of its context tokens. It is
 WEAK (report as such) if control succeeds everywhere and the token advantage
 is under 2x. T4 is excluded from kill scoring (parity expected) but reported.
 
+## Follow-up experiment: hybrid arm (pre-registered addendum)
+
+Motivated by round 1's negative result: the winning interface was bash
+itself, so the **hybrid** arm exposes exactly the control shim's interface
+(`bin/tool [--timeout sec] -- '<bash command>'`, plain text out) but runs
+commands in a persistent PTY session through the daemon. Structure appears
+only in bracketed status lines: `[exit code: N]` (real, per command),
+`[WAITING FOR INPUT — <reason>]` with a `--reply` instruction (early return
+instead of hanging), `[still running as job-N]` with `--poll` (delta-only),
+and `--grep/--tail` on truncated output instead of temp files.
+
+Same four tasks, same scoring. Validation criteria (all must hold, judged
+against transcripts and logs):
+
+1. Success on all four tasks.
+2. T4 (parity): ≤2 tool calls (round 1 term arm needed 14; control 1).
+3. T2 result tokens within 1.5x of control's.
+4. T3 success where the *tool* surfaces the prompt — the agent's transcript
+   must show it simply ran cleanup.py and answered the reported prompt, with
+   no self-built PTY (`script`/`pty.spawn`) and no blind pre-piped answer.
+5. T1 agent wall-clock under control's 149s.
+
+Anything less is reported as the hybrid design failing too.
+
 ## Threats to validity (accepted, disclosed)
 
 n=1 pair per task (cost); single model; agents may deviate from the
