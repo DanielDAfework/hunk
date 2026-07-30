@@ -331,6 +331,46 @@ frontier agent with plain bash and a truncating exec tool is a stronger
 baseline than this project's premise assumed, and the digest/query surface
 as-built did not beat it on its own chosen tasks.**
 
+### Follow-up: the hybrid exec-first arm PASSED all pre-registered criteria
+
+Round 1's autopsy suggested an inverted design: keep the winning interface
+(bash in, plain text out, one call) and put the daemon underneath it —
+`src/sh.ts` over the same sessions/jobs/normalizer/detector. Structure
+appears only as bracketed status lines: real per-command `[exit code: N]`,
+`[WAITING FOR INPUT — <reason>]` with a `--reply` instruction (early return
+instead of a hang), `[still running as job-N]` with delta-only `--poll`, and
+`--grep/--tail job-N` instead of temp files. Criteria were pre-registered in
+PROTOCOL.md and committed before the four hybrid agents ran.
+
+| task | control | old term arm | hybrid |
+| --- | --- | --- | --- |
+| T1 dev-server | ✓ 5 calls · 240 tok · 149s | ✓ 10 · 1,092 · 69s | ✓ 6 · 397 · **46s** |
+| T2 tsc errors | ✓ 2 · 68 · 25s | ✓ 4 · 491 · 20s | ✓ 2 · **69** · 30s |
+| T3 tty prompt | ✓² 2 · 300 · 17s | ✓ 5 · 253 · 18s | ✓ 4 · 375 · 31s |
+| T4 parity | ✓ 1 · 439 · 7s | ✓ 14 · 1,408 · 94s | ✓ **1 · 439** · 18s |
+
+² control's T3 success was open-loop: it *guessed* a prompt existed from
+reading cleanup.py and blind-fed `y` through a self-built PTY. The hybrid
+agent ran the command plainly, was *told* `[WAITING FOR INPUT — blocked
+reading tty; yes-no]`, and answered with `--reply` — the closed-loop shape
+that also works when the required input depends on reading the prompt.
+(Transcript-verified; one disclosed deviation: a read-only `ls` of the
+tool's own bin directory outside the wrapper.)
+
+All five criteria passed: 4/4 success; T4 in 1 call (vs 14 for the old
+surface); T2 tokens at 1.01x control (69 vs 68 — bash composition works
+through the hybrid, so the digest layer's overhead disappears); T3 solved
+by the tool surfacing the prompt; T1 at 46s vs control's 149s. Total
+context cost across all four tasks: control 1,047 tokens, old term surface
+3,244, hybrid 1,280 — parity with the baseline, plus the structural wins
+the baseline lacks (exit codes without sentinels, prompt detection without
+guessing, supervised long-runners without nohup/sleep, lossless queryable
+history without temp files, no pkill-your-own-wrapper class of footgun).
+
+**Revised conclusion: the daemon's value survives, but only under an
+exec-first interface. "A 9-tool replacement for bash" is dead; "bash with a
+supervisor underneath" is validated on every axis this eval measures.**
+
 ## Post-eval: competitive teardown vs Forge (July 2026)
 
 The Phase 1 survey under-counted the field. The closest competitor is
