@@ -371,6 +371,59 @@ history without temp files, no pkill-your-own-wrapper class of footgun).
 exec-first interface. "A 9-tool replacement for bash" is dead; "bash with a
 supervisor underneath" is validated on every axis this eval measures.**
 
+### Round 3 (robustness): the last capability claim dies at frontier tier — and reappears down-model
+
+Pre-registered in PROTOCOL.md before the 12 runs. All ground truth
+orchestrator-verified (secrets against gt files, deletions against the
+filesystem).
+
+**Q1 — closed-loop gate (random code must be READ from the prompt), frontier
+model.** Control 2/2, hybrid 2/2. Both control agents wrote a ~20-line
+`pty.fork()` driver on the fly — closed-loop expect(1) improvised from raw
+primitives, in 2 calls / ~28s, at *lower* token cost than the hybrid arm
+(248 vs 292–475). Per the pre-registered criterion, **the closed-loop
+advantage claim is dead for frontier models**. One hybrid rep took 12 calls
+because of a real UX bug this exposed: the bracketed hints printed the
+CLI's canonical name (`sh --reply ...`) while the agent's wrapper was named
+`tool`, sending it down a dead end first (fixed: hints now use
+$AGENT_TERM_DISPLAY).
+
+**Q2 — T3 reliability, n=3 per arm (frontier).** 3/3 both arms. The
+control's PTY-synthesis workaround (`script -qec`, `pty.spawn`) is
+reliable technique, not a lucky roll.
+
+**Q3 — small model (Haiku class), n=1 per cell.** The predicted separation
+appears exactly at the closed loop: on the gate, **hybrid succeeded** (9
+logged calls — the `[WAITING FOR INPUT]` → `--reply` loop carried it)
+while **control genuinely failed the interaction** across 19 calls of
+non-working PTY attempts — and then "answered" by finding the ground-truth
+file, whose path my fixture leaked inside authgate.py (eval-design flaw,
+disclosed; scored as task failure since the challenge itself was never
+completed). On T3, both Haiku arms succeeded — the `script -c` y/N trick
+is apparently within small-model reach — with hybrid slower (19 calls).
+
+Also from this round's engineering: the new hybrid test suite caught a
+poll-cursor bug (first `--poll` re-shipped lines exec had already
+returned — duplicate context cost; fixed after the round-3 runs, so it
+could only have *inflated* hybrid numbers above, never flattered them).
+
+### Final value assessment after three rounds
+
+For **frontier models**, every capability differentiator tested — output
+economy, background supervision, open-loop prompts, closed-loop prompts —
+was matched by bash improvisation at equal or lower token cost. What
+remains for them is ergonomics and reliability, not capability: no
+hand-rolled pty drivers, no nohup/sleep dances, no pkill-your-own-wrapper
+footguns, faster wall-clock on supervision (46–69s vs 149s), and prompts
+that announce themselves instead of being guessed at. Real, but a
+convenience story.
+
+For **smaller models**, the guardrails convert failure into success on
+closed-loop interaction (n=1; needs replication). If the product story is
+"make cheap models reliable at terminal work," that is where the evidence
+points — and it is also the deployment regime (high-volume, cost-sensitive
+automation) where a supervisor daemon is most natural to operate.
+
 ## Post-eval: competitive teardown vs Forge (July 2026)
 
 The Phase 1 survey under-counted the field. The closest competitor is

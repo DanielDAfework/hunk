@@ -93,7 +93,7 @@ function render(r: ExecViewResult, opts: { deltaOnly?: boolean } = {}): string {
     while (tail.join("\n").length > MAX_BYTES && tail.length > 1) {
       tail = tail.slice(Math.ceil(tail.length / 4));
     }
-    truncNote = `\n[showing last ${tail.length} of ${lines.length} lines — query the rest: sh --grep ${r.job_id} --pattern '<re>'  or  sh --tail ${r.job_id} --lines N]`;
+    truncNote = `\n[showing last ${tail.length} of ${lines.length} lines — query the rest: ${TOOL} --grep ${r.job_id} --pattern '<re>'  or  ${TOOL} --tail ${r.job_id} --lines N]`;
     lines = tail;
   }
   let body = lines.join("\n");
@@ -105,17 +105,21 @@ function render(r: ExecViewResult, opts: { deltaOnly?: boolean } = {}): string {
   } else if (r.state === "awaiting-input") {
     body +=
       `\n[WAITING FOR INPUT — ${r.awaiting_reason}]` +
-      `\n[answer it with: sh --reply '<text>'   (or sh --kill ${r.job_id} to abort)]`;
+      `\n[answer it with: ${TOOL} --reply '<text>'   (or ${TOOL} --kill ${r.job_id} to abort)]`;
   } else {
     body +=
       `\n[still running as ${r.job_id}${opts.deltaOnly ? " (new output only)" : ""} — ` +
-      `new output: sh --poll ${r.job_id} ; stop: sh --kill ${r.job_id}]`;
+      `new output: ${TOOL} --poll ${r.job_id} ; stop: ${TOOL} --kill ${r.job_id}]`;
   }
   return body.trimStart();
 }
 
 const argv = process.argv.slice(2);
 const key = process.env.AGENT_TERM_KEY ?? "hybrid";
+// Name shown in bracketed hints: agents invoke us through arbitrarily named
+// wrappers, and a hint naming the wrong binary sends them down dead ends
+// (observed in the round-3 eval).
+const TOOL = process.env.AGENT_TERM_DISPLAY ?? "sh";
 
 function flag(name: string): string | undefined {
   const i = argv.indexOf(`--${name}`);

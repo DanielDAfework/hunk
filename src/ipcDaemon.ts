@@ -93,7 +93,10 @@ export async function handleIpc(
       }
       const job = manager.run(session.id, String(p.command));
       await session.wait(job, Number(p.timeout_ms ?? 30_000));
-      return execView(manager, job.id);
+      const view = execView(manager, job.id);
+      // Whatever exec ships now, a later poll must not ship again.
+      pollCursors.set(job.id, view.lines.length);
+      return view;
     }
     case "reply": {
       // Answer whatever the session's current job is waiting on, then wait again.
@@ -106,7 +109,9 @@ export async function handleIpc(
       }
       session.sendInput(String(p.text), p.end_with_newline !== false);
       await session.wait(active, Number(p.timeout_ms ?? 30_000));
-      return execView(manager, active.id);
+      const view = execView(manager, active.id);
+      pollCursors.set(active.id, view.lines.length);
+      return view;
     }
     case "poll": {
       // Only-new-output polling; the cursor lives server-side per job.

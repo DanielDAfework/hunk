@@ -106,6 +106,7 @@ export AB_GT=${gt}
 export AGENT_TERM_SOCK=${SOCK}
 export AGENT_TERM_KEY=${id}-hybrid
 export AGENT_TERM_CWD=${arenaDir}
+export AGENT_TERM_DISPLAY=${path.join(bin, "tool")}
 exec bun run ${REPO}/src/sh.ts "$@"
 `;
   }

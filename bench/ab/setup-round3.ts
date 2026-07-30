@@ -88,6 +88,7 @@ export AB_LOG=${log}
 export AGENT_TERM_SOCK=${SOCK}
 export AGENT_TERM_KEY=${instance}
 export AGENT_TERM_CWD=${arenaDir}
+export AGENT_TERM_DISPLAY=${path.join(bin, "tool")}
 exec bun run ${REPO}/src/sh.ts "$@"
 `;
   fs.writeFileSync(path.join(bin, "tool"), body, { mode: 0o755 });
