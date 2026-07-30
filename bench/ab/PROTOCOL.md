@@ -80,6 +80,29 @@ against transcripts and logs):
 
 Anything less is reported as the hybrid design failing too.
 
+## Round 3: robustness (pre-registered addendum)
+
+Three questions left open by rounds 1–2, run as control-vs-hybrid only (the
+old term surface is retired):
+
+- **Q1 closed-loop interactivity (T5).** `authgate.py` prints a random
+  4-digit code on /dev/tty and requires it typed back (3 attempts) before
+  revealing a random secret. Blind feeding cannot succeed; the prompt must
+  be read. Neither `expect` nor `pexpect` is installed, so a control-arm
+  success requires hand-rolled closed-loop PTY driving. n=2 per arm,
+  frontier model. Success = reporting the exact ground-truth secret.
+- **Q2 reliability of round-1/2 T3 results.** T3 repeated twice more per
+  arm (frontier), for n=3 total per arm across rounds.
+- **Q3 cheap-model arm.** T3 and T5, one run per arm, on a small model
+  (Haiku class). Hypothesis: the control arm's improvisation ability drops
+  with model capability and the hybrid's guardrails matter more.
+
+Honest criteria: if control matches hybrid on T5 success at comparable
+cost, the closed-loop advantage claim dies (it is the last capability-side
+differentiator this suite can test). Q2/Q3 are measurements, reported
+as-is; predictions (hybrid ≥ control everywhere; gap wider on Haiku) are
+falsifiable but not kill-grade.
+
 ## Threats to validity (accepted, disclosed)
 
 n=1 pair per task (cost); single model; agents may deviate from the
