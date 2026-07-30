@@ -1,13 +1,13 @@
 ---
 title: Extension API
-description: Register themes, languages, transforms, commands, dialogs, and events through the extension API object.
+description: Register themes, file previews, transforms, commands, dialogs, and events through the extension API object.
 ---
 
-The extension factory receives one API object. Registration calls are only valid while the factory is running; Hunk seals the object afterwards so a deferred callback cannot mutate the registry mid-session. This page indexes the whole object; the two largest registration calls are documented in depth on their own pages and summarized in place below.
+The extension factory receives one API object. Registration calls are only valid while the factory is running; Hunk seals the object afterwards so a deferred callback cannot mutate the registry mid-session. This page indexes the whole object; larger registration calls are documented in depth on their own pages and summarized in place below.
 
 ## `hunk.apiVersion`
 
-The API generation this Hunk speaks (currently `1`). Branch on it if you want one file to support several Hunk versions.
+The API generation this Hunk speaks (currently `2`). Branch on it if you want one file to support several Hunk versions. Version 2 adds the experimental file-view contract and its command controls.
 
 ## `hunk.registerTheme(theme)`
 
@@ -47,6 +47,14 @@ Full contract: [VCS adapters](/docs/extend/vcs-adapters/).
 Contribute a sidebar view — your own React component, rendered inside Hunk's OpenTUI tree beside (or in place of) the built-in file navigation. Views receive live review props, guarded navigation actions, the user's resolved keybindings, and a scrollbox ref contract for selection-following and windowing.
 
 Full contract: [Custom sidebars](/docs/extend/custom-sidebars/).
+
+## `hunk.registerFileView(view)`
+
+Contribute an opt-in alternate presentation for matching files. A view receives the public file and hunk model, typed change ranges, terminal width, cancellation, and lazy exact-source reads. It returns deterministic symbolic rows, optional fixed-height React/OpenTUI row painters, source bindings for inline notes, and positional hunk extents.
+
+Raw diff remains the default and fallback. Hunk continues to own review-stream geometry, scrolling, windowing, hunk navigation, selection, and note rendering.
+
+Full contract and examples: [File previews](/docs/extend/file-previews/).
 
 ## `hunk.transformChangeset(fn)`
 
@@ -88,6 +96,7 @@ Registered commands are also listed in the menu bar's **Extensions** menu under 
 The handler fires when the key is pressed outside modal UI (dialogs, menus, and focused text inputs own their keys; pager mode does not dispatch extension commands). It receives the standard context plus:
 
 - `ctx.sidebars.open(viewId)` / `close(viewId)` / `toggle(viewId)` / `isOpen(viewId)` — a bare id names your own view, `"files"` the built-in file navigation, `"<extensionId>:<viewId>"` any registered view. Opening also reveals a hidden sidebar area.
+- `ctx.fileViews.select(viewId)` / `toggle(viewId)` / `isActive(viewId)` — controls a matching [file preview](/docs/extend/file-previews/) for the current file; `select(null)` restores raw diff.
 - `ctx.selection` — where the review was pointing when the command fired.
 - `ctx.navigation` — moves the review stream.
 - `ctx.dialogs` — asks the user, below.

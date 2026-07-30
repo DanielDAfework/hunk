@@ -18,7 +18,7 @@ export default function (hunk: HunkExtensionAPI) {
 
 **The API is experimental**: `hunkdiff/extension` may change in breaking ways between minor releases while it stabilizes. Breaking changes are called out in release notes, and `hunk.apiVersion` identifies the surface an extension was written against.
 
-What an extension can register is covered by the companion pages: the [extension API](/docs/extend/extension-api/), [VCS adapters](/docs/extend/vcs-adapters/), and [custom sidebars](/docs/extend/custom-sidebars/).
+What an extension can register is covered by the companion pages: the [extension API](/docs/extend/extension-api/), [file previews](/docs/extend/file-previews/), [VCS adapters](/docs/extend/vcs-adapters/), and [custom sidebars](/docs/extend/custom-sidebars/).
 
 ## Where Hunk looks
 
@@ -60,6 +60,7 @@ The **id** is the file stem, or the folder name for `<name>/index.ts` and single
 - config: `[extension.<id>]`
 - commands: `<id>.<commandId>`
 - sidebar views: `<id>:<viewId>`
+- file previews: `<id>:<viewId>`
 
 Ids start with a letter or digit, then letters, digits, `-`, or `_`. `hunk`, `git`, `jj`, and `sl` are reserved. An invalid id — or a second source offering an already-loaded id — is skipped with a startup notice.
 
