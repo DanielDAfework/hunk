@@ -266,6 +266,71 @@ next `since_line`.
 - Token estimates are chars/4 everywhere; swapping in a real tokenizer only
   changes the constants, not the ratios.
 
+## Agent-in-the-loop A/B eval — the pre-registered kill criterion FIRED
+
+Protocol: `bench/ab/PROTOCOL.md`, committed before any run. Two arms of real
+agents (same frontier model, same task text), each restricted to one tool:
+**control** = pi-style truncating exec shim; **term** = the `at` CLI over
+this daemon. Success scored by the orchestrator against ground truth; cost
+= bytes of tool results entering the model's context, logged symmetrically
+per call. One T3 control run was invalidated for bypassing the wrapper
+(zero logged calls) and rerun once per protocol; the rerun is what's scored.
+
+| task | arm | success | calls | result tokens | agent wall-clock |
+| --- | --- | --- | ---: | ---: | ---: |
+| T1 dev-server (never exits) | control | yes | 5 | ~240¹ | 149s |
+| | term | yes | 10 | 1,092 | **69s** |
+| T2 tsc, 200 errors | control | yes | 2 | **68** | 25s |
+| | term | yes | 4 | 491 | 20s |
+| T3 /dev/tty-gated prompt | control | yes² | 2 | 300 | 17s |
+| | term | yes | 5 | **253** | 18s |
+| T4 find/grep (parity task) | control | yes | **1** | **439** | **7s** |
+| | term | yes | 14 | 1,408 | 94s |
+
+¹ Two control calls went unlogged because its `pkill -f devserver` matched
+and killed its own wrapper process (the command string contains
+"devserver") — small outputs, direction of the comparison unaffected.
+² Via `printf y | script -qec "python3 cleanup.py" /dev/null` — the agent
+synthesized a PTY *inside* the exec shim and blind-fed the confirmation.
+
+**Verdict, per the pre-registered criteria: the control arm matched the
+term arm on success across T1–T3 while spending ~608 vs ~1,836 result
+tokens — one third. The kill criterion ("control matches success within
+20% of tokens") fired decisively. On these tasks, with a frontier model,
+the headline value proposition is not supported.**
+
+Why the control arm won, from its transcripts:
+
+- **bash is already a query language.** The control agent never shipped big
+  output into context: it composed `| grep -c "error TS"`, `| head -3`,
+  `grep -m1 Listening` *inside* the exec call. Phase 3's token benchmark
+  implicitly assumed output must transit the tool result before being
+  filtered; a capable agent filters server-side, for free. This
+  retroactively weakens the practical force of the 17–190x numbers for
+  frontier models (they stand for naive/streaming consumption, and for any
+  flow where the agent doesn't know what to filter for yet).
+- **Missing primitives get synthesized on demand.** No background jobs →
+  `nohup ... & echo $!`. No PTY → `script -qec` or Python `pty.spawn`.
+  The training-data gravity the original thesis cited works *against* a
+  new surface too: the model's bash fluency is so deep that an unfamiliar
+  CLI costs more turns than improvising infrastructure with a familiar one
+  (T4: 14 ceremony-laden calls vs 1).
+- Where the term arm did win: **wall-clock on the never-exiting process**
+  (69s vs 149s — `wait` returns on bind; the control arm slept and polled),
+  and T3 tokens, marginally.
+
+What survives, stated carefully (post-hoc hypotheses, not tested claims):
+supervision ergonomics for long-running processes; closed-loop interactive
+dialogs where the needed input depends on reading the prompt (a single y/N
+is open-loop scriptable; a password retry or menu choice is not); weaker
+or cheaper models without this level of bash improvisation; and the
+awaiting-input *detector* as a component (the control arm succeeded at T3
+only because it correctly guessed the prompt in advance — nothing told it
+a prompt existed). But the honest summary for the headline pitch is: **a
+frontier agent with plain bash and a truncating exec tool is a stronger
+baseline than this project's premise assumed, and the digest/query surface
+as-built did not beat it on its own chosen tasks.**
+
 ## Post-eval: competitive teardown vs Forge (July 2026)
 
 The Phase 1 survey under-counted the field. The closest competitor is
