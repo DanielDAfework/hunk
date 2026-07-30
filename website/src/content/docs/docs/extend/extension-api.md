@@ -238,7 +238,7 @@ const patterns = (hunk.config.patterns as string[] | undefined) ?? ["*.lock"];
 
 ## `ctx.notify(message, type?)`
 
-Every handler and transform receives a context with `cwd` and `notify`; event and bus handlers add `sidebars` and `events.emit`, command handlers add `sidebars`, `selection`, `navigation`, and `dialogs`. `notify` shows one transient line at the bottom of the app; `type` is `"info"` (default), `"warning"`, or `"error"`. Messages raised before the UI mounts are buffered, so a `startup` handler can notify safely.
+Every handler and transform receives a context with `cwd` and `notify`; event and bus handlers add `sidebars` and `events.emit`, command handlers add `sidebars`, `fileViews`, `selection`, `navigation`, and `dialogs`. `notify` shows one transient line at the bottom of the app; `type` is `"info"` (default), `"warning"`, or `"error"`. Messages raised before the UI mounts are buffered, so a `startup` handler can notify safely.
 
 ## `hunk.log(message)`
 

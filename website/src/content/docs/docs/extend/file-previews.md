@@ -48,7 +48,7 @@ export default function (hunk: HunkExtensionAPI) {
 
       for (const hunk of input.file.hunks ?? []) {
         const [start, end] = hunk.newRange ?? [0, 0];
-        // A deleted file or deletion-only hunk has no new-side source to present.
+        // A missing or invalid new-side range cannot be positioned in this preview.
         if (start < 1 || end < start) return null;
         hunkRows.push({
           startRow: Math.min(lines.length - 1, start - 1),
@@ -74,7 +74,7 @@ Return `null` whenever the view cannot safely present a file. Hunk will keep or 
 
 `matches(file)` decides whether the view appears in the View menu for that file. Keep it fast and side-effect free. Typical matchers use `file.path`, `file.changeType`, `file.isBinary`, or `file.isTooLarge`.
 
-If `matches` throws, Hunk reports the extension and uses raw diff.
+If `matches` throws, Hunk excludes the view for that file and keeps raw diff.
 
 ### Layout input
 
@@ -84,7 +84,7 @@ If `matches` throws, Hunk reports the extension and uses raw diff.
 | -------------------- | -------------------------------------------------------------------------------------------------- |
 | `file`               | The public file model, including path, change type, stats, patch text, and ordered hunk summaries. |
 | `width`              | Available terminal columns. Return the same layout for the same input and width.                   |
-| `signal`             | Aborts when a reload, resize, view change, or extension reload supersedes the request.             |
+| `signal`             | Aborts when a reload, resize, selection change, view change, or extension reload supersedes it.    |
 | `changes`            | Typed added and removed source ranges with their hunk indexes.                                     |
 | `readDocument(side)` | Lazily reads the exact `"old"` or `"new"` source document.                                         |
 
@@ -112,7 +112,7 @@ Each row needs a stable `id` and a symbolic `spans` array. A span contains text 
 }
 ```
 
-Tones are `muted`, `accent`, `accent-muted`, `syntax`, `added`, and `removed`. Attributes are `bold`, `italic`, `underline`, and `strikethrough`. Hunk maps tones to the active theme while painting, so changing themes does not require a new layout.
+Tones are `muted`, `accent`, `accent-muted`, `syntax`, `added`, and `removed`. Attributes are `bold`, `italic`, `underline`, and `strikethrough`. Span text cannot contain newlines; create a separate row for each line. Hunk maps tones to the active theme while painting, so changing themes does not require a new layout.
 
 `hunkRows` has one entry for every item in `input.file.hunks`, in the same order. Each entry is an inclusive, zero-based extent into `rows`. Hunk uses these extents for `[`/`]` navigation and selected-hunk highlighting even when several preview rows represent one source hunk.
 
@@ -196,7 +196,10 @@ A `null`, invalid, oversized, cancelled, timed-out, or throwing layout produces 
 The examples are not bundled or loaded by default. Run one directly while developing:
 
 ```bash
-bun run src/main.tsx -- diff --extension ./examples/extensions/rendered-markdown before.md after.md
+bun run src/main.tsx -- diff \
+  --extension ./examples/extensions/rendered-markdown \
+  ./examples/extensions/jsx-file-view-gallery/mixed-review/fixtures/before/README.md \
+  ./examples/extensions/jsx-file-view-gallery/mixed-review/fixtures/after/README.md
 ```
 
 For installation, discovery, folder extensions, and trust, start with [Extensions](/docs/extend/extensions/). For the rest of the API object, see [Extension API](/docs/extend/extension-api/).
