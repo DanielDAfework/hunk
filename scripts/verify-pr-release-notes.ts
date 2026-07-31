@@ -46,6 +46,22 @@ export function isGeneratedPrereleasePreparation(changedPaths: readonly string[]
   );
 }
 
+/** Return the highest stable release heading carried in the generated changelog. */
+function findLatestStableRelease(changelog: string) {
+  const versions = [...changelog.matchAll(/^## (\d+)\.(\d+)\.(\d+)$/gm)].map((match) => ({
+    raw: match[0].slice(3),
+    parts: [Number(match[1]), Number(match[2]), Number(match[3])],
+  }));
+  versions.sort((left, right) => {
+    for (let index = 0; index < 3; index += 1) {
+      const difference = right.parts[index]! - left.parts[index]!;
+      if (difference !== 0) return difference;
+    }
+    return 0;
+  });
+  return versions[0]?.raw;
+}
+
 /** Validate the coherent Changesets, package, and changelog state produced for a prerelease. */
 export function validateGeneratedPrerelease(input: GeneratedPrereleaseInput) {
   const { packageJson, pre, changelog, changesetIdsOnDisk } = input;
@@ -64,6 +80,15 @@ export function validateGeneratedPrerelease(input: GeneratedPrereleaseInput) {
   const initialVersion = (pre.initialVersions as Record<string, unknown>)[packageJson.name];
   if (typeof initialVersion !== "string" || !/^\d+\.\d+\.\d+$/.test(initialVersion)) {
     throw new Error(`Missing stable initial version for package ${packageJson.name}`);
+  }
+  const latestStableRelease = findLatestStableRelease(changelog);
+  if (!latestStableRelease) {
+    throw new Error("Changelog does not contain a stable release heading");
+  }
+  if (initialVersion !== latestStableRelease) {
+    throw new Error(
+      `Initial version ${initialVersion} does not match latest stable release ${latestStableRelease}`,
+    );
   }
 
   const escapedTag = pre.tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -101,9 +126,9 @@ export function validateGeneratedPrerelease(input: GeneratedPrereleaseInput) {
 }
 
 /** Run Git and return its captured standard output or fail with its diagnostic. */
-function readGitOutput(args: string[]) {
+function readGitOutput(args: string[], root: string) {
   const result = Bun.spawnSync(["git", ...args], {
-    cwd: repoRoot,
+    cwd: root,
     stdout: "pipe",
     stderr: "inherit",
   });
@@ -114,66 +139,70 @@ function readGitOutput(args: string[]) {
 }
 
 /** Read changed paths without relying on shell parsing or platform path separators. */
-function readChangedPaths(baseRevision: string, headRevision: string) {
-  const output = readGitOutput([
-    "diff",
-    "--name-only",
-    "--no-renames",
-    "-z",
-    baseRevision,
-    headRevision,
-    "--",
-  ]);
+function readChangedPaths(baseRevision: string, headRevision: string, root: string) {
+  const output = readGitOutput(
+    ["diff", "--name-only", "--no-renames", "-z", baseRevision, headRevision, "--"],
+    root,
+  );
   return new TextDecoder().decode(output).split("\0").filter(Boolean);
 }
 
 /** Run the normal Changesets status gate for a non-release-preparation pull request. */
-function runChangesetStatus(baseRevision: string) {
+function runChangesetStatus(baseRevision: string, root: string) {
   const result = Bun.spawnSync(
     [process.execPath, "run", "changeset:status", "--", `--since=${baseRevision}`],
     {
-      cwd: repoRoot,
+      cwd: root,
       stdin: "inherit",
       stdout: "inherit",
       stderr: "inherit",
     },
   );
   if (result.exitCode !== 0) {
-    process.exit(result.exitCode);
+    throw new Error(`Changesets status failed with exit ${result.exitCode}`);
   }
 }
 
 /** Verify ordinary changesets or the generated state of a metadata-only prerelease PR. */
-async function main(args = process.argv.slice(2)) {
-  const [baseRevision, headRevision = "HEAD"] = args;
-  if (!baseRevision || baseRevision.startsWith("-") || headRevision.startsWith("-")) {
-    throw new Error("Usage: verify-pr-release-notes.ts <base-revision> [head-revision]");
-  }
-
-  const changedPaths = readChangedPaths(baseRevision, headRevision);
+export async function verifyPrReleaseNotes(
+  baseRevision: string,
+  headRevision = "HEAD",
+  root = repoRoot,
+) {
+  const changedPaths = readChangedPaths(baseRevision, headRevision, root);
   if (!isGeneratedPrereleasePreparation(changedPaths)) {
-    runChangesetStatus(baseRevision);
-    return;
+    runChangesetStatus(baseRevision, root);
+    return "changeset-status" as const;
   }
 
-  const prePath = path.join(repoRoot, ".changeset", "pre.json");
+  const prePath = path.join(root, ".changeset", "pre.json");
   if (!existsSync(prePath)) {
     throw new Error("Generated prerelease preparation removed .changeset/pre.json");
   }
 
   const [packageJson, pre, changelog] = await Promise.all([
-    Bun.file(path.join(repoRoot, "package.json")).json() as Promise<PackageManifest>,
+    Bun.file(path.join(root, "package.json")).json() as Promise<PackageManifest>,
     Bun.file(prePath).json() as Promise<PrereleaseState>,
-    Bun.file(path.join(repoRoot, "CHANGELOG.md")).text(),
+    Bun.file(path.join(root, "CHANGELOG.md")).text(),
   ]);
   const changesetIdsOnDisk = new Set(
-    readdirSync(path.join(repoRoot, ".changeset"), { withFileTypes: true })
+    readdirSync(path.join(root, ".changeset"), { withFileTypes: true })
       .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
       .map((entry) => entry.name.slice(0, -3)),
   );
 
   validateGeneratedPrerelease({ packageJson, pre, changelog, changesetIdsOnDisk });
   console.log(`Validated generated prerelease notes for ${packageJson.version}.`);
+  return "generated-prerelease" as const;
+}
+
+/** Parse command-line revisions before running pull-request release-note verification. */
+async function main(args = process.argv.slice(2)) {
+  const [baseRevision, headRevision = "HEAD"] = args;
+  if (!baseRevision || baseRevision.startsWith("-") || headRevision.startsWith("-")) {
+    throw new Error("Usage: verify-pr-release-notes.ts <base-revision> [head-revision]");
+  }
+  await verifyPrReleaseNotes(baseRevision, headRevision);
 }
 
 if (import.meta.main) {
