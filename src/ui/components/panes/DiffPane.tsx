@@ -1667,6 +1667,13 @@ export function DiffPane({
     // Only track the align as pending while the stream still has to travel. Marking an
     // already-aligned file pending would hold viewport-driven selection off until the next
     // relayout happened to clear it.
+    //
+    // Testing the coalesced read rather than the live scroll top is deliberate, and safe even
+    // when the two disagree. Skipping requires the coalesced read to already sit on the target,
+    // and the align below puts the live position on that same target synchronously — so the next
+    // coalesced read can only report the value viewport-follow selection last recorded. It never
+    // observes a move, so it cannot mistake this align for user scrolling. Where the live
+    // position sat when the request arrived does not enter into it.
     const desiredTop = resolveFileTopAlignScrollTop(selectedFileId);
     if (desiredTop === null || !isFileTopAlignSettled(desiredTop)) {
       pendingFileTopAlignFileIdRef.current = selectedFileId;
