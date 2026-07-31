@@ -304,12 +304,7 @@ describe("PTY pager", () => {
     }
   });
 
-  // TODO(#650): re-enable once file navigation stops racing the align-to-top
-  // scroll. The `,` leg fails on CI far more often than it passes (4 of 5
-  // observed runs, including a re-run of main's own CI), while passing
-  // consistently on macOS locally. `moveToFile` requests the alignment through
-  // an effect keyed on `selectedFileTopAlignRequestId`, which this test races.
-  test.skip("general pager mode navigates between files in the review stream", async () => {
+  test("general pager mode navigates between files in the review stream", async () => {
     const fixture = harness.createMultiFilePagerPatchFixture();
     const session = await harness.launchHunkWithFileBackedStdin({
       stdinFile: fixture.patchFile,
@@ -325,24 +320,31 @@ describe("PTY pager", () => {
       expect(initial).toContain("line01 = 1;");
       expect(initial).not.toContain("secondValue = 2;");
 
-      await session.waitIdle({ timeout: 200 });
+      // The keypress handler is bound after the first paint, so proving one key landed keeps a
+      // slow start from being misread as broken file navigation.
+      await harness.ensureKeyboardIsLive(session);
       await session.press(".");
+      // second.ts is the last file and too short to own the viewport top, so the only correct
+      // landing spot is the bottom of the stream. Assert that exact position -- reaching it while
+      // first.ts's opening line is gone is what separates a real jump from an incidental redraw.
       const nextFile = await harness.waitForSnapshot(
         session,
-        (text) => text.includes("secondValue = 2;"),
+        (text) => text.includes("secondValue = 2;") && !text.includes("line01 = 1;"),
         5_000,
       );
 
       expect(nextFile).toContain("secondValue = 2;");
+      expect(nextFile).not.toContain("line01 = 1;");
 
       await session.press(",");
       const previousFile = await harness.waitForSnapshot(
         session,
-        (text) => text.includes("line01 = 1;"),
+        (text) => text.includes("line01 = 1;") && !text.includes("secondValue = 2;"),
         5_000,
       );
 
       expect(previousFile).toContain("line01 = 1;");
+      expect(previousFile).not.toContain("secondValue = 2;");
     } finally {
       session.close();
     }
