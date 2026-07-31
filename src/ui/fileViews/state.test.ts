@@ -25,6 +25,15 @@ describe("file-view selection state", () => {
     ).toEqual({ readme: "preview:rendered" });
   });
 
+  test("preserves selection identity when reconciliation removes nothing", () => {
+    const current = { readme: "preview:rendered" };
+    expect(reconcileFileViewSelections(current, ["readme"], new Set(["preview:rendered"]))).toBe(
+      current,
+    );
+    const empty = {};
+    expect(reconcileFileViewSelections(empty, [], new Set())).toBe(empty);
+  });
+
   test("stores raw implicitly and avoids needless state changes", () => {
     const active = selectFileView({}, "readme", "preview:rendered");
     expect(active).toEqual({ readme: "preview:rendered" });

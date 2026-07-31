@@ -18,6 +18,17 @@ describe("file-view availability", () => {
     );
   });
 
+  test("preserves selection identity when no host constraint masks a view", () => {
+    const selections = { readme: "preview:rendered" };
+    expect(availableFileViewSelections(selections, new Map())).toBe(selections);
+    expect(
+      availableFileViewSelections(
+        selections,
+        new Map([["other", FILE_VIEW_DRAFT_UNAVAILABLE_REASON]]),
+      ),
+    ).toBe(selections);
+  });
+
   test("masks unavailable selections without discarding stored choices", () => {
     const selections = { readme: "preview:rendered", other: "ext:view" };
     expect(

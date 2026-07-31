@@ -29,12 +29,15 @@ export function reconcileFileViewSelections(
 ): FileViewSelectionState {
   const validFileIds = new Set(fileIds);
   const next: Record<string, string> = {};
+  let changed = false;
   for (const [fileId, viewKey] of Object.entries(current)) {
     if (validFileIds.has(fileId) && viewKeys.has(viewKey)) {
       next[fileId] = viewKey;
+    } else {
+      changed = true;
     }
   }
-  return next;
+  return changed ? next : current;
 }
 
 /** Select raw or a named view for one file without retaining a redundant raw entry. */

@@ -159,6 +159,48 @@ describe("file-view layout request lifetime", () => {
   });
 });
 
+describe("inactive file-view preparation", () => {
+  test("does not schedule empty-map renders while every file uses raw diff", async () => {
+    let renderCount = 0;
+    let replaceFiles = () => {};
+    let latest: ReadonlyMap<string, ResolvedFileViewLayout> = new Map();
+
+    function Harness() {
+      const [visibleFiles, setVisibleFiles] = useState(files);
+      replaceFiles = () => setVisibleFiles([...files]);
+      renderCount += 1;
+      latest = useFileViewLayouts({
+        files: visibleFiles,
+        selections: {},
+        views: [],
+        width: 80,
+        onIssue: ignoreIssue,
+      });
+      return null;
+    }
+
+    const setup = await testRender(createElement(Harness), { width: 10, height: 2 });
+    try {
+      await act(async () => {
+        await Promise.resolve();
+        await setup.renderOnce();
+      });
+      expect(renderCount).toBe(1);
+      expect(latest.size).toBe(0);
+
+      await act(async () => {
+        replaceFiles();
+        await setup.renderOnce();
+        await Promise.resolve();
+      });
+      expect(renderCount).toBe(2);
+      expect(latest.size).toBe(0);
+    } finally {
+      await act(async () => setup.renderer.destroy());
+    }
+  });
+});
+
 describe("file-view layout cache identity", () => {
   test("retains exact unaffected files while suppressing another file's changed selection", async () => {
     const secondFile = createTestDiffFile({

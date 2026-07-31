@@ -11,9 +11,16 @@ export function availableFileViewSelections(
   selections: Readonly<Record<string, string>>,
   unavailableReasons: ReadonlyMap<string, string>,
 ) {
+  if (unavailableReasons.size === 0) return selections;
+
   const available: Record<string, string> = {};
+  let masked = false;
   for (const [fileId, viewKey] of Object.entries(selections)) {
-    if (!unavailableReasons.has(fileId)) available[fileId] = viewKey;
+    if (unavailableReasons.has(fileId)) {
+      masked = true;
+    } else {
+      available[fileId] = viewKey;
+    }
   }
-  return available;
+  return masked ? available : selections;
 }

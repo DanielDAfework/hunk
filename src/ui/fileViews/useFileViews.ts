@@ -190,6 +190,14 @@ export async function runFileViewLayoutRequest(
   }
 }
 
+/** Return whether this render has any alternate file-view work to prepare. */
+function hasSelectedFileViews(
+  selections: Readonly<Record<string, string>>,
+  views: readonly RegisteredFileView[],
+) {
+  return views.length > 0 && Object.keys(selections).length > 0;
+}
+
 /**
  * Run selected file-view layouts outside render and retain only validated results.
  *
@@ -217,8 +225,16 @@ export function useFileViewLayouts({
   const previousWidth = useRef<number | undefined>(undefined);
   const reportedIssues = useRef(new Set<string>());
   const [resolved, setResolved] = useState<ReadonlyMap<string, ResolvedEntry>>(new Map());
+  const hasSelectedViews = hasSelectedFileViews(selections, views);
 
   useEffect(() => {
+    if (!hasSelectedViews) {
+      // Raw diff is implicit. Avoid traversing every file through async workers and committing an
+      // empty map after each selection-only render when no alternate presentation is selected.
+      if (resolved.size > 0) setResolved(new Map());
+      return;
+    }
+
     const controller = new AbortController();
     const next = new Map<string, ResolvedEntry>();
     const widthChanged = previousWidth.current !== undefined && previousWidth.current !== width;
@@ -327,7 +343,9 @@ export function useFileViewLayouts({
       void Promise.all(
         Array.from({ length: Math.min(FILE_VIEW_LAYOUT_CONCURRENCY, files.length) }, worker),
       ).then(() => {
-        if (active) setResolved(next);
+        if (active) {
+          setResolved((current) => (current.size === 0 && next.size === 0 ? current : next));
+        }
       });
     };
 
@@ -342,9 +360,11 @@ export function useFileViewLayouts({
       if (startTimer) clearTimeout(startTimer);
       controller.abort();
     };
-  }, [files, onIssue, selections, views, width]);
+  }, [files, hasSelectedViews, onIssue, selections, views, width]);
 
   return useMemo(() => {
+    if (!hasSelectedViews) return EMPTY_RESOLVED_FILE_VIEW_LAYOUTS;
+
     const current = new Map<string, ResolvedFileViewLayout>();
     const byKey = new Map(views.map((view) => [registeredFileViewKey(view), view]));
     for (const file of files) {
@@ -363,5 +383,5 @@ export function useFileViewLayouts({
     // Effects clean up after render. Exact per-file filtering synchronously declines stale geometry
     // while preserving unaffected files across filtering and another file's selection change.
     return current.size > 0 ? current : EMPTY_RESOLVED_FILE_VIEW_LAYOUTS;
-  }, [files, resolved, selections, views, width]);
+  }, [files, hasSelectedViews, resolved, selections, views, width]);
 }
