@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
-import type { Key, Session } from "tuistory";
-import { createPtyHarness, dragMouse, lineIndexOf } from "./harness";
+import { createPtyHarness, dragMouse, lineIndexOf, measureKeyScroll } from "./harness";
 
 const harness = createPtyHarness();
 
@@ -10,25 +9,6 @@ setDefaultTimeout(20_000);
 afterEach(() => {
   harness.cleanup();
 });
-
-/**
- * Count how many rows one keypress moved the stream by following the text that
- * sat on a fixed screen row.
- */
-async function measureKeyScroll(session: Session, key: Key, anchorRow: number) {
-  const before = (await session.text({ immediate: true })).split("\n");
-  const anchor = before[anchorRow]?.trim() ?? "";
-  expect(anchor.length).toBeGreaterThan(0);
-
-  await session.press(key);
-  await session.waitIdle({ timeout: 400 });
-
-  const after = (await session.text({ immediate: true })).split("\n");
-  const movedTo = after.findIndex((line) => line.trim() === anchor);
-  expect(movedTo).toBeGreaterThanOrEqual(0);
-
-  return anchorRow - movedTo;
-}
 
 describe("PTY scrolling", () => {
   test("a short last file does not trap upward scrolling at the bottom edge", async () => {
