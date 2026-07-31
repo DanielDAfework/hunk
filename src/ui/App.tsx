@@ -31,7 +31,6 @@ import { writeExtensionTrust } from "../extensions/trust";
 import type {
   ExtensionCommandContext,
   ExtensionEventContext,
-  ExtensionFileViewControls,
   ExtensionReviewNote,
   ExtensionSidebarControls,
   RegisteredCommand,
@@ -72,17 +71,8 @@ import { buildAppMenus } from "./lib/appMenus";
 import { buildExtensionAppCommands, extensionCommandKeyDefaults } from "./lib/extensionCommands";
 import { createGuardedReviewNavigation } from "./lib/extensionNavigation";
 import { buildExtensionReviewSelection } from "./lib/extensionSelection";
-import { useFileViewLayouts } from "./fileViews/useFileViews";
-import type { FileViewRowFailure } from "./components/panes/FileView";
-import { availableFileViewSelections, fileViewUnavailableReason } from "./fileViews/availability";
-import {
-  reconcileFileViewSelections,
-  registeredFileViewKey,
-  resolveBulkFileViewTarget,
-  resolveRegisteredFileView,
-  selectFileView,
-  selectFileViewForFiles,
-} from "./fileViews/state";
+import { useFilePresentationController } from "./fileViews/useFilePresentationController";
+import { useFilePresentationRendering } from "./fileViews/useFilePresentationRendering";
 import { createExtensionSidebarKeybindings, resolveCommandKeys } from "./lib/keymap";
 import {
   buildSessionSidebarViews,
@@ -99,9 +89,6 @@ import { openSelectedFileInEditor } from "./lib/openInEditor";
 import { resolveResponsiveLayout } from "./lib/responsive";
 import { resizeSidebarWidth } from "./lib/sidebar";
 import { availableThemes, resolveTheme, withTransparentSurfaces } from "./themes";
-
-/** Bound row-render warning metadata even if a large custom tree fails throughout scrolling. */
-const FILE_VIEW_RENDER_FAILURE_MAX_ENTRIES = 256;
 
 type FocusArea = "files" | "filter" | "note";
 type ActiveAddNoteTarget = ActiveAddNoteAffordance & { fileId: string };
@@ -344,43 +331,10 @@ export function App({
   const selectedFile = review.selectedFile;
   const selectedHunkIndex = review.selectedHunkIndex;
   const selectedFileId = selectedFile?.id ?? null;
-  // File presentations are per-file, survive filtering, and are reconciled against a reload's
-  // stable ids. Raw is implicit, so an empty state is the guaranteed default/fallback.
   const sessionFileViews = useMemo(
     () => (extensions ? resolveExtensionFileViews(extensions.registry).views : []),
     [extensions],
   );
-  const [fileViewSelections, setFileViewSelections] = useState<Record<string, string>>({});
-  const fileViewSelectionsRef = useRef(fileViewSelections);
-  fileViewSelectionsRef.current = fileViewSelections;
-  const sessionFileViewsRef = useRef(sessionFileViews);
-  sessionFileViewsRef.current = sessionFileViews;
-  const fileViewUnavailableReasons = useMemo(() => {
-    const reasons = new Map<string, string>();
-    for (const file of filteredFiles) {
-      const reason = fileViewUnavailableReason({
-        hasDraftNote: review.draftNote?.fileId === file.id,
-      });
-      if (reason) reasons.set(file.id, reason);
-    }
-    return reasons;
-  }, [filteredFiles, review.draftNote?.fileId]);
-  const fileViewUnavailableReasonsRef = useRef(fileViewUnavailableReasons);
-  fileViewUnavailableReasonsRef.current = fileViewUnavailableReasons;
-  const availableFileViewSelectionState = useMemo(
-    () => availableFileViewSelections(fileViewSelections, fileViewUnavailableReasons),
-    [fileViewSelections, fileViewUnavailableReasons],
-  );
-  useEffect(() => {
-    const viewKeys = new Set(sessionFileViews.map(registeredFileViewKey));
-    setFileViewSelections((current) =>
-      reconcileFileViewSelections(
-        current,
-        reviewFiles.map((file) => file.id),
-        viewKeys,
-      ),
-    );
-  }, [reviewFiles, sessionFileViews]);
   // The one conversion of the visible review files into the frozen views every
   // extension surface sees: sidebar props and command-handler selection both
   // read from this list, so they can never describe the review differently.
@@ -436,6 +390,11 @@ export function App({
       selectedHunkIndex: hunkIndex,
     });
   }, [getExtensionFileViews]);
+  /** Read the live internal selection id independently from the frozen public selection. */
+  const getSelectedFileId = useCallback(
+    () => extensionSelectionInputsRef.current.selectedFileId,
+    [],
+  );
   const moveToAnnotatedFile = review.moveToAnnotatedFile;
   const moveToAnnotatedHunk = review.moveToAnnotatedHunk;
   const moveToFile = review.moveToFile;
@@ -464,6 +423,24 @@ export function App({
       sessionNoticeTimeoutRef.current = null;
     }, 4000);
   }, []);
+
+  const {
+    applyBulkTarget: applyFilePresentationToAllMatching,
+    availableSelections: availableFileViewSelectionState,
+    bulkTarget: selectedFileViewBulkTarget,
+    createControls: createFileViewControls,
+    menuEntries: selectedFileViewEntries,
+  } = useFilePresentationController({
+    files: reviewFiles,
+    visibleFiles: filteredFiles,
+    selectedFile,
+    draftFileId: review.draftNote?.fileId ?? null,
+    views: sessionFileViews,
+    getVisibleFileViews: getExtensionFileViews,
+    getSelectedFileId,
+    getExtensionSelection,
+    showNotice: showSessionNotice,
+  });
 
   useEffect(() => {
     return () => {
@@ -571,84 +548,6 @@ export function App({
       };
     },
     [extensions, setSidebarOpen],
-  );
-
-  /** Build host-owned file-presentation controls for one extension command. */
-  const createFileViewControls = useCallback(
-    (extensionId: string): ExtensionFileViewControls => {
-      const resolve = (viewId: string) =>
-        resolveRegisteredFileView(sessionFileViewsRef.current, extensionId, viewId);
-      const selectedId = () => extensionSelectionInputsRef.current.selectedFileId;
-      const select = (viewId: string | null) => {
-        const fileId = selectedId();
-        if (!fileId) {
-          showSessionNotice(
-            `Extension ${extensionId} cannot select a file view without a selected file`,
-          );
-          return;
-        }
-        const unavailableReason = fileViewUnavailableReasonsRef.current.get(fileId);
-        if (viewId !== null && unavailableReason) {
-          showSessionNotice(unavailableReason);
-          return;
-        }
-        const registered = viewId === null ? undefined : resolve(viewId);
-        if (viewId !== null && !registered) {
-          showSessionNotice(`Extension ${extensionId} targeted unknown file view "${viewId}"`);
-          return;
-        }
-        if (registered) {
-          const selected = getExtensionSelection().file;
-          try {
-            if (!selected || !registered.view.matches(selected)) {
-              showSessionNotice(
-                `File view "${viewId}" does not match the selected file • using raw diff`,
-              );
-              return;
-            }
-          } catch {
-            showSessionNotice(
-              `Extension ${registered.extensionId} file view "${registered.view.id}" failed matching the selected file`,
-            );
-            return;
-          }
-        }
-        setFileViewSelections((current) =>
-          selectFileView(current, fileId, registered ? registeredFileViewKey(registered) : null),
-        );
-      };
-      return {
-        select,
-        toggle(viewId: string) {
-          const registered = resolve(viewId);
-          const fileId = selectedId();
-          if (fileId && fileViewUnavailableReasonsRef.current.has(fileId)) {
-            select(viewId);
-            return;
-          }
-          if (
-            fileId &&
-            registered &&
-            fileViewSelectionsRef.current[fileId] === registeredFileViewKey(registered)
-          ) {
-            select(null);
-          } else {
-            select(viewId);
-          }
-        },
-        isActive(viewId: string) {
-          const registered = resolve(viewId);
-          const fileId = selectedId();
-          return Boolean(
-            fileId &&
-            !fileViewUnavailableReasonsRef.current.has(fileId) &&
-            registered &&
-            fileViewSelectionsRef.current[fileId] === registeredFileViewKey(registered),
-          );
-        },
-      };
-    },
-    [getExtensionSelection, showSessionNotice],
   );
 
   /**
@@ -920,56 +819,19 @@ export function App({
     layout: resolvedLayout,
     width: diffContentWidth,
   });
-  const reportedFileViewRowFailuresRef = useRef(
-    new Map<string, { fileId: string; layoutGeneration: number }>(),
-  );
-  /** Attribute synchronous row failures through the existing extension warning surface. */
-  const reportFileViewRowFailure = useCallback(
-    (failure: FileViewRowFailure) => {
-      const dedupeKey = [
-        failure.extensionId,
-        failure.viewId,
-        failure.fileId,
-        failure.rowId,
-        failure.layoutGeneration,
-        failure.message,
-      ].join("\u0000");
-      const reported = reportedFileViewRowFailuresRef.current;
-      if (reported.has(dedupeKey)) return;
-      reported.set(dedupeKey, {
-        fileId: failure.fileId,
-        layoutGeneration: failure.layoutGeneration,
-      });
-      if (reported.size > FILE_VIEW_RENDER_FAILURE_MAX_ENTRIES) {
-        const oldest = reported.keys().next().value;
-        if (oldest !== undefined) reported.delete(oldest);
-      }
-      extensions?.context.notify(
-        `Extension ${failure.extensionId} file view "${failure.viewId}" row "${failure.rowId}" failed rendering ${failure.filePath} • ${failure.message}`,
-        "warning",
-      );
-    },
+  const showFileViewWarning = useCallback(
+    (message: string) => extensions?.context.notify(message, "warning"),
     [extensions],
   );
-  const fileViewLayouts = useFileViewLayouts({
-    files: filteredFiles,
-    selections: availableFileViewSelectionState,
-    views: sessionFileViews,
-    width: diffContentWidth,
-    onIssue: showSessionNotice,
-  });
-  useEffect(() => {
-    const activeGenerations = new Set(
-      Array.from(fileViewLayouts, ([fileId, layout]) =>
-        [fileId, layout.layoutGeneration].join("\u0000"),
-      ),
-    );
-    for (const [key, failure] of reportedFileViewRowFailuresRef.current) {
-      if (!activeGenerations.has([failure.fileId, failure.layoutGeneration].join("\u0000"))) {
-        reportedFileViewRowFailuresRef.current.delete(key);
-      }
-    }
-  }, [fileViewLayouts]);
+  const { layouts: fileViewLayouts, reportRowFailure: reportFileViewRowFailure } =
+    useFilePresentationRendering({
+      files: filteredFiles,
+      selections: availableFileViewSelectionState,
+      views: sessionFileViews,
+      width: diffContentWidth,
+      onIssue: showSessionNotice,
+      onWarning: showFileViewWarning,
+    });
 
   useHunkSessionBridge({
     addLiveComment: review.addLiveComment,
@@ -1629,44 +1491,6 @@ export function App({
     setFocusArea("files");
   }, [review.cancelDraftNote]);
 
-  const reviewFileViewsForBulkSelection = useMemo(
-    () => toReadOnlyFileViews(reviewFiles),
-    [reviewFiles],
-  );
-  const selectedFileViewBulkTarget = useMemo(() => {
-    if (!selectedFile || fileViewUnavailableReasons.has(selectedFile.id)) return null;
-    const key = fileViewSelections[selectedFile.id];
-    if (!key) return null;
-    const registered = sessionFileViews.find((view) => registeredFileViewKey(view) === key);
-    if (!registered) return null;
-
-    const target = resolveBulkFileViewTarget({
-      current: fileViewSelections,
-      files: reviewFileViewsForBulkSelection,
-      registered,
-      selectedFileId: selectedFile.id,
-    });
-    return target
-      ? { key: target.key, matchingFileIds: target.fileIds, title: registered.view.title }
-      : null;
-  }, [
-    fileViewSelections,
-    fileViewUnavailableReasons,
-    reviewFileViewsForBulkSelection,
-    selectedFile,
-    sessionFileViews,
-  ]);
-  const applyFilePresentationToAllMatching = useCallback(() => {
-    if (!selectedFileViewBulkTarget) return;
-    setFileViewSelections((current) =>
-      selectFileViewForFiles(
-        current,
-        selectedFileViewBulkTarget.matchingFileIds,
-        selectedFileViewBulkTarget.key,
-      ),
-    );
-  }, [selectedFileViewBulkTarget]);
-
   // One dispatch table for every app-level shortcut: the built-in commands
   // over App's live callbacks, then extension commands, so built-ins always
   // win a key and extension order follows load order.
@@ -1703,48 +1527,6 @@ export function App({
     }),
     ...extensionAppCommands.commands,
   ];
-
-  const selectedFileViewEntries = useMemo(() => {
-    if (!selectedFile) return [];
-    const publicFile = getExtensionFileViews().find((file) => file.id === selectedFile.id);
-    if (!publicFile) return [];
-    const unavailableReason = fileViewUnavailableReasons.get(selectedFile.id);
-    const active = unavailableReason ? undefined : fileViewSelections[selectedFile.id];
-    const entries = [
-      {
-        kind: "item" as const,
-        label: "File presentation: Raw diff",
-        commandId: "hunk.view.filePresentation.raw",
-        checked: active === undefined,
-        action: () =>
-          setFileViewSelections((current) => selectFileView(current, selectedFile.id, null)),
-      },
-    ];
-    if (unavailableReason) return entries;
-    for (const registered of sessionFileViews) {
-      try {
-        if (!registered.view.matches(publicFile)) continue;
-      } catch {
-        continue;
-      }
-      const key = registeredFileViewKey(registered);
-      entries.push({
-        kind: "item" as const,
-        label: `File presentation: ${registered.view.title}`,
-        commandId: `hunk.view.filePresentation.${key}`,
-        checked: active === key,
-        action: () =>
-          setFileViewSelections((current) => selectFileView(current, selectedFile.id, key)),
-      });
-    }
-    return entries;
-  }, [
-    fileViewSelections,
-    fileViewUnavailableReasons,
-    getExtensionFileViews,
-    selectedFile,
-    sessionFileViews,
-  ]);
 
   // Menus name commands rather than repeating them: every item's key hint and
   // action come from the table above, so a remapped shortcut shows its new key

@@ -12,21 +12,12 @@ import type { DiffSectionGeometry } from "../../diff/diffSectionGeometry";
 import { resolveVisibleRowIndexWindow, type VisibleBodyBounds } from "../../diff/rowWindowing";
 import { reviewRowId } from "../../lib/ids";
 import { toExtensionPaintTheme } from "../../lib/extensionPaintTheme";
+import type { FileViewRowFailure } from "../../fileViews/types";
 import type { ResolvedFileViewLayout } from "../../fileViews/useFileViews";
 import { AgentInlineNote } from "./AgentInlineNote";
 
 type FileViewTone = ExtensionFileViewSpan["tone"];
 type FileViewTextAttribute = NonNullable<ExtensionFileViewSpan["attributes"]>[number];
-
-export interface FileViewRowFailure {
-  extensionId: string;
-  viewId: string;
-  fileId: string;
-  filePath: string;
-  rowId: string;
-  layoutGeneration: number;
-  message: string;
-}
 
 /** Resolve a generic file-view tone only at paint time, keeping layout theme-independent. */
 function fileViewToneColor(tone: FileViewTone, theme: AppTheme) {

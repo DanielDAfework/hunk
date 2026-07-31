@@ -56,7 +56,7 @@ import {
 } from "../../lib/viewportAnchor";
 import type { AppTheme } from "../../themes";
 import { DiffSection } from "./DiffSection";
-import type { FileViewRowFailure } from "./FileView";
+import type { FileViewRowFailure } from "../../fileViews/types";
 import { DiffFileHeaderRow } from "./DiffFileHeaderRow";
 import { VerticalScrollbar, type VerticalScrollbarHandle } from "../scrollbar/VerticalScrollbar";
 import type { VisibleBodyBounds } from "../../diff/rowWindowing";
