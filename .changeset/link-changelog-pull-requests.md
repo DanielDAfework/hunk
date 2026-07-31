@@ -1,5 +1,4 @@
 ---
-"hunkdiff": patch
 ---
 
-Generate changelog entries with linked GitHub pull requests and contributors when an associated PR is available.
+Configure generated changelogs to link associated GitHub pull requests and contributors.
