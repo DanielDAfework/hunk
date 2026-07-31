@@ -1169,6 +1169,11 @@ export function DiffPane({
       previousViewportTop === scrollViewport.top ||
       !onViewportCenteredHunkChange ||
       suppressViewportSelectionSyncRef.current ||
+      // A requested file-top align is still settling, so this viewport move is our own scroll
+      // rather than the user's. The timed suppression above can expire before the align lands on
+      // a loaded machine, and adopting the centered hunk there would silently undo the navigation
+      // that asked for the align in the first place.
+      pendingFileTopAlignFileIdRef.current !== null ||
       files.length === 0 ||
       scrollViewport.height <= 0
     ) {
@@ -1453,27 +1458,57 @@ export function DiffPane({
     pendingFileTopAlignFileIdRef.current = null;
   }, []);
 
-  /** Scroll one file so it immediately owns the viewport top using the latest planned geometry. */
-  const scrollFileHeaderToTop = useCallback(
+  /**
+   * Report whether the align has landed as far as the rest of this pane can observe it.
+   *
+   * `scrollViewport` is a coalesced read of the scroll box, so it trails `scrollBox.scrollTop` by at
+   * least one read interval and by much more on a loaded machine. Viewport-follow selection reacts
+   * to that trailing value, so an align counts as settled only once the trailing value agrees.
+   */
+  const isFileTopAlignSettled = useCallback(
+    (desiredTop: number) => Math.abs(scrollViewport.top - desiredTop) <= 0.5,
+    [scrollViewport.top],
+  );
+
+  /**
+   * Resolve the scroll top that makes one file own the viewport top, or null when the planned
+   * geometry is not measurable yet.
+   *
+   * The pinned header owns the top row, so align the review stream to the file body. Clamp the
+   * target so short trailing files still settle cleanly at the reachable bottom edge: the last
+   * short file often cannot actually own the viewport top near EOF, and treating that unreachable
+   * top as the target would keep snapping manual upward scrolling back down to the bottom edge.
+   */
+  const resolveFileTopAlignScrollTop = useCallback(
     (fileId: string) => {
       const targetSection = fileSectionLayouts.find((layout) => layout.fileId === fileId);
       if (!targetSection) {
-        return false;
+        return null;
       }
 
       const scrollBox = scrollRef.current;
       if (!scrollBox) {
-        return false;
+        return null;
       }
 
       const viewportHeight = Math.max(scrollViewport.height, scrollBox.viewport.height ?? 0);
-
-      // The pinned header owns the top row, so align the review stream to the file body. Clamp the
-      // request so short trailing files can still settle cleanly at the reachable bottom edge.
-      scrollBox.scrollTo(clampReviewScrollTop(targetSection.bodyTop, viewportHeight));
-      return true;
+      return clampReviewScrollTop(targetSection.bodyTop, viewportHeight);
     },
     [clampReviewScrollTop, fileSectionLayouts, scrollRef, scrollViewport.height],
+  );
+
+  /** Scroll one file so it immediately owns the viewport top using the latest planned geometry. */
+  const scrollFileHeaderToTop = useCallback(
+    (fileId: string) => {
+      const desiredTop = resolveFileTopAlignScrollTop(fileId);
+      if (desiredTop === null) {
+        return false;
+      }
+
+      scrollRef.current?.scrollTo(desiredTop);
+      return true;
+    },
+    [resolveFileTopAlignScrollTop, scrollRef],
   );
 
   useLayoutEffect(() => {
@@ -1629,10 +1664,18 @@ export function DiffPane({
 
     // Sidebar navigation should make the selected file immediately own the viewport top.
     suppressViewportSelectionSync();
-    pendingFileTopAlignFileIdRef.current = selectedFileId;
+    // Only track the align as pending while the stream still has to travel. Marking an
+    // already-aligned file pending would hold viewport-driven selection off until the next
+    // relayout happened to clear it.
+    const desiredTop = resolveFileTopAlignScrollTop(selectedFileId);
+    if (desiredTop === null || !isFileTopAlignSettled(desiredTop)) {
+      pendingFileTopAlignFileIdRef.current = selectedFileId;
+    }
     scrollFileHeaderToTop(selectedFileId);
   }, [
     clearPendingFileTopAlign,
+    isFileTopAlignSettled,
+    resolveFileTopAlignScrollTop,
     scrollFileHeaderToTop,
     selectedFileTopAlignRequestId,
     selectedFileId,
@@ -1653,33 +1696,31 @@ export function DiffPane({
       return;
     }
 
-    const targetSection = fileSectionLayouts.find((layout) => layout.fileId === pendingFileId);
-    if (!targetSection) {
+    const desiredTop = resolveFileTopAlignScrollTop(pendingFileId);
+    if (desiredTop === null) {
       return;
     }
 
-    const viewportHeight = Math.max(scrollViewport.height, scrollRef.current?.viewport.height ?? 0);
-    // Compare against the reachable target, not the raw file body top. The last short file often
-    // cannot actually own the viewport top near EOF, and treating that unreachable top as pending
-    // would keep snapping manual upward scrolling back down to the bottom edge.
-    const desiredTop = clampReviewScrollTop(targetSection.bodyTop, viewportHeight);
-
-    const currentTop = scrollRef.current?.scrollTop ?? scrollViewport.top;
-    if (Math.abs(currentTop - desiredTop) <= 0.5) {
+    if (isFileTopAlignSettled(desiredTop)) {
       clearPendingFileTopAlign();
+      return;
+    }
+
+    // The scroll box may already sit on target while the coalesced viewport read has not caught up
+    // yet. Stay pending in that window instead of re-issuing the same scroll.
+    if (Math.abs((scrollRef.current?.scrollTop ?? scrollViewport.top) - desiredTop) <= 0.5) {
       return;
     }
 
     suppressViewportSelectionSync();
     scrollFileHeaderToTop(pendingFileId);
   }, [
-    clampReviewScrollTop,
     clearPendingFileTopAlign,
-    fileSectionLayouts,
     files,
+    isFileTopAlignSettled,
+    resolveFileTopAlignScrollTop,
     scrollFileHeaderToTop,
     scrollRef,
-    scrollViewport.height,
     scrollViewport.top,
     suppressViewportSelectionSync,
   ]);

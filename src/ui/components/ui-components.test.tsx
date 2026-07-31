@@ -1258,6 +1258,92 @@ describe("UI components", () => {
     }
   });
 
+  test("DiffPane releases viewport-follow selection after an align request that needs no scrolling", async () => {
+    const theme = resolveTheme("github-dark-default", null);
+    const files = [
+      createTestDiffFile(
+        "first",
+        "first.ts",
+        lines("export const alpha = 1;"),
+        lines("export const alpha = 2;"),
+      ),
+      createWideTwoHunkDiffFile("second", "second.ts", 100),
+    ];
+    const scrollRef = createRef<ScrollBoxRenderable>();
+    let latestSelection = { fileId: files[0]!.id, hunkIndex: 0 };
+    let bumpAlignRequest = () => {};
+
+    function FileTopAlignHarness() {
+      const [selection, setSelection] = useState(latestSelection);
+      const [alignRequestId, setAlignRequestId] = useState(0);
+      bumpAlignRequest = () => setAlignRequestId((current) => current + 1);
+
+      return (
+        <DiffPane
+          {...createDiffPaneProps(files, theme, {
+            diffContentWidth: 96,
+            headerLabelWidth: 48,
+            scrollRef,
+            selectedFileId: selection.fileId,
+            selectedFileTopAlignRequestId: alignRequestId,
+            selectedHunkIndex: selection.hunkIndex,
+            selectedHunkRevealRequestId: 0,
+            separatorWidth: 92,
+            width: 100,
+          })}
+          onViewportCenteredHunkChange={(fileId, hunkIndex) => {
+            latestSelection = { fileId, hunkIndex };
+            setSelection(latestSelection);
+          }}
+        />
+      );
+    }
+
+    const setup = await testRender(<FileTopAlignHarness />, {
+      width: 104,
+      height: 12,
+    });
+
+    const sectionGeometry = files.map((file) =>
+      measureDiffSectionGeometry(file, "split", true, theme, [], 96, true, false),
+    );
+    const fileSectionLayouts = buildFileSectionLayouts(
+      files,
+      sectionGeometry.map((geometry) => geometry.bodyHeight),
+      buildInStreamFileHeaderHeights(files),
+    );
+
+    try {
+      await settleDiffPane(setup);
+
+      // Align the already-aligned first file: the stream has nowhere to travel, so the align is
+      // done the moment it is requested and must not keep owning the viewport afterwards.
+      await act(async () => {
+        bumpAlignRequest();
+      });
+      await settleDiffPane(setup);
+
+      const viewportHeight = scrollRef.current?.viewport.height ?? 0;
+      expect(viewportHeight).toBeGreaterThan(0);
+
+      const secondFileSecondHunkTop =
+        fileSectionLayouts[1]!.bodyTop + sectionGeometry[1]!.hunkBounds.get(1)!.top;
+      const targetScrollTop = scrollTopForCenter(secondFileSecondHunkTop, viewportHeight);
+
+      await act(async () => {
+        scrollRef.current?.scrollTo(targetScrollTop);
+      });
+      await settleDiffPane(setup);
+
+      expect(latestSelection).toEqual({ fileId: "second", hunkIndex: 1 });
+      expect(scrollRef.current?.scrollTop ?? 0).toBe(targetScrollTop);
+    } finally {
+      await act(async () => {
+        setup.renderer.destroy();
+      });
+    }
+  });
+
   test("DiffPane keeps the sticky-header lane stable through the divider and next-header handoff", async () => {
     const theme = resolveTheme("github-dark-default", null);
     const firstFile = createTallDiffFile("first", "first.ts", 18);
