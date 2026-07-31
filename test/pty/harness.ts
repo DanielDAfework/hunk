@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Session } from "tuistory";
+import type { Key, Session } from "tuistory";
 
 const integrationDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(integrationDir, "../..");
@@ -60,6 +60,34 @@ interface ChangedFileSpec {
 
 export function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Count how many rows one keypress moved the stream by following the text that
+ * sat on a fixed screen row.
+ *
+ * Positive means the content moved up (scrolled down); zero means the anchor
+ * row did not move at all.
+ */
+export async function measureKeyScroll(session: Session, key: Key, anchorRow: number) {
+  const before = (await session.text({ immediate: true })).split("\n");
+  const anchor = before[anchorRow]?.trim() ?? "";
+  if (anchor.length === 0) {
+    throw new Error(`measureKeyScroll: anchor row ${anchorRow} is empty.`);
+  }
+
+  await session.press(key);
+  await session.waitIdle({ timeout: 400 });
+
+  const after = (await session.text({ immediate: true })).split("\n");
+  const movedTo = after.findIndex((line) => line.trim() === anchor);
+  if (movedTo < 0) {
+    throw new Error(
+      `measureKeyScroll: anchor ${JSON.stringify(anchor)} left the screen after pressing ${String(key)}.`,
+    );
+  }
+
+  return anchorRow - movedTo;
 }
 
 /** Send an SGR mouse motion event at zero-based terminal coordinates. */
