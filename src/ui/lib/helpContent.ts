@@ -105,7 +105,10 @@ const HELP_SECTIONS: readonly HelpSectionSpec[] = [
   {
     title: "Review",
     entries: [
-      { commandIds: ["hunk.review.focusFilter"], description: "focus file filter" },
+      {
+        commandIds: ["hunk.review.focusFilter"],
+        description: "filter files (path + changed lines)",
+      },
       { commandIds: ["hunk.review.startNote"], description: "create review note" },
       { commandIds: ["hunk.app.toggleFocusArea"], description: "toggle files/filter focus" },
       { keys: "F10", description: "open menus" },

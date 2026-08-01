@@ -121,6 +121,53 @@ export function mergeFileAnnotationsByFileId<T extends AgentAnnotation>(
   });
 }
 
+/**
+ * Lowercased text of a file's added and removed lines, excluding context.
+ *
+ * Keyed by metadata rather than by file id so a reloaded changeset recomputes
+ * while repeated filter keystrokes over a stable changeset do not.
+ */
+const changedLineTextCache = new WeakMap<FileDiffMetadata, string>();
+
+/**
+ * Collect the added and removed lines of a file as lowercased text.
+ *
+ * `additionLines` and `deletionLines` also hold context lines — and the whole
+ * file when the diff is not partial — so the change blocks inside each hunk are
+ * what identify the lines that actually changed.
+ */
+export function changedLineText(metadata: FileDiffMetadata): string {
+  const cached = changedLineTextCache.get(metadata);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const changed: string[] = [];
+  for (const hunk of metadata.hunks) {
+    for (const content of hunk.hunkContent) {
+      if (content.type !== "change") {
+        continue;
+      }
+      for (let offset = 0; offset < content.additions; offset += 1) {
+        const line = metadata.additionLines[content.additionLineIndex + offset];
+        if (line !== undefined) {
+          changed.push(line);
+        }
+      }
+      for (let offset = 0; offset < content.deletions; offset += 1) {
+        const line = metadata.deletionLines[content.deletionLineIndex + offset];
+        if (line !== undefined) {
+          changed.push(line);
+        }
+      }
+    }
+  }
+
+  const lowered = changed.join("\n").toLowerCase();
+  changedLineTextCache.set(metadata, lowered);
+  return lowered;
+}
+
 /** Apply the app's file filter query to the visible review stream. */
 export function filterReviewFiles(files: DiffFile[], query: string): DiffFile[] {
   const trimmedQuery = query.trim().toLowerCase();
@@ -133,6 +180,7 @@ export function filterReviewFiles(files: DiffFile[], query: string): DiffFile[] 
       normalizeDiffPath(file.path),
       normalizeDiffPath(file.previousPath),
       file.agent?.summary,
+      changedLineText(file.metadata),
     ]
       .filter(Boolean)
       .join(" ")

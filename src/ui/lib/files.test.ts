@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createTestDiffFile, lines } from "../../../test/helpers/diff-helpers";
-import { buildSidebarEntries, fileLabelParts } from "./files";
+import { buildSidebarEntries, fileLabelParts, filterReviewFiles } from "./files";
 
 describe("files helpers", () => {
   test("buildSidebarEntries hides zero-value sidebar stats", () => {
@@ -159,5 +159,44 @@ describe("files helpers", () => {
       filename: "pi/extensions/loop.ts -> agents/pi/extensions/notify.ts",
       stateLabel: null,
     });
+  });
+
+  test("filterReviewFiles matches added and removed line content", () => {
+    const file = createTestDiffFile({
+      id: "content",
+      path: "src/ui/content.ts",
+      before: lines("const keepContextToken = 1;", "const removedToken = 2;"),
+      after: lines("const keepContextToken = 1;", "const addedToken = 3;"),
+      context: 1,
+    });
+
+    expect(filterReviewFiles([file], "addedToken")).toEqual([file]);
+    expect(filterReviewFiles([file], "removedToken")).toEqual([file]);
+    expect(filterReviewFiles([file], "ADDEDTOKEN")).toEqual([file]);
+  });
+
+  test("filterReviewFiles ignores unchanged context lines", () => {
+    const file = createTestDiffFile({
+      id: "context-only",
+      path: "src/ui/context-only.ts",
+      before: lines("const keepContextToken = 1;", "const removedToken = 2;"),
+      after: lines("const keepContextToken = 1;", "const addedToken = 3;"),
+      context: 1,
+    });
+
+    expect(filterReviewFiles([file], "keepContextToken")).toEqual([]);
+  });
+
+  test("filterReviewFiles still matches paths and an empty query", () => {
+    const file = createTestDiffFile({
+      id: "by-path",
+      path: "src/ui/by-path.ts",
+      before: lines("const alpha = 1;"),
+      after: lines("const beta = 2;"),
+    });
+
+    expect(filterReviewFiles([file], "by-path")).toEqual([file]);
+    expect(filterReviewFiles([file], "")).toEqual([file]);
+    expect(filterReviewFiles([file], "nomatchanywhere")).toEqual([]);
   });
 });

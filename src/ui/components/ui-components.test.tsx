@@ -2701,7 +2701,7 @@ describe("UI components", () => {
       "l / w / m / M            lines / wrap / metadata / menu",
       "e                        open file in $EDITOR",
       "Review",
-      "/                        focus file filter",
+      "/                        filter files (path + changed lines)",
       "c                        create review note",
       "Tab                      toggle files/filter focus",
       "F10                      open menus",
