@@ -77,6 +77,8 @@ describe("ExtensionSidebarPane actions", () => {
         })}
         files={files}
         fileViews={toReadOnlyFileViews(files)}
+        hiddenFileIds={new Set<string>()}
+        onToggleFileHidden={() => {}}
         selectedFileId={null}
         selectedHunkIndex={null}
         showTopChrome={true}
@@ -140,6 +142,8 @@ describe("ExtensionSidebarPane failure recovery", () => {
           registered={registered}
           files={files}
           fileViews={toReadOnlyFileViews(files)}
+          hiddenFileIds={new Set<string>()}
+          onToggleFileHidden={() => {}}
           selectedFileId={null}
           selectedHunkIndex={null}
           showTopChrome={true}

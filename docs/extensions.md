@@ -524,6 +524,7 @@ The component receives fresh props as the app changes:
 | Prop                | What it is                                                                                                                                                                |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `files`             | the visible reviewed files, review-stream order, filtered, frozen views (each carries `changeType`, `statsTruncated`, and `hunks` summaries beside the usual file fields) |
+| `hiddenFileIds`     | ids of files the reviewer collapsed; they stay in `files`, so render their rows and mark them rather than dropping them                                                   |
 | `selectedFileId`    | the selected file, or `null`                                                                                                                                              |
 | `selectedHunkIndex` | the selected hunk within that file, or `null`                                                                                                                             |
 | `width`             | terminal columns the sidebar pane occupies                                                                                                                                |
@@ -536,8 +537,11 @@ through the same review controller as the built-in sidebar and the keyboard
 shortcuts, so the review stream scrolls, selection updates, and the
 `selection_changed` event fires exactly as if the user had clicked a built-in
 row. `actions.notify(message, type?)` shows a toast attributed to your
-extension. An action given a file id that is not currently visible is refused
-with a warning rather than corrupting the selection.
+extension. `actions.toggleFileHidden(fileId)` collapses or restores one file's
+diff body, the same state `hiddenFileIds` reports; it lasts for the session and
+resets when the changeset reloads. An action given a file id that is not
+currently visible is refused with a warning rather than corrupting the
+selection.
 
 The three hunk surfaces line up by design: each file's `hunks` lists public
 `ExtensionDiffHunk` summaries (`index`, the `@@` header, inclusive old/new

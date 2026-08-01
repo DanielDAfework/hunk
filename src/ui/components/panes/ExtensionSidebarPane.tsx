@@ -85,6 +85,7 @@ export function ExtensionSidebarPane({
   registered,
   files,
   fileViews,
+  hiddenFileIds,
   selectedFileId,
   selectedHunkIndex,
   showTopChrome,
@@ -94,6 +95,7 @@ export function ExtensionSidebarPane({
   notify,
   onSelectFile,
   onSelectHunk,
+  onToggleFileHidden,
   onRenderFailure,
 }: {
   registered: RegisteredSidebarView;
@@ -110,6 +112,8 @@ export function ExtensionSidebarPane({
    * command handlers receive come out of one conversion.
    */
   fileViews: ExtensionDiffFile[];
+  /** Ids of files whose diff body the reviewer collapsed. */
+  hiddenFileIds: ReadonlySet<string>;
   selectedFileId: string | null;
   selectedHunkIndex: number | null;
   showTopChrome: boolean;
@@ -119,6 +123,7 @@ export function ExtensionSidebarPane({
   notify: ExtensionNotifySink;
   onSelectFile: (fileId: string) => void;
   onSelectHunk: (fileId: string, hunkIndex: number) => void;
+  onToggleFileHidden: (fileId: string) => void;
   /**
    * Called when the view fails rendering, in place of the in-pane fallback.
    *
@@ -146,8 +151,17 @@ export function ExtensionSidebarPane({
         notify(message: string, type: ExtensionNotifyType = "info") {
           notify(`${extensionId}: ${message}`, type);
         },
+        toggleFileHidden(fileId: string) {
+          // Guarded like navigation: a sidebar may only collapse a file the
+          // host actually has in the current review stream.
+          if (!files.some((file) => file.id === fileId)) {
+            notify(`${extensionId}: no file matches id ${fileId}`, "warning");
+            return;
+          }
+          onToggleFileHidden(fileId);
+        },
       }),
-    [extensionId, files, notify, onSelectFile, onSelectHunk],
+    [extensionId, files, notify, onSelectFile, onSelectHunk, onToggleFileHidden],
   );
 
   // The published contract types the component's return opaquely (`unknown`)
@@ -157,6 +171,7 @@ export function ExtensionSidebarPane({
 
   const viewProps: ExtensionSidebarViewProps = {
     files: fileViews,
+    hiddenFileIds,
     selectedFileId,
     selectedHunkIndex,
     width,

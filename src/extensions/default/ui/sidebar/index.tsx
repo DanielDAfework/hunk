@@ -10,7 +10,6 @@ import {
 import { fileRowId } from "../../../../ui/lib/ids";
 import { buildSidebarRenderWindow } from "../../../../ui/lib/sidebarRenderWindow";
 import { FileGroupHeader, FileListItem } from "../../../../ui/components/panes/FileListItem";
-import { useHiddenFiles } from "../../../../ui/lib/hiddenFiles";
 import { HUNK_VENDOR_EXTENSION_ID } from "../../../extensionIds";
 import { runExtensionFactory } from "../../../runExtension";
 import {
@@ -62,6 +61,7 @@ export const BUNDLED_SIDEBAR_VIEW_ID = "files";
 /** Render the built-in file navigation sidebar from the public sidebar props. */
 export function BuiltInSidebarView({
   files,
+  hiddenFileIds,
   selectedFileId,
   theme,
   width,
@@ -70,8 +70,6 @@ export function BuiltInSidebarView({
   const scrollRef = useRef<ScrollBoxRenderable | null>(null);
   const [scrollViewport, setScrollViewport] = useState({ top: 0, height: 0 });
   const terminal = useTerminalDimensions();
-  // App-level review state, kept out of the published sidebar props.
-  const { hiddenFileIds, toggleFileHidden } = useHiddenFiles();
   // Mirrors the host layout: one column of row highlight plus row padding.
   const textWidth = Math.max(8, width - 2);
   const entries = useMemo<SidebarEntry[]>(() => buildSidebarEntries(files), [files]);
@@ -191,7 +189,7 @@ export function BuiltInSidebarView({
               textWidth={textWidth}
               theme={theme}
               onSelectFile={actions.selectFile}
-              onToggleFileHidden={toggleFileHidden}
+              onToggleFileHidden={actions.toggleFileHidden}
             />
           );
         })}

@@ -779,6 +779,14 @@ export interface ExtensionReviewNavigation {
 export interface ExtensionSidebarActions extends ExtensionReviewNavigation {
   /** Show one toast, attributed to the owning extension. */
   notify(message: string, type?: ExtensionNotifyType): void;
+  /**
+   * Collapse or restore one file's diff body in the review stream.
+   *
+   * Collapsed files stay in `files` and keep their place in the stream; only
+   * the body is hidden. The state lasts for the session and resets when the
+   * changeset reloads.
+   */
+  toggleFileHidden(fileId: string): void;
 }
 
 /**
@@ -816,6 +824,13 @@ export interface ExtensionSidebarViewProps {
    * app's file filter applies before the list reaches the component.
    */
   files: ExtensionDiffFile[];
+  /**
+   * Ids of files whose diff body is currently collapsed.
+   *
+   * These files remain in `files`; a sidebar is expected to keep rendering
+   * their rows and mark them, rather than dropping them from the list.
+   */
+  hiddenFileIds: ReadonlySet<string>;
   selectedFileId: string | null;
   selectedHunkIndex: number | null;
   /** Terminal columns the sidebar pane occupies; height comes from flex layout. */

@@ -454,12 +454,18 @@ describe("UI components", () => {
       <BuiltInSidebarView
         // The exact frozen file views the extension pipeline hands any sidebar.
         files={toReadOnlyFileViews(files)}
+        hiddenFileIds={new Set<string>()}
         selectedFileId="app"
         selectedHunkIndex={0}
         theme={theme}
         width={30}
         keybindings={{ matches: () => false, getKeys: () => [] }}
-        actions={{ selectFile: () => {}, selectHunk: () => {}, notify: () => {} }}
+        actions={{
+          selectFile: () => {},
+          selectHunk: () => {},
+          notify: () => {},
+          toggleFileHidden: () => {},
+        }}
       />,
       36,
       12,
