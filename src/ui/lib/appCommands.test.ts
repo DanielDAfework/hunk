@@ -40,6 +40,8 @@ function createTestCommands(resolvedKeys?: ResolvedCommandKeys) {
     canRefreshCurrentInput: true,
     applyFilePresentationToAllMatching: record("applyFilePresentationToAllMatching"),
     focusFilter: record("focusFilter"),
+    toggleSelectedFileHidden: record("toggleSelectedFileHidden"),
+    showAllHiddenFiles: record("showAllHiddenFiles"),
     moveToAnnotatedFile: record("moveToAnnotatedFile"),
     moveToAnnotatedHunk: record("moveToAnnotatedHunk"),
     moveToFile: record("moveToFile"),

@@ -40,6 +40,8 @@ function createTestCommands(overrides: Partial<BuildAppCommandsOptions> = {}) {
     canRefreshCurrentInput: true,
     applyFilePresentationToAllMatching: record("applyFilePresentationToAllMatching"),
     focusFilter: noop,
+    toggleSelectedFileHidden: noop,
+    showAllHiddenFiles: noop,
     moveToAnnotatedFile: record("moveToAnnotatedFile"),
     moveToAnnotatedHunk: noop,
     moveToFile: noop,

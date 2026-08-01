@@ -344,6 +344,13 @@ export function App({
   const filteredFiles = review.visibleFiles;
   // Passed to the built-in sidebar by context rather than through the published
   // sidebar props; see `lib/hiddenFiles`.
+  /** Collapse or restore whichever file the review currently has selected. */
+  const toggleSelectedFileHidden = useCallback(() => {
+    const fileId = review.selectedFile?.id;
+    if (fileId) {
+      review.toggleFileHidden(fileId);
+    }
+  }, [review.selectedFile, review.toggleFileHidden]);
   const hiddenFilesState = useMemo(
     () => ({ hiddenFileIds: review.hiddenFileIds, toggleFileHidden: review.toggleFileHidden }),
     [review.hiddenFileIds, review.toggleFileHidden],
@@ -1683,6 +1690,8 @@ export function App({
       canRefreshCurrentInput,
       applyFilePresentationToAllMatching,
       focusFilter,
+      toggleSelectedFileHidden,
+      showAllHiddenFiles: review.showAllHiddenFiles,
       moveToAnnotatedFile,
       moveToAnnotatedHunk,
       moveToFile,

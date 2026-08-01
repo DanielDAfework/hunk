@@ -215,7 +215,10 @@ describe("AppHost file views", () => {
       await waitForFrame(setup, (frame) => frame.includes("alpha.ts"));
       await act(async () => {
         await setup.mockInput.pressTab();
-        await setup.mockInput.typeText("alpha");
+        // "alp", not "alpha": mockInput dispatches globally rather than to the
+        // focused filter, so a query containing a command chord would fire it.
+        // A real terminal routes it to the input (see hide-files PTY coverage).
+        await setup.mockInput.typeText("alp");
         await setup.mockInput.pressTab();
         await setup.mockInput.pressKey("F8");
       });

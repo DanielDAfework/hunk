@@ -80,6 +80,10 @@ export interface BuildAppCommandsOptions {
   canRefreshCurrentInput: boolean;
   applyFilePresentationToAllMatching: () => void;
   focusFilter: () => void;
+  /** Collapse or restore the selected file's diff body. */
+  toggleSelectedFileHidden: () => void;
+  /** Restore every collapsed file. */
+  showAllHiddenFiles: () => void;
   moveToAnnotatedFile: (delta: number) => void;
   moveToAnnotatedHunk: (delta: number) => void;
   moveToFile: (delta: number) => void;
@@ -167,6 +171,20 @@ function builtinCommandSpecs(options: BuildAppCommandsOptions): BuiltinCommandSp
       title: "Focus the file filter",
       defaultKeys: ["/"],
       run: () => options.focusFilter(),
+    },
+    {
+      id: "hunk.review.toggleFileHidden",
+      title: "Collapse or restore the selected file",
+      defaultKeys: ["h"],
+      run: () => options.toggleSelectedFileHidden(),
+      closesMenu: true,
+    },
+    {
+      id: "hunk.review.showAllHiddenFiles",
+      title: "Restore all collapsed files",
+      defaultKeys: ["H"],
+      run: () => options.showAllHiddenFiles(),
+      closesMenu: true,
     },
     {
       id: "hunk.review.startNote",
@@ -428,6 +446,8 @@ const NOOP_COMMAND_OPTIONS: BuildAppCommandsOptions = (() => {
     canRefreshCurrentInput: true,
     applyFilePresentationToAllMatching: noop,
     focusFilter: noop,
+    toggleSelectedFileHidden: noop,
+    showAllHiddenFiles: noop,
     moveToAnnotatedFile: noop,
     moveToAnnotatedHunk: noop,
     moveToFile: noop,

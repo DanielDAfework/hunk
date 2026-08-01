@@ -2667,7 +2667,7 @@ describe("UI components", () => {
     const frame = await captureFrame(
       <HelpDialog
         commands={builtinCommandMatchProbes()}
-        terminalHeight={39}
+        terminalHeight={40}
         terminalWidth={76}
         theme={theme}
         onClose={() => {}}
@@ -2702,6 +2702,7 @@ describe("UI components", () => {
       "e                        open file in $EDITOR",
       "Review",
       "/                        filter files (path + changed lines)",
+      "h / H                    collapse file / restore all",
       "c                        create review note",
       "Tab                      toggle files/filter focus",
       "F10                      open menus",
@@ -2734,13 +2735,13 @@ describe("UI components", () => {
     const frame = await captureFrame(
       <HelpDialog
         commands={builtinCommandMatchProbes(keys)}
-        terminalHeight={39}
+        terminalHeight={40}
         terminalWidth={76}
         theme={theme}
         onClose={() => {}}
       />,
       76,
-      39,
+      40,
     );
 
     expect(frame).toContain("Ctrl+X");
