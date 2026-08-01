@@ -100,6 +100,8 @@ function clampVerticalScrollTop(scrollTop: number, contentHeight: number, viewpo
   return Math.min(Math.max(0, scrollTop), maxScrollTop);
 }
 
+const EMPTY_HIDDEN_FILE_IDS: ReadonlySet<string> = new Set<string>();
+
 /** Estimate render-only viewport bounds before OpenTUI publishes exact scrollbox geometry. */
 function estimateInitialRenderViewportHeight(rendererHeight: number, screenTop: number) {
   return Math.max(1, rendererHeight - Math.max(0, screenTop));
@@ -189,6 +191,8 @@ export function DiffPane({
   expandedGapsByFileId = EMPTY_EXPANDED_GAPS_BY_FILE_ID,
   fileViews = EMPTY_FILE_VIEWS,
   files,
+  hiddenFileIds = EMPTY_HIDDEN_FILE_IDS,
+  onToggleFileHidden,
   headerLabelWidth,
   headerStatsWidth,
   layout,
@@ -240,6 +244,10 @@ export function DiffPane({
   /** Validated alternate layouts, keyed by file id; raw Pierre remains the fallback. */
   fileViews?: ReadonlyMap<string, ResolvedFileViewLayout>;
   files: DiffFile[];
+  /** Files whose diff body is collapsed to a clickable placeholder. */
+  hiddenFileIds?: ReadonlySet<string>;
+  /** Restore a collapsed file when its placeholder is clicked. */
+  onToggleFileHidden?: (fileId: string) => void;
   headerLabelWidth: number;
   headerStatsWidth: number;
   layout: Exclude<LayoutMode, "auto">;
@@ -700,7 +708,16 @@ export function DiffPane({
     };
   }, [activateRapidScrollOverscan, clearAddNoteHoverForScroll, files.length, scrollRef, wrapLines]);
 
-  const sectionHeaderHeights = useMemo(() => buildInStreamFileHeaderHeights(files), [files]);
+  // A collapsed file always renders a header row, even as the first section
+  // where the stream normally omits it, so there is something to click to
+  // restore it.
+  const sectionHeaderHeights = useMemo(
+    () =>
+      buildInStreamFileHeaderHeights(files).map((height, index) =>
+        hiddenFileIds.has(files[index]!.id) ? Math.max(1, height) : height,
+      ),
+    [files, hiddenFileIds],
+  );
   const reserveAddNoteColumn = Boolean(onStartUserNoteAtHunk);
 
   const baseSectionGeometry = useMemo(
@@ -793,8 +810,11 @@ export function DiffPane({
     ],
   );
   const estimatedBodyHeights = useMemo(
-    () => sectionGeometry.map((metrics) => metrics.bodyHeight),
-    [sectionGeometry],
+    () =>
+      sectionGeometry.map((metrics, index) =>
+        hiddenFileIds.has(files[index]!.id) ? 0 : metrics.bodyHeight,
+      ),
+    [files, hiddenFileIds, sectionGeometry],
   );
   const fileSectionLayouts = useMemo(
     () => buildFileSectionLayouts(files, estimatedBodyHeights, sectionHeaderHeights),
@@ -1948,6 +1968,31 @@ export function DiffPane({
                   const file = files[index];
                   if (!file) {
                     return null;
+                  }
+
+                  // Collapsed: render the separator + header only, matching the
+                  // zeroed body height this file contributes to stream geometry.
+                  if (hiddenFileIds.has(file.id)) {
+                    return (
+                      <box
+                        key={file.id}
+                        style={{ width: "100%", flexDirection: "column" }}
+                        onMouseUp={() => onToggleFileHidden?.(file.id)}
+                      >
+                        {index > 0 ? (
+                          <box style={{ width: "100%", height: 1, backgroundColor: theme.panel }} />
+                        ) : null}
+                        <box style={{ width: "100%", height: 1, minHeight: 1 }}>
+                          <DiffFileHeaderRow
+                            file={file}
+                            headerLabelWidth={headerLabelWidth}
+                            headerStatsWidth={headerStatsWidth}
+                            theme={theme}
+                            onSelect={() => onToggleFileHidden?.(file.id)}
+                          />
+                        </box>
+                      </box>
+                    );
                   }
 
                   return (

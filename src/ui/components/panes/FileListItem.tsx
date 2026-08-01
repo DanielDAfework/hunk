@@ -1,3 +1,4 @@
+import { MouseButton, type MouseEvent as TuiMouseEvent } from "@opentui/core";
 import { memo } from "react";
 import type { ExtensionSidebarTheme } from "../../../extension-api/types";
 import { fileRowId } from "../../lib/ids";
@@ -10,6 +11,9 @@ import { fitText, padText } from "../../lib/text";
  * published props, and these rows are what it draws. `AppTheme` satisfies the
  * token slice structurally, so internal callers pass their theme unchanged.
  */
+
+/** Marks a file whose diff body the reviewer collapsed. */
+const HIDDEN_FILE_ICON = "⊘";
 
 /** Get icon and color for file state using standard git status codes. */
 function getFileStateIcon(
@@ -64,24 +68,43 @@ export function FileGroupHeader({
 /** Render one file row in the navigation sidebar. */
 export const FileListItem = memo(function FileListItem({
   entry,
+  hidden = false,
   paddingLeft = 1,
   selected,
   statsWidth,
   textWidth,
   theme,
   onSelectFile,
+  onToggleFileHidden,
 }: {
   entry: FileListEntry;
+  /** Whether this file's diff body is collapsed in the review stream. */
+  hidden?: boolean;
   paddingLeft?: number;
   selected: boolean;
   statsWidth: number;
   textWidth: number;
   theme: ExtensionSidebarTheme;
   onSelectFile: (fileId: string) => void;
+  onToggleFileHidden?: (fileId: string) => void;
 }) {
   const rowBackground = selected ? theme.panelAlt : theme.panel;
   const stats = sidebarEntryStats(entry);
-  const { icon, color } = getFileStateIcon(entry, theme);
+  const { icon, color } = hidden
+    ? { icon: HIDDEN_FILE_ICON, color: theme.muted }
+    : getFileStateIcon(entry, theme);
+
+  /**
+   * Left click selects; any other button toggles the collapsed state, so a
+   * right click hides or restores the file without leaving the sidebar.
+   */
+  const handleMouseUp = (event: TuiMouseEvent) => {
+    if (event.button === MouseButton.LEFT || !onToggleFileHidden) {
+      onSelectFile(entry.id);
+      return;
+    }
+    onToggleFileHidden(entry.id);
+  };
   const iconWidth = icon ? 2 : 0; // icon + space
   const statsSectionWidth = statsWidth > 0 ? statsWidth + 1 : 0;
   const nameWidth = Math.max(1, textWidth - 1 - iconWidth - statsSectionWidth);
@@ -95,7 +118,7 @@ export const FileListItem = memo(function FileListItem({
         backgroundColor: rowBackground,
         flexDirection: "row",
       }}
-      onMouseUp={() => onSelectFile(entry.id)}
+      onMouseUp={handleMouseUp}
     >
       <box
         style={{
@@ -114,7 +137,9 @@ export const FileListItem = memo(function FileListItem({
         }}
       >
         {icon && <text fg={color}>{icon} </text>}
-        <text fg={theme.text}>{padText(fitText(entry.name, nameWidth), nameWidth)}</text>
+        <text fg={hidden ? theme.muted : theme.text}>
+          {padText(fitText(entry.name, nameWidth), nameWidth)}
+        </text>
         {statsSectionWidth > 0 && (
           <box
             style={{

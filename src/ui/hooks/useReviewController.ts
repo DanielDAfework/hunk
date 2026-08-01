@@ -131,6 +131,10 @@ export interface ReviewController {
   allFiles: DiffFile[];
   expandedGapsByFileId: Record<string, ReadonlySet<string>>;
   filter: string;
+  /** Files whose diff body is collapsed in the review stream. */
+  hiddenFileIds: ReadonlySet<string>;
+  toggleFileHidden: (fileId: string) => void;
+  showAllHiddenFiles: () => void;
   draftNote: DraftReviewNote | null;
   liveCommentCount: number;
   liveCommentSummaries: SessionLiveCommentSummary[];
@@ -229,6 +233,10 @@ export function useReviewController({
   const [sourceStatusByFileId, setSourceStatusByFileId] = useState<
     Record<string, FileSourceStatus>
   >({});
+  // Files the reviewer has collapsed to focus on the rest of the changeset.
+  // Deliberately session-only: a reload rebuilds the changeset, so carrying
+  // hidden ids across one would silently hide files whose content changed.
+  const [hiddenFileIds, setHiddenFileIds] = useState<ReadonlySet<string>>(() => new Set<string>());
   // Mirror sourceStatusByFileId so toggleGap can dedup synchronously without
   // waiting for React's state updater to commit.
   const sourceStatusRef = useRef(sourceStatusByFileId);
@@ -263,8 +271,34 @@ export function useReviewController({
       }
       setSourceStatusByFileId((prev) => removeKeys(prev, staleFileIds));
       setExpandedGapsByFileId((prev) => removeKeys(prev, staleFileIds));
+      setHiddenFileIds((prev) => {
+        if (prev.size === 0) {
+          return prev;
+        }
+        const next = new Set(prev);
+        for (const fileId of staleFileIds) {
+          next.delete(fileId);
+        }
+        return next.size === prev.size ? prev : next;
+      });
     }
   }
+
+  /** Collapse or restore one file's diff body in the review stream. */
+  const toggleFileHidden = useCallback((fileId: string) => {
+    setHiddenFileIds((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(fileId)) {
+        next.add(fileId);
+      }
+      return next;
+    });
+  }, []);
+
+  /** Restore every collapsed file. */
+  const showAllHiddenFiles = useCallback(() => {
+    setHiddenFileIds((prev) => (prev.size === 0 ? prev : new Set<string>()));
+  }, []);
 
   const deferredFilter = useDeferredValue(filter);
 
@@ -1053,6 +1087,9 @@ export function useReviewController({
     draftNote,
     expandedGapsByFileId,
     filter,
+    hiddenFileIds,
+    toggleFileHidden,
+    showAllHiddenFiles,
     liveCommentCount,
     liveCommentSummaries,
     liveCommentsByFileId,

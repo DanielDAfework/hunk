@@ -48,6 +48,7 @@ import { ExtensionToast } from "./components/chrome/ExtensionToast";
 import { StatusBar } from "./components/chrome/StatusBar";
 import { DiffPane } from "./components/panes/DiffPane";
 import { ExtensionSidebarPane } from "./components/panes/ExtensionSidebarPane";
+import { HiddenFilesContext } from "./lib/hiddenFiles";
 import { PaneDivider } from "./components/panes/PaneDivider";
 import {
   findMaxLineNumber,
@@ -341,6 +342,12 @@ export function App({
     stmlEnabled,
   });
   const filteredFiles = review.visibleFiles;
+  // Passed to the built-in sidebar by context rather than through the published
+  // sidebar props; see `lib/hiddenFiles`.
+  const hiddenFilesState = useMemo(
+    () => ({ hiddenFileIds: review.hiddenFileIds, toggleFileHidden: review.toggleFileHidden }),
+    [review.hiddenFileIds, review.toggleFileHidden],
+  );
   const selectedFile = review.selectedFile;
   const selectedHunkIndex = review.selectedHunkIndex;
   const selectedFileId = selectedFile?.id ?? null;
@@ -1895,33 +1902,35 @@ export function App({
     // per-source cache hands every pane (and command snapshots) one list.
     const paneSelection = getExtensionSelection();
     return (
-      <ExtensionSidebarPane
-        registered={pane.view.registered}
-        files={filteredFiles}
-        fileViews={getExtensionFileViews()}
-        selectedFileId={paneSelection.file?.id ?? null}
-        selectedHunkIndex={paneSelection.hunkIndex}
-        showTopChrome={showMenuBar}
-        theme={activeTheme}
-        width={pane.width}
-        keybindings={sidebarKeybindings}
-        notify={(message, type) => extensions?.context.notify(message, type)}
-        onSelectFile={(fileId) => {
-          focusFiles();
-          jumpToFile(fileId, 0, { alignFileHeaderTop: true });
-        }}
-        onSelectHunk={(fileId, hunkIndex) => {
-          focusFiles();
-          review.selectHunk(fileId, hunkIndex);
-        }}
-        // Extension panes close on a render failure; the bundled files pane is
-        // Hunk's own and keeps its in-place fallback semantics.
-        onRenderFailure={
-          pane.view.key === bundledSidebarViewKey()
-            ? undefined
-            : () => handleSidebarViewFailure(pane.view.key)
-        }
-      />
+      <HiddenFilesContext.Provider value={hiddenFilesState}>
+        <ExtensionSidebarPane
+          registered={pane.view.registered}
+          files={filteredFiles}
+          fileViews={getExtensionFileViews()}
+          selectedFileId={paneSelection.file?.id ?? null}
+          selectedHunkIndex={paneSelection.hunkIndex}
+          showTopChrome={showMenuBar}
+          theme={activeTheme}
+          width={pane.width}
+          keybindings={sidebarKeybindings}
+          notify={(message, type) => extensions?.context.notify(message, type)}
+          onSelectFile={(fileId) => {
+            focusFiles();
+            jumpToFile(fileId, 0, { alignFileHeaderTop: true });
+          }}
+          onSelectHunk={(fileId, hunkIndex) => {
+            focusFiles();
+            review.selectHunk(fileId, hunkIndex);
+          }}
+          // Extension panes close on a render failure; the bundled files pane is
+          // Hunk's own and keeps its in-place fallback semantics.
+          onRenderFailure={
+            pane.view.key === bundledSidebarViewKey()
+              ? undefined
+              : () => handleSidebarViewFailure(pane.view.key)
+          }
+        />
+      </HiddenFilesContext.Provider>
     );
   };
 
@@ -2009,6 +2018,8 @@ export function App({
           expandedGapsByFileId={review.expandedGapsByFileId}
           fileViews={fileViewLayouts}
           files={filteredFiles}
+          hiddenFileIds={review.hiddenFileIds}
+          onToggleFileHidden={review.toggleFileHidden}
           pagerMode={pagerMode}
           screenLeft={diffPaneScreenLeft}
           screenTop={diffPaneScreenTop}
