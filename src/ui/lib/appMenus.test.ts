@@ -106,6 +106,8 @@ describe("buildAppMenus", () => {
       "Toggle files/filter focus",
       "Focus filter",
       "Open file in editor",
+      "Collapse file",
+      "Restore collapsed files",
       "Reload",
       "Quit",
     ]);
@@ -144,6 +146,8 @@ describe("buildAppMenus", () => {
       "hunk.app.toggleFocusArea",
       "hunk.review.focusFilter",
       "hunk.review.editSelectedFile",
+      "hunk.review.toggleFileHidden",
+      "hunk.review.showAllHiddenFiles",
       "hunk.app.refresh",
       "hunk.app.quit",
     ]);
@@ -215,6 +219,8 @@ describe("buildAppMenus", () => {
       "Toggle files/filter focus",
       "Focus filter",
       "Open file in editor",
+      "Collapse file",
+      "Restore collapsed files",
       "Quit",
     ]);
   });
